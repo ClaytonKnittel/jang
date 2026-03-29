@@ -17,12 +17,3 @@ pub enum JangToken {
   Ident(Ident),
   Keyword(Keyword),
 }
-
-impl JangToken {
-  pub fn into_ident(self) -> Ident {
-    match self {
-      Self::Ident(ident) => ident,
-      _ => panic!("Not an ident!"),
-    }
-  }
-}
