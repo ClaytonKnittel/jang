@@ -15,7 +15,7 @@ grammar!(
   <function_decl>: FunctionDecl =>
     Keyword(Keyword::Function) Ident(..) {
     FunctionDecl {
-      name: #1.into_ident()
+      name: #1
     }
   };
 );
