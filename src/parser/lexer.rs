@@ -71,7 +71,7 @@ pub fn lex_stream<I: IntoIterator<Item = char>>(
 #[cfg(test)]
 mod tests {
   use cknittel_util::iter::CollectResult;
-  use googletest::prelude::*;
+  use googletest::{description::Description, matcher::MatcherResult, prelude::*};
 
   use crate::{
     error::JangError,
@@ -81,14 +81,56 @@ mod tests {
     },
   };
 
+  #[derive(MatcherBase)]
+  struct IdentMatcher {
+    expected_name: String,
+  }
+
+  impl Matcher<&JangToken> for IdentMatcher {
+    fn matches(&self, actual: &JangToken) -> MatcherResult {
+      if let JangToken::Ident(ident) = actual
+        && ident.name() == self.expected_name
+      {
+        MatcherResult::Match
+      } else {
+        MatcherResult::NoMatch
+      }
+    }
+
+    fn describe(&self, matcher_result: MatcherResult) -> Description {
+      match matcher_result {
+        MatcherResult::Match => {
+          format!("is an identifier with name {:?}", self.expected_name).into()
+        }
+        MatcherResult::NoMatch => {
+          format!("is not an identifier with name {:?}", self.expected_name).into()
+        }
+      }
+    }
+  }
+
+  fn ident(expected_name: impl Into<String>) -> IdentMatcher {
+    IdentMatcher {
+      expected_name: expected_name.into(),
+    }
+  }
+
   #[gtest]
   fn test_single_ident() {
     let text = "my_idenT";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
+    expect_that!(tokens, elements_are![ident("my_idenT")]);
+  }
+
+  #[gtest]
+  fn test_many_idents() {
+    let text = "  my_\niden\t\t\n T";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
     expect_that!(
       tokens,
-      elements_are![eq(&JangToken::Ident(Ident::new("my_idenT")))]
+      elements_are![ident("my_"), ident("iden"), ident("T")]
     );
   }
 
