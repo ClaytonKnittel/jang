@@ -1,0 +1,31 @@
+name: Build and Unit Test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out jang
+        uses: actions/checkout@v4
+        with:
+          path: jang
+          submodules: recursive
+      - name: Initialize and Build
+        working-directory: jang
+        run: |
+          cargo build
+      - name: Run unit tests
+        working-directory: jang
+        run: |
+          cargo test
+      - name: Clippy lint
+        working-directory: jang
+        run: |
+          cargo clippy -- -D warnings
