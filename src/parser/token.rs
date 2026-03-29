@@ -7,12 +7,12 @@ impl Ident {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Keyword {
   Function,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JangToken {
   Ident(Ident),
   Keyword(Keyword),

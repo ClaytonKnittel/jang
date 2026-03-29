@@ -20,7 +20,7 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "cknittel-util"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9133f2f8718f3bfaeb82a6521bdc4e1457a45885#9133f2f8718f3bfaeb82a6521bdc4e1457a45885"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=0dabbfb79e5ef186a545b437119d5603a42cf89d#0dabbfb79e5ef186a545b437119d5603a42cf89d"
 dependencies = [
  "proc-macro-util",
 ]
@@ -76,7 +76,7 @@ dependencies = [
 [[package]]
 name = "lr_table"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=8ef2f061fc1cc8e69eef7571d58596c901689667#8ef2f061fc1cc8e69eef7571d58596c901689667"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=fa862dd90188667cfeca366e0acac8ccb557b2d6#fa862dd90188667cfeca366e0acac8ccb557b2d6"
 dependencies = [
  "cknittel-util",
  "googletest",
@@ -102,7 +102,7 @@ dependencies = [
 [[package]]
 name = "parser_generator"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=8ef2f061fc1cc8e69eef7571d58596c901689667#8ef2f061fc1cc8e69eef7571d58596c901689667"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=fa862dd90188667cfeca366e0acac8ccb557b2d6#fa862dd90188667cfeca366e0acac8ccb557b2d6"
 dependencies = [
  "googletest",
  "parser_generator_impl",
@@ -111,7 +111,7 @@ dependencies = [
 [[package]]
 name = "parser_generator_impl"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=8ef2f061fc1cc8e69eef7571d58596c901689667#8ef2f061fc1cc8e69eef7571d58596c901689667"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=fa862dd90188667cfeca366e0acac8ccb557b2d6#fa862dd90188667cfeca366e0acac8ccb557b2d6"
 dependencies = [
  "cknittel-util",
  "itertools",
@@ -148,7 +148,7 @@ dependencies = [
 [[package]]
 name = "proc-macro-util"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9133f2f8718f3bfaeb82a6521bdc4e1457a45885#9133f2f8718f3bfaeb82a6521bdc4e1457a45885"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=0dabbfb79e5ef186a545b437119d5603a42cf89d#0dabbfb79e5ef186a545b437119d5603a42cf89d"
 dependencies = [
  "proc-macro2",
 ]
