@@ -2,12 +2,21 @@ use cknittel_util::peekable_stream::{IntoPeekableStream, PeekableStream};
 
 use crate::{
   error::{JangError, JangResult},
-  parser::token::{Ident, JangToken, Keyword},
+  parser::token::{
+    JangToken,
+    ident::Ident,
+    keyword::Keyword,
+    literal::{Literal, NumericLiteral},
+  },
   source_location::SourceLocation,
 };
 
 fn is_ident_char(ch: &char) -> bool {
   matches!(ch, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_')
+}
+
+fn is_numeric_char(ch: &char) -> bool {
+  matches!(ch, '0'..='9' | '.')
 }
 
 struct TokenIter<I: Iterator<Item = char>> {
@@ -26,19 +35,28 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
     }
   }
 
-  fn parse_ident_or_keyword(&mut self, first_char: char) -> JangResult<JangToken> {
-    let mut ident = String::from(first_char);
+  fn collect_while<F: FnMut(&char) -> bool>(&mut self, first_char: char, mut cond: F) -> String {
+    let mut string_val = String::from(first_char);
     while let Some(next_char) = self.char_iter.peek()
-      && is_ident_char(&next_char)
+      && cond(&next_char)
     {
-      ident.push(next_char.take());
+      string_val.push(next_char.take());
     }
+    string_val
+  }
 
+  fn parse_ident_or_keyword(&mut self, first_char: char) -> JangResult<JangToken> {
+    let ident = self.collect_while(first_char, is_ident_char);
     if let Some(keyword) = Keyword::build_from_string(&ident) {
-      Ok(JangToken::Keyword(keyword))
+      Ok(keyword.into())
     } else {
-      Ok(JangToken::Ident(Ident::new(ident)))
+      Ok(Ident::new(ident).into())
     }
+  }
+
+  fn parse_numeric(&mut self, first_char: char) -> JangResult<JangToken> {
+    let numeric = self.collect_while(first_char, is_numeric_char);
+    Ok(NumericLiteral::from_str(numeric).into())
   }
 
   fn parse_next(&mut self) -> JangResult<Option<JangToken>> {
@@ -47,8 +65,24 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
       Some(first_char @ ('a'..='z' | 'A'..='Z' | '_')) => {
         Ok(Some(self.parse_ident_or_keyword(first_char)?))
       }
+      Some(first_char @ ('0'..='9')) => Ok(Some(self.parse_numeric(first_char)?)),
+      Some('.') => {
+        if self
+          .char_iter
+          .peek()
+          .as_deref()
+          .is_some_and(char::is_ascii_digit)
+        {
+          Ok(Some(self.parse_numeric('.')?))
+        } else {
+          Err(JangError::parse_error(
+            format!("Unexpected symbol '.'"),
+            SourceLocation::new(0),
+          ))
+        }
+      }
       Some(ch) => Err(JangError::parse_error(
-        "Unexpected symbol {ch}",
+        format!("Unexpected symbol '{ch}'"),
         SourceLocation::new(0),
       )),
       None => Ok(None),
@@ -80,7 +114,10 @@ mod tests {
   use crate::{
     error::JangError,
     keyword,
-    parser::{lexer::lex_stream, test_util::ident},
+    parser::{
+      lexer::lex_stream,
+      token::test_util::{float, ident, integral},
+    },
   };
 
   #[gtest]
@@ -128,8 +165,43 @@ mod tests {
   }
 
   #[gtest]
-  fn test_unexpected_char() {
+  fn test_integral_literal() {
+    let text = "123";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
+    expect_that!(tokens, elements_are![integral("123")]);
+  }
+
+  #[gtest]
+  fn test_float_literal() {
+    let text = "1.3 0.56 .92 8. .0 0.";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
+    expect_that!(
+      tokens,
+      elements_are![
+        float("1.3"),
+        float("0.56"),
+        float(".92"),
+        float("8."),
+        float(".0"),
+        float("0.")
+      ]
+    );
+  }
+
+  #[gtest]
+  fn test_lone_dot() {
+    // This should not parse as a numeric literal.
     let text = ".";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(tokens, err(pat![JangError::ParseError(anything())]));
+  }
+
+  #[gtest]
+  fn test_unexpected_char() {
+    let text = "#";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
     expect_that!(tokens, err(pat![JangError::ParseError(anything())]));

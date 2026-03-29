@@ -1,6 +1,6 @@
 use parser_generator::grammar;
 
-use crate::parser::token::{Ident, JangToken, Keyword};
+use crate::parser::token::{JangToken, ident::Ident, keyword::Keyword};
 
 #[derive(Clone, Debug)]
 struct FunctionDecl {
@@ -27,7 +27,7 @@ mod tests {
 
   use crate::parser::{
     grammar::{FunctionDecl, JangGrammar},
-    token::{Ident, JangToken, Keyword},
+    token::{JangToken, ident::Ident, keyword::Keyword},
   };
 
   #[gtest]

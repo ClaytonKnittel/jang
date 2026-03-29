@@ -4,7 +4,11 @@ use googletest::{
   prelude::{Matcher, MatcherBase},
 };
 
-use crate::parser::token::{JangToken, Keyword};
+use crate::parser::token::{
+  JangToken,
+  keyword::Keyword,
+  literal::{Literal, NumericLiteral},
+};
 
 #[derive(MatcherBase)]
 pub struct IdentMatcher {
@@ -71,6 +75,50 @@ impl Matcher<&JangToken> for KeywordMatcher {
 #[macro_export]
 macro_rules! keyword {
   ($keyword:ident) => {
-    $crate::parser::test_util::KeywordMatcher::new($crate::parser::token::Keyword::$keyword)
+    $crate::parser::token::test_util::KeywordMatcher::new(
+      $crate::parser::token::keyword::Keyword::$keyword,
+    )
   };
+}
+
+#[derive(MatcherBase)]
+pub struct LiteralMatcher {
+  expected: Literal,
+}
+
+impl Matcher<&JangToken> for LiteralMatcher {
+  fn matches(&self, actual: &JangToken) -> MatcherResult {
+    if let JangToken::Literal(literal) = actual
+      && literal == &self.expected
+    {
+      MatcherResult::Match
+    } else {
+      MatcherResult::NoMatch
+    }
+  }
+
+  fn describe(&self, matcher_result: MatcherResult) -> Description {
+    let expected_str = match &self.expected {
+      Literal::Numeric(NumericLiteral::Integral(val)) => format!("integer literal value {val:?}"),
+      Literal::Numeric(NumericLiteral::Float(val)) => {
+        format!("floating point literal value {val:?}")
+      }
+    };
+    match matcher_result {
+      MatcherResult::Match => format!("is {expected_str}").into(),
+      MatcherResult::NoMatch => format!("is not {expected_str}").into(),
+    }
+  }
+}
+
+pub fn integral(expected: impl Into<String>) -> LiteralMatcher {
+  LiteralMatcher {
+    expected: Literal::Numeric(NumericLiteral::Integral(expected.into())),
+  }
+}
+
+pub fn float(expected: impl Into<String>) -> LiteralMatcher {
+  LiteralMatcher {
+    expected: Literal::Numeric(NumericLiteral::Float(expected.into())),
+  }
 }
