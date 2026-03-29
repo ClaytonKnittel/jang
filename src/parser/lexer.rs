@@ -73,9 +73,12 @@ mod tests {
   use cknittel_util::iter::CollectResult;
   use googletest::prelude::*;
 
-  use crate::parser::{
-    lexer::lex_stream,
-    token::{Ident, JangToken},
+  use crate::{
+    error::JangError,
+    parser::{
+      lexer::lex_stream,
+      token::{Ident, JangToken},
+    },
   };
 
   #[gtest]
@@ -87,5 +90,13 @@ mod tests {
       tokens,
       elements_are![eq(&JangToken::Ident(Ident::new("my_idenT")))]
     );
+  }
+
+  #[gtest]
+  fn test_unexpected_char() {
+    let text = ".";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(tokens, err(pat![JangError::ParseError(anything())]));
   }
 }
