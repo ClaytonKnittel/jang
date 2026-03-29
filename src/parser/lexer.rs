@@ -2,7 +2,7 @@ use cknittel_util::peekable_stream::{IntoPeekableStream, PeekableStream};
 
 use crate::{
   error::{JangError, JangResult},
-  parser::token::{Ident, JangToken},
+  parser::token::{Ident, JangToken, Keyword},
   source_location::SourceLocation,
 };
 
@@ -34,7 +34,11 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
       ident.push(next_char.take());
     }
 
-    Ok(JangToken::Ident(Ident::new(ident)))
+    if let Some(keyword) = Keyword::build_from_string(&ident) {
+      Ok(JangToken::Keyword(keyword))
+    } else {
+      Ok(JangToken::Ident(Ident::new(ident)))
+    }
   }
 
   fn parse_next(&mut self) -> JangResult<Option<JangToken>> {
@@ -75,6 +79,7 @@ mod tests {
 
   use crate::{
     error::JangError,
+    keyword,
     parser::{lexer::lex_stream, test_util::ident},
   };
 
@@ -95,6 +100,31 @@ mod tests {
       tokens,
       elements_are![ident("my_"), ident("iden"), ident("T")]
     );
+  }
+
+  #[gtest]
+  fn test_single_keyword() {
+    let text = "fn";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
+    expect_that!(tokens, elements_are![keyword!(Function)]);
+  }
+
+  #[gtest]
+  fn test_keyword_and_ident() {
+    let text = "fn my_fn";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
+    expect_that!(tokens, elements_are![keyword!(Function), ident("my_fn")]);
+  }
+
+  #[gtest]
+  fn test_keyword_requires_space() {
+    // This should lex as a single ident, not a keyword followed by a literal.
+    let text = "fn2";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
+    expect_that!(tokens, elements_are![ident("fn2")]);
   }
 
   #[gtest]

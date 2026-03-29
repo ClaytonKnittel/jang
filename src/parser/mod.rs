@@ -1,4 +1,3 @@
-mod char_stream;
 mod grammar;
 mod lexer;
 #[cfg(test)]
