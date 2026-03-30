@@ -69,6 +69,11 @@ grammar!(
       #add_expr, #leaf_expr, BinaryOp::Add
     ))
   };
+  <add_expr>: Expression => <add_expr> <minus> <leaf_expr> {
+    Expression::BinaryExpression(BinaryExpression::new(
+      #add_expr, #leaf_expr, BinaryOp::Sub
+    ))
+  };
   <add_expr>: Expression => <leaf_expr>;
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
@@ -107,6 +112,9 @@ grammar!(
 
   <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Alone });
   <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Joint });
+
+  <minus> => Operator(Operator { op: Op::Minus, spacing: Spacing::Alone });
+  <minus> => Operator(Operator { op: Op::Minus, spacing: Spacing::Joint });
 
   <colon> => Operator(Operator { op: Op::Colon, spacing: Spacing::Alone });
   <comma> => Operator(Operator { op: Op::Comma, spacing: Spacing::Alone });
@@ -356,11 +364,55 @@ mod tests {
   }
 
   #[gtest]
+  fn add_sub_equal_precedence() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let add_sub = a + b - c
+          let sub_add = a - b + c
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![
+        let_statement(
+          ident("add_sub"),
+          binary_expression(
+            binary_expression(
+              ident_expression(ident("a")),
+              &BinaryOp::Add,
+              ident_expression(ident("b"))
+            ),
+            &BinaryOp::Sub,
+            ident_expression(ident("c"))
+          )
+        ),
+        let_statement(
+          ident("sub_add"),
+          binary_expression(
+            binary_expression(
+              ident_expression(ident("a")),
+              &BinaryOp::Sub,
+              ident_expression(ident("b"))
+            ),
+            &BinaryOp::Add,
+            ident_expression(ident("c"))
+          )
+        )
+      ])
+    );
+  }
+
+  #[gtest]
   fn parenthesis_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         fn function_name() -> i32 {
-          let x = (y + z) + (w + 3)
+          let x = (y + z) - (w - 3)
         }
         "#
       .chars(),
@@ -377,10 +429,10 @@ mod tests {
             &BinaryOp::Add,
             ident_expression(ident("z"))
           ),
-          &BinaryOp::Add,
+          &BinaryOp::Sub,
           binary_expression(
             ident_expression(ident("w")),
-            &BinaryOp::Add,
+            &BinaryOp::Sub,
             literal_expression(integral("3"))
           )
         )
