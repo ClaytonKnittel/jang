@@ -1,24 +1,6 @@
 use crate::parser::{ast::expression::Expression, token::ident::Ident};
 
 #[derive(Clone, Debug)]
-pub enum Statement {
-  NonRet(NonRetStatement),
-  Ret(RetStatement),
-}
-
-impl From<RetStatement> for Statement {
-  fn from(value: RetStatement) -> Self {
-    Self::Ret(value)
-  }
-}
-
-impl<T: Into<NonRetStatement>> From<T> for Statement {
-  fn from(value: T) -> Self {
-    Self::NonRet(value.into())
-  }
-}
-
-#[derive(Clone, Debug)]
 pub enum NonRetStatement {
   Let(LetStatement),
 }
@@ -69,7 +51,7 @@ pub mod matchers {
   use crate::parser::{
     ast::{
       expression::Expression,
-      statement::{LetStatement, NonRetStatement, RetStatement, Statement},
+      statement::{LetStatement, NonRetStatement, RetStatement},
     },
     token::ident::Ident,
   };
@@ -78,16 +60,16 @@ pub mod matchers {
   pub fn let_statement<'a>(
     var_matcher: impl Matcher<&'a Ident>,
     expr_matcher: impl Matcher<&'a Expression>,
-  ) -> impl Matcher<&'a Statement> {
-    pat!(Statement::NonRet(pat!(NonRetStatement::Let(pat!(
-      LetStatement {
-        var: var_matcher,
-        expr: expr_matcher
-      }
-    )))))
+  ) -> impl Matcher<&'a NonRetStatement> {
+    pat!(NonRetStatement::Let(pat!(LetStatement {
+      var: var_matcher,
+      expr: expr_matcher
+    })))
   }
 
-  pub fn ret_statement<'a>(expected: impl Matcher<&'a Expression>) -> impl Matcher<&'a Statement> {
-    pat!(Statement::Ret(pat!(RetStatement { expr: expected })))
+  pub fn ret_statement<'a>(
+    expected: impl Matcher<&'a Expression>,
+  ) -> impl Matcher<&'a RetStatement> {
+    pat!(RetStatement { expr: expected })
   }
 }

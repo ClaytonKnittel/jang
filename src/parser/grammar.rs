@@ -3,10 +3,10 @@ use parser_generator::grammar;
 use crate::parser::{
   ast::{
     binary_expression::{BinaryExpression, BinaryOp},
-    block::Block,
+    block::{Block, BlockBuilder},
     expression::Expression,
     function_decl::{FunctionDecl, FunctionParameter},
-    statement::{LetStatement, RetStatement, Statement},
+    statement::{LetStatement, NonRetStatement, RetStatement},
     type_expr::Type,
   },
   token::{
@@ -34,33 +34,31 @@ grammar!(
       <statement_list>
       <close_bracket>
   {
-    FunctionDecl::new(#ident, #parameter_list, #type, Block::new(#statement_list))
+    FunctionDecl::new(#ident, #parameter_list, #type, #statement_list)
   };
 
   <type>: Type => <ident> { Type(#ident) };
 
-  <statement_list>: Vec<Statement> => ! { Vec::new() };
-  <statement_list>: Vec<Statement> => <non_returning_statement_list> <statement> {
-    #non_returning_statement_list.push(#statement);
-    #non_returning_statement_list
+  <statement_list>: Block => ! { BlockBuilder::new().build() };
+  <statement_list>: Block => <non_ret_statement_list> <non_ret_statement> {
+    #non_ret_statement_list.with_statement(#non_ret_statement).build()
+  };
+  <statement_list>: Block => <non_ret_statement_list> <ret_statement> {
+    #non_ret_statement_list.build_with_ret(#ret_statement)
   };
 
-  <non_returning_statement_list>: Vec<Statement> => ! { Vec::new() };
-  <non_returning_statement_list>: Vec<Statement> => <non_returning_statement_list> <non_return_statement> {
-    #non_returning_statement_list.push(#non_return_statement);
-    #non_returning_statement_list
+  <non_ret_statement_list>: BlockBuilder => ! { BlockBuilder::new() };
+  <non_ret_statement_list>: BlockBuilder => <non_ret_statement_list> <non_ret_statement> {
+    #non_ret_statement_list.with_statement(#non_ret_statement)
   };
 
-  <statement>: Statement => <non_return_statement>;
-  <statement>: Statement => <return_statement>;
-
-  <non_return_statement>: Statement => <let_binding>;
-  <let_binding>: Statement => Keyword(Keyword::Let) <ident> <eq> <expr> {
+  <non_ret_statement>: NonRetStatement => <let_binding>;
+  <let_binding>: NonRetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
     LetStatement::new(#ident, #expr).into()
   };
 
-  <return_statement>: Statement => Keyword(Keyword::Ret) <expr> {
-    RetStatement::new(#expr).into()
+  <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
+    RetStatement::new(#expr)
   };
 
   <expr>: Expression => <add_expr>;
@@ -162,7 +160,7 @@ mod tests {
   use crate::parser::{
     ast::{
       binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
-      block::matchers::block,
+      block::matchers::{block, block_with_ret},
       expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
         fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
@@ -191,7 +189,10 @@ mod tests {
     expect_that!(ast, fn_return_type(type_expr_name(ident("i32"))));
     expect_that!(
       ast,
-      fn_body(block(elements_are![ret_stmt(lit_exp(integral("123")))]))
+      fn_body(block_with_ret(
+        is_empty(),
+        ret_stmt(lit_exp(integral("123")))
+      ))
     );
     expect_that!(ast, fn_parameters(is_empty()));
   }
@@ -225,7 +226,7 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body(block(elements_are![ret_stmt(id_exp(ident("x")))]))
+      fn_body(block_with_ret(is_empty(), ret_stmt(id_exp(ident("x")))))
     );
   }
 
@@ -266,11 +267,13 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body(block(elements_are![
-        let_stmt(ident("x"), lit_exp(integral("123"))),
-        let_stmt(ident("y"), id_exp(ident("x"))),
+      fn_body(block_with_ret(
+        elements_are![
+          let_stmt(ident("x"), lit_exp(integral("123"))),
+          let_stmt(ident("y"), id_exp(ident("x"))),
+        ],
         ret_stmt(lit_exp(integral("789")))
-      ]))
+      ))
     );
   }
 
