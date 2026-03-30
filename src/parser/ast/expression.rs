@@ -10,6 +10,24 @@ pub enum Expression {
   BinaryExpression(BinaryExpression),
 }
 
+impl From<Literal> for Expression {
+  fn from(value: Literal) -> Self {
+    Self::Literal(value)
+  }
+}
+
+impl From<Ident> for Expression {
+  fn from(value: Ident) -> Self {
+    Self::Ident(value)
+  }
+}
+
+impl From<BinaryExpression> for Expression {
+  fn from(value: BinaryExpression) -> Self {
+    Self::BinaryExpression(value)
+  }
+}
+
 #[cfg(test)]
 pub mod matchers {
   use crate::parser::{

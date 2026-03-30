@@ -3,9 +3,10 @@ use parser_generator::grammar;
 use crate::parser::{
   ast::{
     binary_expression::{BinaryExpression, BinaryOp},
+    block::{Block, BlockBuilder},
     expression::Expression,
     function_decl::{FunctionDecl, FunctionParameter},
-    statement::{LetStatement, RetStatement, Statement},
+    statement::{LetStatement, NonRetStatement, RetStatement},
     type_expr::Type,
   },
   token::{
@@ -24,72 +25,64 @@ grammar!(
   <function_decl>: FunctionDecl =>
       Keyword(Keyword::Function)
       <ident>
-      <open_paren>
-      <parameter_list>
-      <close_paren>
-      <right_arrow>
-      <type>
-      <open_bracket>
-      <statement_list>
-      <close_bracket>
+      <function_params>
+      <function_ret_type>
+      <block_scope>
   {
-    FunctionDecl::new(#ident, #parameter_list, #type, #statement_list)
+    FunctionDecl::new(#ident, #function_params, #function_ret_type, #block_scope)
+  };
+
+  <function_ret_type>: Option<Type> => ! { None };
+  <function_ret_type>: Option<Type> => <right_arrow> <type> {
+    Some(#type)
   };
 
   <type>: Type => <ident> { Type(#ident) };
 
-  <statement_list>: Vec<Statement> => ! { Vec::new() };
-  <statement_list>: Vec<Statement> => <non_returning_statement_list> <statement> {
-    #non_returning_statement_list.push(#statement);
-    #non_returning_statement_list
+  <block_scope>: Block => <open_bracket> <statement_list> <close_bracket> {
+    #statement_list
   };
 
-  <non_returning_statement_list>: Vec<Statement> => ! { Vec::new() };
-  <non_returning_statement_list>: Vec<Statement> => <non_returning_statement_list> <non_return_statement> {
-    #non_returning_statement_list.push(#non_return_statement);
-    #non_returning_statement_list
+  <statement_list>: Block => ! { BlockBuilder::new().build() };
+  <statement_list>: Block => <non_ret_statement_list> <non_ret_statement> {
+    #non_ret_statement_list.with_statement(#non_ret_statement).build()
+  };
+  <statement_list>: Block => <non_ret_statement_list> <ret_statement> {
+    #non_ret_statement_list.build_with_ret(#ret_statement)
   };
 
-  <statement>: Statement => <non_return_statement>;
-  <statement>: Statement => <return_statement>;
-
-  <non_return_statement>: Statement => <let_binding>;
-  <let_binding>: Statement => Keyword(Keyword::Let) <ident> <eq> <expr> {
-    Statement::Let(LetStatement::new(#ident, #expr))
+  <non_ret_statement_list>: BlockBuilder => ! { BlockBuilder::new() };
+  <non_ret_statement_list>: BlockBuilder => <non_ret_statement_list> <non_ret_statement> {
+    #non_ret_statement_list.with_statement(#non_ret_statement)
   };
 
-  <return_statement>: Statement => Keyword(Keyword::Ret) <expr> {
-    Statement::Ret(RetStatement::new(#expr))
+  <non_ret_statement>: NonRetStatement => <let_binding>;
+  <let_binding>: NonRetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
+    LetStatement::new(#ident, #expr).into()
+  };
+
+  <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
+    RetStatement::new(#expr)
   };
 
   <expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #add_expr, #mul_expr, BinaryOp::Add
-    ))
+    BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Add).into()
   };
   <add_expr>: Expression => <add_expr> <minus> <mul_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #add_expr, #mul_expr, BinaryOp::Sub
-    ))
+    BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Sub).into()
   };
   <add_expr>: Expression => <mul_expr>;
 
   <mul_expr>: Expression => <mul_expr> <mul> <leaf_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #mul_expr, #leaf_expr, BinaryOp::Mul
-    ))
+    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Mul).into()
   };
   <mul_expr>: Expression => <mul_expr> <div> <leaf_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #mul_expr, #leaf_expr, BinaryOp::Div
-    ))
+    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Div).into()
   };
   <mul_expr>: Expression => <mul_expr> <modulo> <leaf_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #mul_expr, #leaf_expr, BinaryOp::Mod
-    ))
+    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Mod).into()
   };
   <mul_expr>: Expression => <leaf_expr>;
 
@@ -99,6 +92,10 @@ grammar!(
   };
   <leaf_expr>: Expression => Ident(..) {
     Expression::Ident(#0)
+  };
+
+  <function_params>: Vec<FunctionParameter> => <open_paren> <parameter_list> <close_paren> {
+    #parameter_list
   };
 
   <parameter_list>: Vec<FunctionParameter> => ! { vec![] };
@@ -160,14 +157,15 @@ mod tests {
 
   use crate::parser::{
     ast::{
-      binary_expression::{BinaryOp, matchers::binary_expression},
-      expression::matchers::{ident_expression, literal_expression},
+      binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
+      block::matchers::{block, block_with_ret},
+      expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
-        fn_body_matches, fn_name_matches, fn_parameter_name_matches, fn_parameter_type_matches,
-        fn_parameters_match, fn_return_type_matches,
+        fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
+        fn_return_type_none,
       },
-      statement::matchers::{let_statement, ret_statement},
-      type_expr::matchers::type_expr_name_matches,
+      statement::matchers::{let_statement as let_stmt, ret_statement as ret_stmt},
+      type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
     lexer::lex_stream,
@@ -186,18 +184,32 @@ mod tests {
     ))
     .unwrap();
 
-    expect_that!(ast, fn_name_matches(ident("function_name")));
+    expect_that!(ast, fn_name(ident("function_name")));
+    expect_that!(ast, fn_return_type(type_expr_name(ident("i32"))));
     expect_that!(
       ast,
-      fn_return_type_matches(type_expr_name_matches(ident("i32")))
+      fn_body(block_with_ret(
+        is_empty(),
+        ret_stmt(lit_exp(integral("123")))
+      ))
     );
-    expect_that!(
-      ast,
-      fn_body_matches(elements_are![ret_statement(literal_expression(integral(
-        "123"
-      )))])
-    );
-    expect_that!(ast, fn_parameters_match(is_empty()));
+    expect_that!(ast, fn_parameters(is_empty()));
+  }
+
+  #[gtest]
+  fn function_without_return_type() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {}
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(ast, fn_name(ident("function_name")));
+    expect_that!(ast, fn_return_type_none());
+    expect_that!(ast, fn_body(block(is_empty())));
+    expect_that!(ast, fn_parameters(is_empty()));
   }
 
   #[gtest]
@@ -229,7 +241,7 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![ret_statement(ident_expression(ident("x")))])
+      fn_body(block_with_ret(is_empty(), ret_stmt(id_exp(ident("x")))))
     );
   }
 
@@ -237,7 +249,7 @@ mod tests {
   fn let_binding() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = 123
         }
         "#
@@ -247,10 +259,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        literal_expression(integral("123"))
-      )])
+        lit_exp(integral("123"))
+      )]))
     );
   }
 
@@ -258,7 +270,7 @@ mod tests {
   fn lets_followed_by_ret() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = 123
           let y = x
           ret 789
@@ -270,11 +282,13 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![
-        let_statement(ident("x"), literal_expression(integral("123"))),
-        let_statement(ident("y"), ident_expression(ident("x"))),
-        ret_statement(literal_expression(integral("789")))
-      ])
+      fn_body(block_with_ret(
+        elements_are![
+          let_stmt(ident("x"), lit_exp(integral("123"))),
+          let_stmt(ident("y"), id_exp(ident("x"))),
+        ],
+        ret_stmt(lit_exp(integral("789")))
+      ))
     );
   }
 
@@ -282,7 +296,7 @@ mod tests {
   fn reject_let_after_ret() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           ret 123
           let x = 456
         }
@@ -297,7 +311,7 @@ mod tests {
   fn parse_unary_function() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn func(a: i32) -> i32 {
+        fn func(a: i32) {
           ret 123
         }
         "#
@@ -307,9 +321,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_parameters_match(elements_are![all!(
-        fn_parameter_name_matches(ident("a")),
-        fn_parameter_type_matches(type_expr_name_matches(ident("i32")))
+      fn_parameters(elements_are![all!(
+        fn_parameter_name(ident("a")),
+        fn_parameter_type(type_expr_name(ident("i32")))
       )])
     );
   }
@@ -318,7 +332,7 @@ mod tests {
   fn parse_multi_param_function() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn func(a: i32, b: i32) -> i32 {
+        fn func(a: i32, b: i32) {
           ret 123
         }
         "#
@@ -328,9 +342,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_parameters_match(elements_are![
-        all!(fn_parameter_name_matches(ident("a"))),
-        all!(fn_parameter_name_matches(ident("b")))
+      fn_parameters(elements_are![
+        all!(fn_parameter_name(ident("a"))),
+        all!(fn_parameter_name(ident("b")))
       ])
     );
   }
@@ -339,7 +353,7 @@ mod tests {
   fn add_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = y + 3
         }
         "#
@@ -349,14 +363,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          ident_expression(ident("y")),
-          &BinaryOp::Add,
-          literal_expression(integral("3"))
-        )
-      )])
+        bin_exp(id_exp(ident("y")), &BinaryOp::Add, lit_exp(integral("3")))
+      )]))
     );
   }
 
@@ -364,7 +374,7 @@ mod tests {
   fn sub_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = 5 - a
         }
         "#
@@ -374,14 +384,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          literal_expression(integral("5")),
-          &BinaryOp::Sub,
-          ident_expression(ident("a")),
-        )
-      )])
+        bin_exp(lit_exp(integral("5")), &BinaryOp::Sub, id_exp(ident("a")),)
+      )]))
     );
   }
 
@@ -389,7 +395,7 @@ mod tests {
   fn mul_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = 2 * a
         }
         "#
@@ -399,14 +405,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          literal_expression(integral("2")),
-          &BinaryOp::Mul,
-          ident_expression(ident("a")),
-        )
-      )])
+        bin_exp(lit_exp(integral("2")), &BinaryOp::Mul, id_exp(ident("a")),)
+      )]))
     );
   }
 
@@ -414,7 +416,7 @@ mod tests {
   fn div_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = a / b
         }
         "#
@@ -424,14 +426,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          ident_expression(ident("a")),
-          &BinaryOp::Div,
-          ident_expression(ident("b")),
-        )
-      )])
+        bin_exp(id_exp(ident("a")), &BinaryOp::Div, id_exp(ident("b")),)
+      )]))
     );
   }
 
@@ -439,7 +437,7 @@ mod tests {
   fn mod_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = a % 10
         }
         "#
@@ -449,14 +447,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          ident_expression(ident("a")),
-          &BinaryOp::Mod,
-          literal_expression(integral("10"))
-        )
-      )])
+        bin_exp(id_exp(ident("a")), &BinaryOp::Mod, lit_exp(integral("10")))
+      )]))
     );
   }
 
@@ -464,7 +458,7 @@ mod tests {
   fn add_left_associativity() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = a + b + c
         }
         "#
@@ -474,18 +468,14 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          binary_expression(
-            ident_expression(ident("a")),
-            &BinaryOp::Add,
-            ident_expression(ident("b"))
-          ),
+        bin_exp(
+          bin_exp(id_exp(ident("a")), &BinaryOp::Add, id_exp(ident("b"))),
           &BinaryOp::Add,
-          ident_expression(ident("c"))
+          id_exp(ident("c"))
         )
-      )])
+      )]))
     );
   }
 
@@ -493,7 +483,7 @@ mod tests {
   fn mul_left_associativity() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = a * b * c
         }
         "#
@@ -503,18 +493,14 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          binary_expression(
-            ident_expression(ident("a")),
-            &BinaryOp::Mul,
-            ident_expression(ident("b"))
-          ),
+        bin_exp(
+          bin_exp(id_exp(ident("a")), &BinaryOp::Mul, id_exp(ident("b"))),
           &BinaryOp::Mul,
-          ident_expression(ident("c"))
+          id_exp(ident("c"))
         )
-      )])
+      )]))
     );
   }
 
@@ -522,7 +508,7 @@ mod tests {
   fn add_sub_equal_precedence() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let add_sub = a + b - c
           let sub_add = a - b + c
         }
@@ -533,32 +519,24 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![
-        let_statement(
+      fn_body(block(elements_are![
+        let_stmt(
           ident("add_sub"),
-          binary_expression(
-            binary_expression(
-              ident_expression(ident("a")),
-              &BinaryOp::Add,
-              ident_expression(ident("b"))
-            ),
+          bin_exp(
+            bin_exp(id_exp(ident("a")), &BinaryOp::Add, id_exp(ident("b"))),
             &BinaryOp::Sub,
-            ident_expression(ident("c"))
+            id_exp(ident("c"))
           )
         ),
-        let_statement(
+        let_stmt(
           ident("sub_add"),
-          binary_expression(
-            binary_expression(
-              ident_expression(ident("a")),
-              &BinaryOp::Sub,
-              ident_expression(ident("b"))
-            ),
+          bin_exp(
+            bin_exp(id_exp(ident("a")), &BinaryOp::Sub, id_exp(ident("b"))),
             &BinaryOp::Add,
-            ident_expression(ident("c"))
+            id_exp(ident("c"))
           )
         )
-      ])
+      ]))
     );
   }
 
@@ -566,7 +544,7 @@ mod tests {
   fn mul_div_mod_equal_precedence() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let mdm = a * b / c % d
           let dmm = a / b % c * d
           let mmd = a % b * c / d
@@ -578,56 +556,44 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![
-        let_statement(
+      fn_body(block(elements_are![
+        let_stmt(
           ident("mdm"),
-          binary_expression(
-            binary_expression(
-              binary_expression(
-                ident_expression(ident("a")),
-                &BinaryOp::Mul,
-                ident_expression(ident("b"))
-              ),
+          bin_exp(
+            bin_exp(
+              bin_exp(id_exp(ident("a")), &BinaryOp::Mul, id_exp(ident("b"))),
               &BinaryOp::Div,
-              ident_expression(ident("c"))
+              id_exp(ident("c"))
             ),
             &BinaryOp::Mod,
-            ident_expression(ident("d"))
+            id_exp(ident("d"))
           )
         ),
-        let_statement(
+        let_stmt(
           ident("dmm"),
-          binary_expression(
-            binary_expression(
-              binary_expression(
-                ident_expression(ident("a")),
-                &BinaryOp::Div,
-                ident_expression(ident("b"))
-              ),
+          bin_exp(
+            bin_exp(
+              bin_exp(id_exp(ident("a")), &BinaryOp::Div, id_exp(ident("b"))),
               &BinaryOp::Mod,
-              ident_expression(ident("c"))
+              id_exp(ident("c"))
             ),
             &BinaryOp::Mul,
-            ident_expression(ident("d"))
+            id_exp(ident("d"))
           )
         ),
-        let_statement(
+        let_stmt(
           ident("mmd"),
-          binary_expression(
-            binary_expression(
-              binary_expression(
-                ident_expression(ident("a")),
-                &BinaryOp::Mod,
-                ident_expression(ident("b"))
-              ),
+          bin_exp(
+            bin_exp(
+              bin_exp(id_exp(ident("a")), &BinaryOp::Mod, id_exp(ident("b"))),
               &BinaryOp::Mul,
-              ident_expression(ident("c"))
+              id_exp(ident("c"))
             ),
             &BinaryOp::Div,
-            ident_expression(ident("d"))
+            id_exp(ident("d"))
           )
         )
-      ])
+      ]))
     );
   }
 
@@ -635,7 +601,7 @@ mod tests {
   fn parenthesis_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = (y + z) - (w * 3)
         }
         "#
@@ -645,22 +611,14 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          binary_expression(
-            ident_expression(ident("y")),
-            &BinaryOp::Add,
-            ident_expression(ident("z"))
-          ),
+        bin_exp(
+          bin_exp(id_exp(ident("y")), &BinaryOp::Add, id_exp(ident("z"))),
           &BinaryOp::Sub,
-          binary_expression(
-            ident_expression(ident("w")),
-            &BinaryOp::Mul,
-            literal_expression(integral("3"))
-          )
+          bin_exp(id_exp(ident("w")), &BinaryOp::Mul, lit_exp(integral("3")))
         )
-      )])
+      )]))
     );
   }
 
@@ -668,7 +626,7 @@ mod tests {
   fn many_parenthesis() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = (((((((((y))))) + (((((((z)))))))))))
         }
         "#
@@ -678,14 +636,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          ident_expression(ident("y")),
-          &BinaryOp::Add,
-          ident_expression(ident("z"))
-        )
-      )])
+        bin_exp(id_exp(ident("y")), &BinaryOp::Add, id_exp(ident("z")))
+      )]))
     );
   }
 }
