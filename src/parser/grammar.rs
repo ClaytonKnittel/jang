@@ -325,4 +325,91 @@ mod tests {
       )])
     );
   }
+
+  #[gtest]
+  fn add_left_associativity() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = a + b + c
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          binary_expression(
+            ident_expression(ident("a")),
+            &BinaryOp::Add,
+            ident_expression(ident("b"))
+          ),
+          &BinaryOp::Add,
+          ident_expression(ident("c"))
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn parenthesis_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = (y + z) + (w + 3)
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          binary_expression(
+            ident_expression(ident("y")),
+            &BinaryOp::Add,
+            ident_expression(ident("z"))
+          ),
+          &BinaryOp::Add,
+          binary_expression(
+            ident_expression(ident("w")),
+            &BinaryOp::Add,
+            literal_expression(integral("3"))
+          )
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn many_parenthesis() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = (((((((((y))))) + (((((((z)))))))))))
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          ident_expression(ident("y")),
+          &BinaryOp::Add,
+          ident_expression(ident("z"))
+        )
+      )])
+    );
+  }
 }
