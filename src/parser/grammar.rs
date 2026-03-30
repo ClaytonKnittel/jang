@@ -3,6 +3,7 @@ use parser_generator::grammar;
 use crate::parser::token::{JangToken, ident::Ident, keyword::Keyword};
 
 #[derive(Clone, Debug)]
+#[allow(unused)]
 struct FunctionDecl {
   name: Ident,
 }

@@ -6,7 +6,7 @@ use crate::{
     JangToken,
     ident::Ident,
     keyword::Keyword,
-    literal::{Literal, NumericLiteral},
+    literal::NumericLiteral,
     operator::{Op, Operator, Spacing, is_op},
   },
   source_location::SourceLocation,
