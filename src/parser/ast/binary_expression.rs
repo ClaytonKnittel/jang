@@ -4,6 +4,9 @@ use crate::parser::ast::expression::Expression;
 pub enum BinaryOp {
   Add,
   Sub,
+  Mul,
+  Div,
+  Mod,
 }
 
 #[derive(Clone, Debug)]

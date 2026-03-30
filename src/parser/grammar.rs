@@ -64,17 +64,34 @@ grammar!(
 
   <expr>: Expression => <add_expr>;
 
-  <add_expr>: Expression => <add_expr> <plus> <leaf_expr> {
+  <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
     Expression::BinaryExpression(BinaryExpression::new(
-      #add_expr, #leaf_expr, BinaryOp::Add
+      #add_expr, #mul_expr, BinaryOp::Add
     ))
   };
-  <add_expr>: Expression => <add_expr> <minus> <leaf_expr> {
+  <add_expr>: Expression => <add_expr> <minus> <mul_expr> {
     Expression::BinaryExpression(BinaryExpression::new(
-      #add_expr, #leaf_expr, BinaryOp::Sub
+      #add_expr, #mul_expr, BinaryOp::Sub
     ))
   };
-  <add_expr>: Expression => <leaf_expr>;
+  <add_expr>: Expression => <mul_expr>;
+
+  <mul_expr>: Expression => <mul_expr> <mul> <leaf_expr> {
+    Expression::BinaryExpression(BinaryExpression::new(
+      #mul_expr, #leaf_expr, BinaryOp::Mul
+    ))
+  };
+  <mul_expr>: Expression => <mul_expr> <div> <leaf_expr> {
+    Expression::BinaryExpression(BinaryExpression::new(
+      #mul_expr, #leaf_expr, BinaryOp::Div
+    ))
+  };
+  <mul_expr>: Expression => <mul_expr> <modulo> <leaf_expr> {
+    Expression::BinaryExpression(BinaryExpression::new(
+      #mul_expr, #leaf_expr, BinaryOp::Mod
+    ))
+  };
+  <mul_expr>: Expression => <leaf_expr>;
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
   <leaf_expr>: Expression => Literal(..) {
@@ -115,6 +132,15 @@ grammar!(
 
   <minus> => Operator(Operator { op: Op::Dash, spacing: Spacing::Alone });
   <minus> => Operator(Operator { op: Op::Dash, spacing: Spacing::Joint });
+
+  <mul> => Operator(Operator { op: Op::Star, spacing: Spacing::Alone });
+  <mul> => Operator(Operator { op: Op::Star, spacing: Spacing::Joint });
+
+  <div> => Operator(Operator { op: Op::Slash, spacing: Spacing::Alone });
+  <div> => Operator(Operator { op: Op::Slash, spacing: Spacing::Joint });
+
+  <modulo> => Operator(Operator { op: Op::Percent, spacing: Spacing::Alone });
+  <modulo> => Operator(Operator { op: Op::Percent, spacing: Spacing::Joint });
 
   <colon> => Operator(Operator { op: Op::Colon, spacing: Spacing::Alone });
   <comma> => Operator(Operator { op: Op::Comma, spacing: Spacing::Alone });
@@ -335,6 +361,106 @@ mod tests {
   }
 
   #[gtest]
+  fn sub_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = 5 - a
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          literal_expression(integral("5")),
+          &BinaryOp::Sub,
+          ident_expression(ident("a")),
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn mul_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = 2 * a
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          literal_expression(integral("2")),
+          &BinaryOp::Mul,
+          ident_expression(ident("a")),
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn div_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = a / b
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          ident_expression(ident("a")),
+          &BinaryOp::Div,
+          ident_expression(ident("b")),
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn mod_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = a % 10
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          ident_expression(ident("a")),
+          &BinaryOp::Mod,
+          literal_expression(integral("10"))
+        )
+      )])
+    );
+  }
+
+  #[gtest]
   fn add_left_associativity() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
@@ -357,6 +483,35 @@ mod tests {
             ident_expression(ident("b"))
           ),
           &BinaryOp::Add,
+          ident_expression(ident("c"))
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn mul_left_associativity() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = a * b * c
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          binary_expression(
+            ident_expression(ident("a")),
+            &BinaryOp::Mul,
+            ident_expression(ident("b"))
+          ),
+          &BinaryOp::Mul,
           ident_expression(ident("c"))
         )
       )])
@@ -408,11 +563,80 @@ mod tests {
   }
 
   #[gtest]
+  fn mul_div_mod_equal_precedence() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let mdm = a * b / c % d
+          let dmm = a / b % c * d
+          let mmd = a % b * c / d
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![
+        let_statement(
+          ident("mdm"),
+          binary_expression(
+            binary_expression(
+              binary_expression(
+                ident_expression(ident("a")),
+                &BinaryOp::Mul,
+                ident_expression(ident("b"))
+              ),
+              &BinaryOp::Div,
+              ident_expression(ident("c"))
+            ),
+            &BinaryOp::Mod,
+            ident_expression(ident("d"))
+          )
+        ),
+        let_statement(
+          ident("dmm"),
+          binary_expression(
+            binary_expression(
+              binary_expression(
+                ident_expression(ident("a")),
+                &BinaryOp::Div,
+                ident_expression(ident("b"))
+              ),
+              &BinaryOp::Mod,
+              ident_expression(ident("c"))
+            ),
+            &BinaryOp::Mul,
+            ident_expression(ident("d"))
+          )
+        ),
+        let_statement(
+          ident("mmd"),
+          binary_expression(
+            binary_expression(
+              binary_expression(
+                ident_expression(ident("a")),
+                &BinaryOp::Mod,
+                ident_expression(ident("b"))
+              ),
+              &BinaryOp::Mul,
+              ident_expression(ident("c"))
+            ),
+            &BinaryOp::Div,
+            ident_expression(ident("d"))
+          )
+        )
+      ])
+    );
+  }
+
+  #[gtest]
   fn parenthesis_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         fn function_name() -> i32 {
-          let x = (y + z) - (w - 3)
+          let x = (y + z) - (w * 3)
         }
         "#
       .chars(),
@@ -432,7 +656,7 @@ mod tests {
           &BinaryOp::Sub,
           binary_expression(
             ident_expression(ident("w")),
-            &BinaryOp::Sub,
+            &BinaryOp::Mul,
             literal_expression(integral("3"))
           )
         )

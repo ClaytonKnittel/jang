@@ -26,6 +26,12 @@ pub enum Op {
   Dot,
   /// '+'
   Plus,
+  /// '*'
+  Star,
+  /// '/'
+  Slash,
+  /// '%'
+  Percent,
 }
 
 impl Op {
@@ -43,6 +49,9 @@ impl Op {
       ':' => Some(Self::Colon),
       '.' => Some(Self::Dot),
       '+' => Some(Self::Plus),
+      '*' => Some(Self::Star),
+      '/' => Some(Self::Slash),
+      '%' => Some(Self::Percent),
       _ => None,
     }
   }
@@ -61,6 +70,9 @@ impl Op {
       Self::Colon => ':',
       Self::Dot => '.',
       Self::Plus => '+',
+      Self::Star => '*',
+      Self::Slash => '/',
+      Self::Percent => '%',
     }
   }
 }
