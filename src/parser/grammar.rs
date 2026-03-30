@@ -25,13 +25,11 @@ grammar!(
   <function_decl>: FunctionDecl =>
       Keyword(Keyword::Function)
       <ident>
-      <open_paren>
-      <parameter_list>
-      <close_paren>
+      <function_params>
       <function_ret_type>
       <block_scope>
   {
-    FunctionDecl::new(#ident, #parameter_list, #function_ret_type, #block_scope)
+    FunctionDecl::new(#ident, #function_params, #function_ret_type, #block_scope)
   };
 
   <function_ret_type>: Option<Type> => ! { None };
@@ -104,6 +102,10 @@ grammar!(
   };
   <leaf_expr>: Expression => Ident(..) {
     Expression::Ident(#0)
+  };
+
+  <function_params>: Vec<FunctionParameter> => <open_paren> <parameter_list> <close_paren> {
+    #parameter_list
   };
 
   <parameter_list>: Vec<FunctionParameter> => ! { vec![] };
