@@ -1,3 +1,3 @@
-mod grammar;
-mod lexer;
+pub mod grammar;
+pub mod lexer;
 mod token;
