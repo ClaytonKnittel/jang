@@ -31,3 +31,22 @@ impl Display for Keyword {
     )
   }
 }
+
+#[cfg(test)]
+pub mod matchers {
+  use crate::parser::token::{JangToken, keyword::Keyword};
+  use googletest::prelude::*;
+
+  pub fn keyword_matcher(keyword: &Keyword) -> impl Matcher<&JangToken> {
+    pat!(JangToken::Keyword(eq(keyword)))
+  }
+
+  #[macro_export]
+  macro_rules! keyword {
+    ($keyword:ident) => {
+      $crate::parser::token::keyword::matchers::keyword_matcher(
+        &$crate::parser::token::keyword::Keyword::$keyword,
+      )
+    };
+  }
+}

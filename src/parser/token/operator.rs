@@ -94,3 +94,39 @@ impl Operator {
     self.spacing
   }
 }
+
+#[cfg(test)]
+pub mod matchers {
+  use crate::parser::token::{
+    JangToken,
+    operator::{Op, Operator, Spacing},
+  };
+  use googletest::prelude::*;
+
+  pub fn operator_matcher<'a>(op: &'a Op, spacing: &'a Spacing) -> impl Matcher<&'a JangToken> {
+    pat!(JangToken::Operator(pat!(Operator {
+      op: op,
+      spacing: spacing
+    })))
+  }
+
+  #[macro_export]
+  macro_rules! operator {
+    ($op:ident) => {
+      $crate::parser::token::operator::matchers::operator_matcher(
+        &$crate::parser::token::operator::Op::$op,
+        &$crate::parser::token::operator::Spacing::Alone,
+      )
+    };
+  }
+
+  #[macro_export]
+  macro_rules! joint_operator {
+    ($op:ident) => {
+      $crate::parser::token::operator::matchers::operator_matcher(
+        &$crate::parser::token::operator::Op::$op,
+        &$crate::parser::token::operator::Spacing::Joint,
+      )
+    };
+  }
+}

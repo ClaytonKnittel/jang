@@ -25,3 +25,24 @@ impl From<NumericLiteral> for Literal {
     Self::Numeric(value)
   }
 }
+
+#[cfg(test)]
+pub mod matchers {
+  use crate::parser::token::{
+    JangToken,
+    literal::{Literal, NumericLiteral},
+  };
+  use googletest::prelude::*;
+
+  pub fn integral(expected_value: &str) -> impl Matcher<&JangToken> {
+    pat!(JangToken::Literal(pat!(Literal::Numeric(pat!(
+      NumericLiteral::Integral(eq(expected_value))
+    )))))
+  }
+
+  pub fn float(expected_value: &str) -> impl Matcher<&JangToken> {
+    pat!(JangToken::Literal(pat!(Literal::Numeric(pat!(
+      NumericLiteral::Float(eq(expected_value))
+    )))))
+  }
+}

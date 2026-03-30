@@ -131,7 +131,10 @@ mod tests {
     joint_operator, keyword, operator,
     parser::{
       lexer::lex_stream,
-      token::test_util::{float, ident, integral},
+      token::{
+        ident::matchers::ident,
+        literal::matchers::{float, integral},
+      },
     },
   };
 
