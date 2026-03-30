@@ -113,14 +113,14 @@ grammar!(
   <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Alone });
   <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Joint });
 
-  <minus> => Operator(Operator { op: Op::Minus, spacing: Spacing::Alone });
-  <minus> => Operator(Operator { op: Op::Minus, spacing: Spacing::Joint });
+  <minus> => Operator(Operator { op: Op::Dash, spacing: Spacing::Alone });
+  <minus> => Operator(Operator { op: Op::Dash, spacing: Spacing::Joint });
 
   <colon> => Operator(Operator { op: Op::Colon, spacing: Spacing::Alone });
   <comma> => Operator(Operator { op: Op::Comma, spacing: Spacing::Alone });
 
   <right_arrow> =>
-      Operator(Operator { op: Op::Minus, spacing: Spacing::Joint })
+      Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
       Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Alone });
 
   <ident>: Ident => Ident(..);

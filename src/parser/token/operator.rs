@@ -14,6 +14,8 @@ pub enum Op {
   OpenBracket,
   /// '}'
   CloseBracket,
+  /// '-'
+  Dash,
   /// '<'
   LessThan,
   /// '>'
@@ -24,8 +26,6 @@ pub enum Op {
   Dot,
   /// '+'
   Plus,
-  /// '-'
-  Minus,
 }
 
 impl Op {
@@ -37,12 +37,12 @@ impl Op {
       ')' => Some(Self::CloseParen),
       '{' => Some(Self::OpenBracket),
       '}' => Some(Self::CloseBracket),
+      '-' => Some(Self::Dash),
       '<' => Some(Self::LessThan),
       '>' => Some(Self::GreaterThan),
       ':' => Some(Self::Colon),
       '.' => Some(Self::Dot),
       '+' => Some(Self::Plus),
-      '-' => Some(Self::Minus),
       _ => None,
     }
   }
@@ -55,12 +55,12 @@ impl Op {
       Self::CloseParen => ')',
       Self::OpenBracket => '{',
       Self::CloseBracket => '}',
+      Self::Dash => '-',
       Self::LessThan => '<',
       Self::GreaterThan => '>',
       Self::Colon => ':',
       Self::Dot => '.',
       Self::Plus => '+',
-      Self::Minus => '-',
     }
   }
 }
