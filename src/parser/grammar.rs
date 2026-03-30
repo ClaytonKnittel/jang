@@ -160,13 +160,13 @@ mod tests {
 
   use crate::parser::{
     ast::{
-      binary_expression::{BinaryOp, matchers::binary_expression},
-      expression::matchers::{ident_expression, literal_expression},
+      binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
+      expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
         fn_body_matches, fn_name_matches, fn_parameter_name_matches, fn_parameter_type_matches,
         fn_parameters_match, fn_return_type_matches,
       },
-      statement::matchers::{let_statement, ret_statement},
+      statement::matchers::{let_statement as let_stmt, ret_statement as ret_stmt},
       type_expr::matchers::type_expr_name_matches,
     },
     grammar::JangGrammar,
@@ -193,9 +193,7 @@ mod tests {
     );
     expect_that!(
       ast,
-      fn_body_matches(elements_are![ret_statement(literal_expression(integral(
-        "123"
-      )))])
+      fn_body_matches(elements_are![ret_stmt(lit_exp(integral("123")))])
     );
     expect_that!(ast, fn_parameters_match(is_empty()));
   }
@@ -229,7 +227,7 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![ret_statement(ident_expression(ident("x")))])
+      fn_body_matches(elements_are![ret_stmt(id_exp(ident("x")))])
     );
   }
 
@@ -247,9 +245,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        literal_expression(integral("123"))
+        lit_exp(integral("123"))
       )])
     );
   }
@@ -271,9 +269,9 @@ mod tests {
     expect_that!(
       ast,
       fn_body_matches(elements_are![
-        let_statement(ident("x"), literal_expression(integral("123"))),
-        let_statement(ident("y"), ident_expression(ident("x"))),
-        ret_statement(literal_expression(integral("789")))
+        let_stmt(ident("x"), lit_exp(integral("123"))),
+        let_stmt(ident("y"), id_exp(ident("x"))),
+        ret_stmt(lit_exp(integral("789")))
       ])
     );
   }
@@ -349,13 +347,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          ident_expression(ident("y")),
-          &BinaryOp::Add,
-          literal_expression(integral("3"))
-        )
+        bin_exp(id_exp(ident("y")), &BinaryOp::Add, lit_exp(integral("3")))
       )])
     );
   }
@@ -374,13 +368,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          literal_expression(integral("5")),
-          &BinaryOp::Sub,
-          ident_expression(ident("a")),
-        )
+        bin_exp(lit_exp(integral("5")), &BinaryOp::Sub, id_exp(ident("a")),)
       )])
     );
   }
@@ -399,13 +389,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          literal_expression(integral("2")),
-          &BinaryOp::Mul,
-          ident_expression(ident("a")),
-        )
+        bin_exp(lit_exp(integral("2")), &BinaryOp::Mul, id_exp(ident("a")),)
       )])
     );
   }
@@ -424,13 +410,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          ident_expression(ident("a")),
-          &BinaryOp::Div,
-          ident_expression(ident("b")),
-        )
+        bin_exp(id_exp(ident("a")), &BinaryOp::Div, id_exp(ident("b")),)
       )])
     );
   }
@@ -449,13 +431,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          ident_expression(ident("a")),
-          &BinaryOp::Mod,
-          literal_expression(integral("10"))
-        )
+        bin_exp(id_exp(ident("a")), &BinaryOp::Mod, lit_exp(integral("10")))
       )])
     );
   }
@@ -474,16 +452,12 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          binary_expression(
-            ident_expression(ident("a")),
-            &BinaryOp::Add,
-            ident_expression(ident("b"))
-          ),
+        bin_exp(
+          bin_exp(id_exp(ident("a")), &BinaryOp::Add, id_exp(ident("b"))),
           &BinaryOp::Add,
-          ident_expression(ident("c"))
+          id_exp(ident("c"))
         )
       )])
     );
@@ -503,16 +477,12 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          binary_expression(
-            ident_expression(ident("a")),
-            &BinaryOp::Mul,
-            ident_expression(ident("b"))
-          ),
+        bin_exp(
+          bin_exp(id_exp(ident("a")), &BinaryOp::Mul, id_exp(ident("b"))),
           &BinaryOp::Mul,
-          ident_expression(ident("c"))
+          id_exp(ident("c"))
         )
       )])
     );
@@ -534,28 +504,20 @@ mod tests {
     expect_that!(
       ast,
       fn_body_matches(elements_are![
-        let_statement(
+        let_stmt(
           ident("add_sub"),
-          binary_expression(
-            binary_expression(
-              ident_expression(ident("a")),
-              &BinaryOp::Add,
-              ident_expression(ident("b"))
-            ),
+          bin_exp(
+            bin_exp(id_exp(ident("a")), &BinaryOp::Add, id_exp(ident("b"))),
             &BinaryOp::Sub,
-            ident_expression(ident("c"))
+            id_exp(ident("c"))
           )
         ),
-        let_statement(
+        let_stmt(
           ident("sub_add"),
-          binary_expression(
-            binary_expression(
-              ident_expression(ident("a")),
-              &BinaryOp::Sub,
-              ident_expression(ident("b"))
-            ),
+          bin_exp(
+            bin_exp(id_exp(ident("a")), &BinaryOp::Sub, id_exp(ident("b"))),
             &BinaryOp::Add,
-            ident_expression(ident("c"))
+            id_exp(ident("c"))
           )
         )
       ])
@@ -579,52 +541,40 @@ mod tests {
     expect_that!(
       ast,
       fn_body_matches(elements_are![
-        let_statement(
+        let_stmt(
           ident("mdm"),
-          binary_expression(
-            binary_expression(
-              binary_expression(
-                ident_expression(ident("a")),
-                &BinaryOp::Mul,
-                ident_expression(ident("b"))
-              ),
+          bin_exp(
+            bin_exp(
+              bin_exp(id_exp(ident("a")), &BinaryOp::Mul, id_exp(ident("b"))),
               &BinaryOp::Div,
-              ident_expression(ident("c"))
+              id_exp(ident("c"))
             ),
             &BinaryOp::Mod,
-            ident_expression(ident("d"))
+            id_exp(ident("d"))
           )
         ),
-        let_statement(
+        let_stmt(
           ident("dmm"),
-          binary_expression(
-            binary_expression(
-              binary_expression(
-                ident_expression(ident("a")),
-                &BinaryOp::Div,
-                ident_expression(ident("b"))
-              ),
+          bin_exp(
+            bin_exp(
+              bin_exp(id_exp(ident("a")), &BinaryOp::Div, id_exp(ident("b"))),
               &BinaryOp::Mod,
-              ident_expression(ident("c"))
+              id_exp(ident("c"))
             ),
             &BinaryOp::Mul,
-            ident_expression(ident("d"))
+            id_exp(ident("d"))
           )
         ),
-        let_statement(
+        let_stmt(
           ident("mmd"),
-          binary_expression(
-            binary_expression(
-              binary_expression(
-                ident_expression(ident("a")),
-                &BinaryOp::Mod,
-                ident_expression(ident("b"))
-              ),
+          bin_exp(
+            bin_exp(
+              bin_exp(id_exp(ident("a")), &BinaryOp::Mod, id_exp(ident("b"))),
               &BinaryOp::Mul,
-              ident_expression(ident("c"))
+              id_exp(ident("c"))
             ),
             &BinaryOp::Div,
-            ident_expression(ident("d"))
+            id_exp(ident("d"))
           )
         )
       ])
@@ -645,20 +595,12 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          binary_expression(
-            ident_expression(ident("y")),
-            &BinaryOp::Add,
-            ident_expression(ident("z"))
-          ),
+        bin_exp(
+          bin_exp(id_exp(ident("y")), &BinaryOp::Add, id_exp(ident("z"))),
           &BinaryOp::Sub,
-          binary_expression(
-            ident_expression(ident("w")),
-            &BinaryOp::Mul,
-            literal_expression(integral("3"))
-          )
+          bin_exp(id_exp(ident("w")), &BinaryOp::Mul, lit_exp(integral("3")))
         )
       )])
     );
@@ -678,13 +620,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_statement(
+      fn_body_matches(elements_are![let_stmt(
         ident("x"),
-        binary_expression(
-          ident_expression(ident("y")),
-          &BinaryOp::Add,
-          ident_expression(ident("z"))
-        )
+        bin_exp(id_exp(ident("y")), &BinaryOp::Add, id_exp(ident("z")))
       )])
     );
   }
