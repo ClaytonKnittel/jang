@@ -68,31 +68,21 @@ grammar!(
   <expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #add_expr, #mul_expr, BinaryOp::Add
-    ))
+    BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Add).into()
   };
   <add_expr>: Expression => <add_expr> <minus> <mul_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #add_expr, #mul_expr, BinaryOp::Sub
-    ))
+    BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Sub).into()
   };
   <add_expr>: Expression => <mul_expr>;
 
   <mul_expr>: Expression => <mul_expr> <mul> <leaf_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #mul_expr, #leaf_expr, BinaryOp::Mul
-    ))
+    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Mul).into()
   };
   <mul_expr>: Expression => <mul_expr> <div> <leaf_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #mul_expr, #leaf_expr, BinaryOp::Div
-    ))
+    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Div).into()
   };
   <mul_expr>: Expression => <mul_expr> <modulo> <leaf_expr> {
-    Expression::BinaryExpression(BinaryExpression::new(
-      #mul_expr, #leaf_expr, BinaryOp::Mod
-    ))
+    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Mod).into()
   };
   <mul_expr>: Expression => <leaf_expr>;
 
