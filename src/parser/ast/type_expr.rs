@@ -4,7 +4,7 @@ use crate::parser::token::ident::Ident;
 pub struct Type(pub Ident);
 
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use crate::parser::{ast::type_expr::Type, token::ident::Ident};
   use googletest::prelude::{Matcher, pat};
 

@@ -120,7 +120,7 @@ impl Operator {
 }
 
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use crate::parser::token::{
     JangToken,
     operator::{Op, Operator, Spacing},
