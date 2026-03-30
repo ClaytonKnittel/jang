@@ -28,16 +28,22 @@ grammar!(
       <open_paren>
       <parameter_list>
       <close_paren>
-      <right_arrow>
-      <type>
-      <open_bracket>
-      <statement_list>
-      <close_bracket>
+      <function_ret_type>
+      <block_scope>
   {
-    FunctionDecl::new(#ident, #parameter_list, #type, #statement_list)
+    FunctionDecl::new(#ident, #parameter_list, #function_ret_type, #block_scope)
+  };
+
+  <function_ret_type>: Option<Type> => ! { None };
+  <function_ret_type>: Option<Type> => <right_arrow> <type> {
+    Some(#type)
   };
 
   <type>: Type => <ident> { Type(#ident) };
+
+  <block_scope>: Block => <open_bracket> <statement_list> <close_bracket> {
+    #statement_list
+  };
 
   <statement_list>: Block => ! { BlockBuilder::new().build() };
   <statement_list>: Block => <non_ret_statement_list> <non_ret_statement> {
@@ -164,6 +170,7 @@ mod tests {
       expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
         fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
+        fn_return_type_none,
       },
       statement::matchers::{let_statement as let_stmt, ret_statement as ret_stmt},
       type_expr::matchers::type_expr_name,
@@ -194,6 +201,22 @@ mod tests {
         ret_stmt(lit_exp(integral("123")))
       ))
     );
+    expect_that!(ast, fn_parameters(is_empty()));
+  }
+
+  #[gtest]
+  fn function_without_return_type() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {}
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(ast, fn_name(ident("function_name")));
+    expect_that!(ast, fn_return_type_none());
+    expect_that!(ast, fn_body(block(is_empty())));
     expect_that!(ast, fn_parameters(is_empty()));
   }
 
@@ -234,7 +257,7 @@ mod tests {
   fn let_binding() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = 123
         }
         "#
@@ -255,7 +278,7 @@ mod tests {
   fn lets_followed_by_ret() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = 123
           let y = x
           ret 789
@@ -281,7 +304,7 @@ mod tests {
   fn reject_let_after_ret() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           ret 123
           let x = 456
         }
@@ -296,7 +319,7 @@ mod tests {
   fn parse_unary_function() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn func(a: i32) -> i32 {
+        fn func(a: i32) {
           ret 123
         }
         "#
@@ -317,7 +340,7 @@ mod tests {
   fn parse_multi_param_function() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn func(a: i32, b: i32) -> i32 {
+        fn func(a: i32, b: i32) {
           ret 123
         }
         "#
@@ -338,7 +361,7 @@ mod tests {
   fn add_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = y + 3
         }
         "#
@@ -359,7 +382,7 @@ mod tests {
   fn sub_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = 5 - a
         }
         "#
@@ -380,7 +403,7 @@ mod tests {
   fn mul_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = 2 * a
         }
         "#
@@ -401,7 +424,7 @@ mod tests {
   fn div_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = a / b
         }
         "#
@@ -422,7 +445,7 @@ mod tests {
   fn mod_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = a % 10
         }
         "#
@@ -443,7 +466,7 @@ mod tests {
   fn add_left_associativity() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = a + b + c
         }
         "#
@@ -468,7 +491,7 @@ mod tests {
   fn mul_left_associativity() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = a * b * c
         }
         "#
@@ -493,7 +516,7 @@ mod tests {
   fn add_sub_equal_precedence() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let add_sub = a + b - c
           let sub_add = a - b + c
         }
@@ -529,7 +552,7 @@ mod tests {
   fn mul_div_mod_equal_precedence() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let mdm = a * b / c % d
           let dmm = a / b % c * d
           let mmd = a % b * c / d
@@ -586,7 +609,7 @@ mod tests {
   fn parenthesis_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = (y + z) - (w * 3)
         }
         "#
@@ -611,7 +634,7 @@ mod tests {
   fn many_parenthesis() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
-        fn function_name() -> i32 {
+        fn function_name() {
           let x = (((((((((y))))) + (((((((z)))))))))))
         }
         "#

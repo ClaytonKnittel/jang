@@ -7,7 +7,7 @@ use crate::parser::{
 pub struct FunctionDecl {
   name: Ident,
   parameters: Vec<FunctionParameter>,
-  return_type: Type,
+  return_type: Option<Type>,
   body: Block,
 }
 
@@ -15,7 +15,7 @@ impl FunctionDecl {
   pub fn new(
     name: Ident,
     parameters: Vec<FunctionParameter>,
-    return_type: Type,
+    return_type: Option<Type>,
     body: Block,
   ) -> Self {
     Self {
@@ -34,8 +34,8 @@ impl FunctionDecl {
     &self.parameters
   }
 
-  pub fn return_type(&self) -> &Type {
-    &self.return_type
+  pub fn return_type(&self) -> Option<&Type> {
+    self.return_type.as_ref()
   }
 
   pub fn body(&self) -> &Block {
@@ -79,8 +79,12 @@ pub mod matchers {
     property!(&FunctionDecl.name(), matcher)
   }
 
+  pub fn fn_return_type_none<'a>() -> impl Matcher<&'a FunctionDecl> {
+    property!(&FunctionDecl.return_type(), none())
+  }
+
   pub fn fn_return_type<'a>(matcher: impl Matcher<&'a Type>) -> impl Matcher<&'a FunctionDecl> {
-    property!(&FunctionDecl.return_type(), matcher)
+    property!(&FunctionDecl.return_type(), some(matcher))
   }
 
   pub fn fn_body<'a>(matcher: impl Matcher<&'a Block>) -> impl Matcher<&'a FunctionDecl> {
