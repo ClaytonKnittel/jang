@@ -180,6 +180,17 @@ mod tests {
   }
 
   #[gtest]
+  fn test_all_keywords() {
+    let text = "fn let ret";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
+    expect_that!(
+      tokens,
+      elements_are![keyword!(Function), keyword!(Let), keyword!(Ret)]
+    );
+  }
+
+  #[gtest]
   fn test_integral_literal() {
     let text = "123";
 
