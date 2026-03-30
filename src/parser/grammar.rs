@@ -64,6 +64,9 @@ grammar!(
   <expr>: Expression => Literal(..) {
     Expression::Literal(#0)
   };
+  <expr>: Expression => Ident(..) {
+    Expression::Ident(#0)
+  };
 
   <parameter_list>: Vec<FunctionParameter> => ! { vec![] };
   <parameter_list>: Vec<FunctionParameter> => <non_empty_parameter_list>;
@@ -109,7 +112,7 @@ mod tests {
 
   use crate::parser::{
     ast::{
-      expression::matchers::literal_expression,
+      expression::matchers::{ident_expression, literal_expression},
       function_decl::matchers::{
         fn_body_matches, fn_name_matches, fn_parameter_name_matches, fn_parameter_type_matches,
         fn_parameters_match, fn_return_type_matches,
@@ -164,6 +167,24 @@ mod tests {
   }
 
   #[gtest]
+  fn ret_ident() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          ret x
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![ret_statement(ident_expression(ident("x")))])
+    );
+  }
+
+  #[gtest]
   fn let_binding() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
@@ -190,7 +211,7 @@ mod tests {
       r#"
         fn function_name() -> i32 {
           let x = 123
-          let y = 456
+          let y = x
           ret 789
         }
         "#
@@ -202,7 +223,7 @@ mod tests {
       ast,
       fn_body_matches(elements_are![
         let_statement(ident("x"), literal_expression(integral("123"))),
-        let_statement(ident("y"), literal_expression(integral("456"))),
+        let_statement(ident("y"), ident_expression(ident("x"))),
         ret_statement(literal_expression(integral("789")))
       ])
     );
