@@ -1,9 +1,13 @@
-use crate::parser::token::{ident::Ident, literal::Literal};
+use crate::parser::{
+  ast::binary_expression::BinaryExpression,
+  token::{ident::Ident, literal::Literal},
+};
 
 #[derive(Clone, Debug)]
 pub enum Expression {
   Literal(Literal),
   Ident(Ident),
+  BinaryExpression(BinaryExpression),
 }
 
 #[cfg(test)]

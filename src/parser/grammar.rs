@@ -2,6 +2,7 @@ use parser_generator::grammar;
 
 use crate::parser::{
   ast::{
+    binary_expression::{BinaryExpression, BinaryOp},
     expression::Expression,
     function_decl::{FunctionDecl, FunctionParameter},
     statement::{LetStatement, RetStatement, Statement},
@@ -61,10 +62,20 @@ grammar!(
     Statement::Ret(RetStatement::new(#expr))
   };
 
-  <expr>: Expression => Literal(..) {
+  <expr>: Expression => <add_expr>;
+
+  <add_expr>: Expression => <add_expr> <plus> <leaf_expr> {
+    Expression::BinaryExpression(BinaryExpression::new(
+      #add_expr, #leaf_expr, BinaryOp::Add
+    ))
+  };
+  <add_expr>: Expression => <leaf_expr>;
+
+  <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
+  <leaf_expr>: Expression => Literal(..) {
     Expression::Literal(#0)
   };
-  <expr>: Expression => Ident(..) {
+  <leaf_expr>: Expression => Ident(..) {
     Expression::Ident(#0)
   };
 
@@ -94,11 +105,14 @@ grammar!(
   <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: Spacing::Alone });
   <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: Spacing::Joint });
 
+  <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Alone });
+  <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Joint });
+
   <colon> => Operator(Operator { op: Op::Colon, spacing: Spacing::Alone });
   <comma> => Operator(Operator { op: Op::Comma, spacing: Spacing::Alone });
 
   <right_arrow> =>
-      Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
+      Operator(Operator { op: Op::Minus, spacing: Spacing::Joint })
       Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Alone });
 
   <ident>: Ident => Ident(..);
@@ -112,6 +126,7 @@ mod tests {
 
   use crate::parser::{
     ast::{
+      binary_expression::{BinaryOp, matchers::binary_expression},
       expression::matchers::{ident_expression, literal_expression},
       function_decl::matchers::{
         fn_body_matches, fn_name_matches, fn_parameter_name_matches, fn_parameter_type_matches,
@@ -283,6 +298,31 @@ mod tests {
         all!(fn_parameter_name_matches(ident("a"))),
         all!(fn_parameter_name_matches(ident("b")))
       ])
+    );
+  }
+
+  #[gtest]
+  fn add_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = y + 3
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          ident_expression(ident("y")),
+          &BinaryOp::Add,
+          literal_expression(integral("3"))
+        )
+      )])
     );
   }
 }
