@@ -11,4 +11,12 @@ impl Ident {
   }
 }
 
+#[cfg(test)]
+pub mod matchers {
+  use crate::parser::token::{JangToken, ident::Ident};
+  use googletest::prelude::*;
 
+  pub fn ident(expected_name: &str) -> impl Matcher<&JangToken> {
+    pat!(JangToken::Ident(pat!(Ident(eq(expected_name)))))
+  }
+}

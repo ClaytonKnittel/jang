@@ -2,8 +2,6 @@ pub mod ident;
 pub mod keyword;
 pub mod literal;
 pub mod operator;
-#[cfg(test)]
-pub mod test_util;
 
 use crate::parser::token::{ident::Ident, keyword::Keyword, literal::Literal, operator::Operator};
 
