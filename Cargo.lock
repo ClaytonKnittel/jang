@@ -77,7 +77,7 @@ dependencies = [
 [[package]]
 name = "lr_table"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=d1723b5eb922baefb7920415391429e18a3e7d8a#d1723b5eb922baefb7920415391429e18a3e7d8a"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=cc9023f279308df3681aedb09b9e9938d40d9cb5#cc9023f279308df3681aedb09b9e9938d40d9cb5"
 dependencies = [
  "cknittel-util",
  "googletest",
@@ -102,7 +102,7 @@ dependencies = [
 [[package]]
 name = "parser_generator"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=d1723b5eb922baefb7920415391429e18a3e7d8a#d1723b5eb922baefb7920415391429e18a3e7d8a"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=cc9023f279308df3681aedb09b9e9938d40d9cb5#cc9023f279308df3681aedb09b9e9938d40d9cb5"
 dependencies = [
  "googletest",
  "parser_generator_impl",
@@ -111,7 +111,7 @@ dependencies = [
 [[package]]
 name = "parser_generator_impl"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=d1723b5eb922baefb7920415391429e18a3e7d8a#d1723b5eb922baefb7920415391429e18a3e7d8a"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=cc9023f279308df3681aedb09b9e9938d40d9cb5#cc9023f279308df3681aedb09b9e9938d40d9cb5"
 dependencies = [
  "cknittel-util",
  "itertools",
