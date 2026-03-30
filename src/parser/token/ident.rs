@@ -1,5 +1,5 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Ident(String);
+pub struct Ident(pub String);
 
 impl Ident {
   pub fn new(name: impl Into<String>) -> Self {

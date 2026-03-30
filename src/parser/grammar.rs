@@ -1,12 +1,17 @@
 use parser_generator::grammar;
 
-use crate::parser::token::{JangToken, ident::Ident, keyword::Keyword};
-
-#[derive(Clone, Debug)]
-#[allow(unused)]
-struct FunctionDecl {
-  name: Ident,
-}
+use crate::parser::{
+  ast::{
+    expression::Expression, function_decl::FunctionDecl, function_decl::FunctionParameter,
+    statement::RetStatement, statement::Statement, type_expr::Type,
+  },
+  token::{
+    JangToken,
+    ident::Ident,
+    keyword::Keyword,
+    operator::{Op, Operator, Spacing},
+  },
+};
 
 grammar!(
   name: JangGrammar;
@@ -14,36 +19,155 @@ grammar!(
 
   <root>: FunctionDecl => <function_decl>;
   <function_decl>: FunctionDecl =>
-    Keyword(Keyword::Function) Ident(..) {
-    FunctionDecl {
-      name: #1
-    }
+      Keyword(Keyword::Function)
+      <ident>
+      <open_paren>
+      <parameter_list>
+      <close_paren>
+      <right_arrow>
+      <type>
+      <open_bracket>
+      <statement_list>
+      <close_bracket>
+  {
+    FunctionDecl::new(#ident, #parameter_list, #type, #statement_list)
   };
+
+  <type>: Type => <ident> { Type(#ident) };
+
+  <statement_list>: Vec<Statement> => <statement> {
+    vec![#statement] // Just a single ret-statement atm.
+  };
+
+  <statement>: Statement => Keyword(Keyword::Ret) <expr> {
+    Statement::Ret(RetStatement::new(#expr))
+  };
+
+  <expr>: Expression => Literal(..) {
+    Expression::Literal(#0)
+  };
+
+  <parameter_list>: Vec<FunctionParameter> => ! { vec![] };
+  <parameter_list>: Vec<FunctionParameter> => <non_empty_parameter_list>;
+  <non_empty_parameter_list>: Vec<FunctionParameter> => <non_empty_parameter_list> <comma> <ident> <colon> <type> {
+    #non_empty_parameter_list.push(FunctionParameter::new(#ident, #type));
+    #non_empty_parameter_list
+  };
+  <non_empty_parameter_list>: Vec<FunctionParameter> => <ident> <colon> <type> {
+    vec![
+      FunctionParameter::new(#ident, #type)
+    ]
+  };
+
+  // <eq> => Operator(Operator { op: Op::Equal, spacing: Spacing::Alone });
+  <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: Spacing::Alone });
+  <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: Spacing::Joint });
+
+  <close_paren> => Operator(Operator { op: Op::CloseParen, spacing: Spacing::Alone });
+  <close_paren> => Operator(Operator { op: Op::CloseParen, spacing: Spacing::Joint });
+
+  <open_bracket> => Operator(Operator { op: Op::OpenBracket, spacing: Spacing::Alone });
+  <open_bracket> => Operator(Operator { op: Op::OpenBracket, spacing: Spacing::Joint });
+
+  <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: Spacing::Alone });
+  <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: Spacing::Joint });
+
+  <colon> => Operator(Operator { op: Op::Colon, spacing: Spacing::Alone });
+  <comma> => Operator(Operator { op: Op::Comma, spacing: Spacing::Alone });
+
+  <right_arrow> =>
+      Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
+      Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Alone });
+
+  <ident>: Ident => Ident(..);
 );
 
 #[cfg(test)]
 mod tests {
+
   use googletest::prelude::*;
   use parser_generator::parser::Parser;
 
   use crate::parser::{
-    grammar::{FunctionDecl, JangGrammar},
-    token::{JangToken, ident::Ident, keyword::Keyword},
+    ast::{
+      expression::matchers::literal_expression,
+      function_decl::matchers::{
+        fn_body_matches, fn_name_matches, fn_parameter_name_matches, fn_parameter_type_matches,
+        fn_parameters_match, fn_return_type_matches,
+      },
+      statement::matchers::ret_statement,
+      type_expr::matchers::type_expr_name_matches,
+    },
+    grammar::JangGrammar,
+    lexer::lex_stream,
+    token::{ident::matchers::ident, literal::matchers::integral},
   };
 
   #[gtest]
-  fn parse_single_function() {
-    let ast = JangGrammar::parse([
-      JangToken::Keyword(Keyword::Function),
-      JangToken::Ident(Ident::new("test_function")),
-    ])
+  fn parse_minimal_function() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          ret 123
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(ast, fn_name_matches(ident("function_name")));
+    expect_that!(
+      ast,
+      fn_return_type_matches(type_expr_name_matches(ident("i32")))
+    );
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![ret_statement(literal_expression(integral(
+        "123"
+      )))])
+    );
+    expect_that!(ast, fn_parameters_match(is_empty()));
+  }
+
+  #[gtest]
+  fn parse_unary_function() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn func(a: i32) -> i32 {
+          ret 123
+        }
+        "#
+      .chars(),
+    ))
     .unwrap();
 
     expect_that!(
       ast,
-      pat![FunctionDecl {
-        name: &Ident::new("test_function")
-      }]
+      fn_parameters_match(elements_are![all!(
+        fn_parameter_name_matches(ident("a")),
+        fn_parameter_type_matches(type_expr_name_matches(ident("i32")))
+      )])
+    );
+  }
+
+  #[gtest]
+  fn parse_multi_param_function() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn func(a: i32, b: i32) -> i32 {
+          ret 123
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_parameters_match(elements_are![
+        all!(fn_parameter_name_matches(ident("a"))),
+        all!(fn_parameter_name_matches(ident("b")))
+      ])
     );
   }
 }

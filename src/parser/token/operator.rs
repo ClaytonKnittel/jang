@@ -10,6 +10,10 @@ pub enum Op {
   OpenParen,
   /// ')'
   CloseParen,
+  /// '{'
+  OpenBracket,
+  /// '}'
+  CloseBracket,
   /// '-'
   Dash,
   /// '<'
@@ -29,6 +33,8 @@ impl Op {
       ',' => Some(Self::Comma),
       '(' => Some(Self::OpenParen),
       ')' => Some(Self::CloseParen),
+      '{' => Some(Self::OpenBracket),
+      '}' => Some(Self::CloseBracket),
       '-' => Some(Self::Dash),
       '<' => Some(Self::LessThan),
       '>' => Some(Self::GreaterThan),
@@ -44,6 +50,8 @@ impl Op {
       Self::Comma => ',',
       Self::OpenParen => '(',
       Self::CloseParen => ')',
+      Self::OpenBracket => '{',
+      Self::CloseBracket => '}',
       Self::Dash => '-',
       Self::LessThan => '<',
       Self::GreaterThan => '>',
@@ -77,8 +85,8 @@ pub enum Spacing {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Operator {
-  op: Op,
-  spacing: Spacing,
+  pub op: Op,
+  pub spacing: Spacing,
 }
 
 impl Operator {
