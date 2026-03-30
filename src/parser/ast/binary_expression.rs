@@ -1,6 +1,6 @@
 use crate::parser::ast::expression::Expression;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
   Add,
   Sub,
@@ -11,6 +11,20 @@ pub struct BinaryExpression {
   lhs: Box<Expression>,
   rhs: Box<Expression>,
   op: BinaryOp,
+}
+
+impl BinaryExpression {
+  pub fn lhs(&self) -> &Expression {
+    &self.lhs
+  }
+
+  pub fn rhs(&self) -> &Expression {
+    &self.rhs
+  }
+
+  pub fn op(&self) -> BinaryOp {
+    self.op
+  }
 }
 
 impl BinaryExpression {
