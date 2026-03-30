@@ -3,6 +3,7 @@ use parser_generator::grammar;
 use crate::parser::{
   ast::{
     binary_expression::{BinaryExpression, BinaryOp},
+    block::Block,
     expression::Expression,
     function_decl::{FunctionDecl, FunctionParameter},
     statement::{LetStatement, RetStatement, Statement},
@@ -33,7 +34,7 @@ grammar!(
       <statement_list>
       <close_bracket>
   {
-    FunctionDecl::new(#ident, #parameter_list, #type, #statement_list)
+    FunctionDecl::new(#ident, #parameter_list, #type, Block::new(#statement_list))
   };
 
   <type>: Type => <ident> { Type(#ident) };
@@ -55,11 +56,11 @@ grammar!(
 
   <non_return_statement>: Statement => <let_binding>;
   <let_binding>: Statement => Keyword(Keyword::Let) <ident> <eq> <expr> {
-    Statement::Let(LetStatement::new(#ident, #expr))
+    LetStatement::new(#ident, #expr).into()
   };
 
   <return_statement>: Statement => Keyword(Keyword::Ret) <expr> {
-    Statement::Ret(RetStatement::new(#expr))
+    RetStatement::new(#expr).into()
   };
 
   <expr>: Expression => <add_expr>;
@@ -161,13 +162,13 @@ mod tests {
   use crate::parser::{
     ast::{
       binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
+      block::matchers::block,
       expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
-        fn_body_matches, fn_name_matches, fn_parameter_name_matches, fn_parameter_type_matches,
-        fn_parameters_match, fn_return_type_matches,
+        fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
       },
       statement::matchers::{let_statement as let_stmt, ret_statement as ret_stmt},
-      type_expr::matchers::type_expr_name_matches,
+      type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
     lexer::lex_stream,
@@ -186,16 +187,13 @@ mod tests {
     ))
     .unwrap();
 
-    expect_that!(ast, fn_name_matches(ident("function_name")));
+    expect_that!(ast, fn_name(ident("function_name")));
+    expect_that!(ast, fn_return_type(type_expr_name(ident("i32"))));
     expect_that!(
       ast,
-      fn_return_type_matches(type_expr_name_matches(ident("i32")))
+      fn_body(block(elements_are![ret_stmt(lit_exp(integral("123")))]))
     );
-    expect_that!(
-      ast,
-      fn_body_matches(elements_are![ret_stmt(lit_exp(integral("123")))])
-    );
-    expect_that!(ast, fn_parameters_match(is_empty()));
+    expect_that!(ast, fn_parameters(is_empty()));
   }
 
   #[gtest]
@@ -227,7 +225,7 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![ret_stmt(id_exp(ident("x")))])
+      fn_body(block(elements_are![ret_stmt(id_exp(ident("x")))]))
     );
   }
 
@@ -245,10 +243,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         lit_exp(integral("123"))
-      )])
+      )]))
     );
   }
 
@@ -268,11 +266,11 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![
+      fn_body(block(elements_are![
         let_stmt(ident("x"), lit_exp(integral("123"))),
         let_stmt(ident("y"), id_exp(ident("x"))),
         ret_stmt(lit_exp(integral("789")))
-      ])
+      ]))
     );
   }
 
@@ -305,9 +303,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_parameters_match(elements_are![all!(
-        fn_parameter_name_matches(ident("a")),
-        fn_parameter_type_matches(type_expr_name_matches(ident("i32")))
+      fn_parameters(elements_are![all!(
+        fn_parameter_name(ident("a")),
+        fn_parameter_type(type_expr_name(ident("i32")))
       )])
     );
   }
@@ -326,9 +324,9 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_parameters_match(elements_are![
-        all!(fn_parameter_name_matches(ident("a"))),
-        all!(fn_parameter_name_matches(ident("b")))
+      fn_parameters(elements_are![
+        all!(fn_parameter_name(ident("a"))),
+        all!(fn_parameter_name(ident("b")))
       ])
     );
   }
@@ -347,10 +345,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(id_exp(ident("y")), &BinaryOp::Add, lit_exp(integral("3")))
-      )])
+      )]))
     );
   }
 
@@ -368,10 +366,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(lit_exp(integral("5")), &BinaryOp::Sub, id_exp(ident("a")),)
-      )])
+      )]))
     );
   }
 
@@ -389,10 +387,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(lit_exp(integral("2")), &BinaryOp::Mul, id_exp(ident("a")),)
-      )])
+      )]))
     );
   }
 
@@ -410,10 +408,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(id_exp(ident("a")), &BinaryOp::Div, id_exp(ident("b")),)
-      )])
+      )]))
     );
   }
 
@@ -431,10 +429,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(id_exp(ident("a")), &BinaryOp::Mod, lit_exp(integral("10")))
-      )])
+      )]))
     );
   }
 
@@ -452,14 +450,14 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(
           bin_exp(id_exp(ident("a")), &BinaryOp::Add, id_exp(ident("b"))),
           &BinaryOp::Add,
           id_exp(ident("c"))
         )
-      )])
+      )]))
     );
   }
 
@@ -477,14 +475,14 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(
           bin_exp(id_exp(ident("a")), &BinaryOp::Mul, id_exp(ident("b"))),
           &BinaryOp::Mul,
           id_exp(ident("c"))
         )
-      )])
+      )]))
     );
   }
 
@@ -503,7 +501,7 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![
+      fn_body(block(elements_are![
         let_stmt(
           ident("add_sub"),
           bin_exp(
@@ -520,7 +518,7 @@ mod tests {
             id_exp(ident("c"))
           )
         )
-      ])
+      ]))
     );
   }
 
@@ -540,7 +538,7 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![
+      fn_body(block(elements_are![
         let_stmt(
           ident("mdm"),
           bin_exp(
@@ -577,7 +575,7 @@ mod tests {
             id_exp(ident("d"))
           )
         )
-      ])
+      ]))
     );
   }
 
@@ -595,14 +593,14 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(
           bin_exp(id_exp(ident("y")), &BinaryOp::Add, id_exp(ident("z"))),
           &BinaryOp::Sub,
           bin_exp(id_exp(ident("w")), &BinaryOp::Mul, lit_exp(integral("3")))
         )
-      )])
+      )]))
     );
   }
 
@@ -620,10 +618,10 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body_matches(elements_are![let_stmt(
+      fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(id_exp(ident("y")), &BinaryOp::Add, id_exp(ident("z")))
-      )])
+      )]))
     );
   }
 }

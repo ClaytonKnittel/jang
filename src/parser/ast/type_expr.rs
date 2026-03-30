@@ -8,7 +8,7 @@ pub mod matchers {
   use crate::parser::{ast::type_expr::Type, token::ident::Ident};
   use googletest::prelude::{Matcher, pat};
 
-  pub fn type_expr_name_matches<'a>(expected: impl Matcher<&'a Ident>) -> impl Matcher<&'a Type> {
+  pub fn type_expr_name<'a>(expected: impl Matcher<&'a Ident>) -> impl Matcher<&'a Type> {
     pat!(Type(expected))
   }
 }

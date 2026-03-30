@@ -1,5 +1,5 @@
 use crate::parser::{
-  ast::{statement::Statement, type_expr::Type},
+  ast::{block::Block, type_expr::Type},
   token::ident::Ident,
 };
 
@@ -8,7 +8,7 @@ pub struct FunctionDecl {
   name: Ident,
   parameters: Vec<FunctionParameter>,
   return_type: Type,
-  body: Vec<Statement>,
+  body: Block,
 }
 
 impl FunctionDecl {
@@ -16,7 +16,7 @@ impl FunctionDecl {
     name: Ident,
     parameters: Vec<FunctionParameter>,
     return_type: Type,
-    body: Vec<Statement>,
+    body: Block,
   ) -> Self {
     Self {
       name,
@@ -38,7 +38,7 @@ impl FunctionDecl {
     &self.return_type
   }
 
-  pub fn body(&self) -> &[Statement] {
+  pub fn body(&self) -> &Block {
     &self.body
   }
 }
@@ -67,43 +67,39 @@ impl FunctionParameter {
 pub mod matchers {
   use crate::parser::{
     ast::{
+      block::Block,
       function_decl::{FunctionDecl, FunctionParameter},
-      statement::Statement,
       type_expr::Type,
     },
     token::ident::Ident,
   };
   use googletest::prelude::*;
 
-  pub fn fn_name_matches<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a FunctionDecl> {
+  pub fn fn_name<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a FunctionDecl> {
     property!(&FunctionDecl.name(), matcher)
   }
 
-  pub fn fn_return_type_matches<'a>(
-    matcher: impl Matcher<&'a Type>,
-  ) -> impl Matcher<&'a FunctionDecl> {
+  pub fn fn_return_type<'a>(matcher: impl Matcher<&'a Type>) -> impl Matcher<&'a FunctionDecl> {
     property!(&FunctionDecl.return_type(), matcher)
   }
 
-  pub fn fn_body_matches<'a>(
-    matcher: impl Matcher<&'a [Statement]>,
-  ) -> impl Matcher<&'a FunctionDecl> {
+  pub fn fn_body<'a>(matcher: impl Matcher<&'a Block>) -> impl Matcher<&'a FunctionDecl> {
     property!(&FunctionDecl.body(), matcher)
   }
 
-  pub fn fn_parameters_match<'a>(
+  pub fn fn_parameters<'a>(
     matcher: impl Matcher<&'a [FunctionParameter]>,
   ) -> impl Matcher<&'a FunctionDecl> {
     property!(&FunctionDecl.parameters(), matcher)
   }
 
-  pub fn fn_parameter_name_matches<'a>(
+  pub fn fn_parameter_name<'a>(
     matcher: impl Matcher<&'a Ident>,
   ) -> impl Matcher<&'a FunctionParameter> {
     property!(&FunctionParameter.name(), matcher)
   }
 
-  pub fn fn_parameter_type_matches<'a>(
+  pub fn fn_parameter_type<'a>(
     matcher: impl Matcher<&'a Type>,
   ) -> impl Matcher<&'a FunctionParameter> {
     property!(&FunctionParameter.ty(), matcher)
