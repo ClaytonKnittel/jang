@@ -8,6 +8,7 @@ use crate::parser::token::{
   JangToken,
   keyword::Keyword,
   literal::{Literal, NumericLiteral},
+  operator::{Op, Operator, Spacing},
 };
 
 #[derive(MatcherBase)]
@@ -121,4 +122,60 @@ pub fn float(expected: impl Into<String>) -> LiteralMatcher {
   LiteralMatcher {
     expected: Literal::Numeric(NumericLiteral::Float(expected.into())),
   }
+}
+
+#[derive(MatcherBase)]
+pub struct OperatorMatcher {
+  expected: Operator,
+}
+
+impl OperatorMatcher {
+  pub fn new(op: Op, spacing: Spacing) -> Self {
+    Self {
+      expected: Operator::new(op, spacing),
+    }
+  }
+}
+
+impl Matcher<&JangToken> for OperatorMatcher {
+  fn matches(&self, actual: &JangToken) -> MatcherResult {
+    if let JangToken::Operator(literal) = actual
+      && literal == &self.expected
+    {
+      MatcherResult::Match
+    } else {
+      MatcherResult::NoMatch
+    }
+  }
+
+  fn describe(&self, matcher_result: MatcherResult) -> Description {
+    let spacing_str = match &self.expected.spacing() {
+      Spacing::Alone => "",
+      Spacing::Joint => " (joint)",
+    };
+    match matcher_result {
+      MatcherResult::Match => format!("is {}{spacing_str}", self.expected.op()).into(),
+      MatcherResult::NoMatch => format!("is not {}{spacing_str}", self.expected.op()).into(),
+    }
+  }
+}
+
+#[macro_export]
+macro_rules! operator {
+  ($op:ident) => {
+    $crate::parser::token::test_util::OperatorMatcher::new(
+      $crate::parser::token::operator::Op::$op,
+      $crate::parser::token::operator::Spacing::Alone,
+    )
+  };
+}
+
+#[macro_export]
+macro_rules! joint_operator {
+  ($op:ident) => {
+    $crate::parser::token::test_util::OperatorMatcher::new(
+      $crate::parser::token::operator::Op::$op,
+      $crate::parser::token::operator::Spacing::Joint,
+    )
+  };
 }

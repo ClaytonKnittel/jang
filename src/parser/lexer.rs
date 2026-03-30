@@ -7,6 +7,7 @@ use crate::{
     ident::Ident,
     keyword::Keyword,
     literal::{Literal, NumericLiteral},
+    operator::{Op, Operator, Spacing, is_op},
   },
   source_location::SourceLocation,
 };
@@ -54,9 +55,23 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
     }
   }
 
-  fn parse_numeric(&mut self, first_char: char) -> JangResult<JangToken> {
+  fn parse_numeric(&mut self, first_char: char) -> JangToken {
     let numeric = self.collect_while(first_char, is_numeric_char);
-    Ok(NumericLiteral::from_str(numeric).into())
+    NumericLiteral::from_str(numeric).into()
+  }
+
+  fn parse_operator(&mut self, first_char: char) -> JangToken {
+    let spacing = if self.char_iter.peek().as_deref().cloned().is_some_and(is_op) {
+      Spacing::Joint
+    } else {
+      Spacing::Alone
+    };
+    Operator::new(
+      Op::from_char(first_char)
+        .expect("parse_operator should only be called on operator characters"),
+      spacing,
+    )
+    .into()
   }
 
   fn parse_next(&mut self) -> JangResult<Option<JangToken>> {
@@ -65,7 +80,7 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
       Some(first_char @ ('a'..='z' | 'A'..='Z' | '_')) => {
         Ok(Some(self.parse_ident_or_keyword(first_char)?))
       }
-      Some(first_char @ ('0'..='9')) => Ok(Some(self.parse_numeric(first_char)?)),
+      Some(first_char @ ('0'..='9')) => Ok(Some(self.parse_numeric(first_char))),
       Some('.') => {
         if self
           .char_iter
@@ -73,13 +88,13 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
           .as_deref()
           .is_some_and(char::is_ascii_digit)
         {
-          Ok(Some(self.parse_numeric('.')?))
+          Ok(Some(self.parse_numeric('.')))
         } else {
-          Err(JangError::parse_error(
-            format!("Unexpected symbol '.'"),
-            SourceLocation::new(0),
-          ))
+          Ok(Some(self.parse_operator('.')))
         }
+      }
+      Some(first_char @ ('=' | ',' | '(' | ')' | '-' | '<' | '>' | ':')) => {
+        Ok(Some(self.parse_operator(first_char)))
       }
       Some(ch) => Err(JangError::parse_error(
         format!("Unexpected symbol '{ch}'"),
@@ -113,7 +128,7 @@ mod tests {
 
   use crate::{
     error::JangError,
-    keyword,
+    joint_operator, keyword, operator,
     parser::{
       lexer::lex_stream,
       token::test_util::{float, ident, integral},
@@ -196,7 +211,47 @@ mod tests {
     let text = ".";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(tokens, err(pat![JangError::ParseError(anything())]));
+    expect_that!(tokens, ok(elements_are![operator!(Dot)]));
+  }
+
+  #[gtest]
+  fn test_joint_dots() {
+    let text = "..";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![joint_operator!(Dot), operator!(Dot)])
+    );
+  }
+
+  #[gtest]
+  fn test_dots_with_space() {
+    let text = ". .";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(tokens, ok(elements_are![operator!(Dot), operator!(Dot)]));
+  }
+
+  #[gtest]
+  fn test_other_operators() {
+    let text = "= , ( ) - < > : .";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![
+        operator!(Equal),
+        operator!(Comma),
+        operator!(OpenParen),
+        operator!(CloseParen),
+        operator!(Dash),
+        operator!(LessThan),
+        operator!(GreaterThan),
+        operator!(Colon),
+        operator!(Dot)
+      ])
+    );
   }
 
   #[gtest]
