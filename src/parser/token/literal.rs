@@ -27,7 +27,7 @@ impl From<NumericLiteral> for Literal {
 }
 
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use crate::parser::token::{
     JangToken,
     literal::{Literal, NumericLiteral},

@@ -45,7 +45,7 @@ impl BinaryExpression {
 }
 
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use std::ops::Deref;
 
   use crate::parser::ast::{

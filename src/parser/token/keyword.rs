@@ -33,7 +33,7 @@ impl Display for Keyword {
 }
 
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use crate::parser::token::{JangToken, keyword::Keyword};
   use googletest::prelude::*;
 

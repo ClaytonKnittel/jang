@@ -12,7 +12,7 @@ impl Ident {
 }
 
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use crate::parser::token::{JangToken, ident::Ident};
   use googletest::prelude::*;
 

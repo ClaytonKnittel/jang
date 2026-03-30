@@ -1,13 +1,26 @@
-use crate::parser::{ast::expression::Expression, token::ident::Ident};
+use crate::parser::{
+  ast::{
+    block::{NonRetBlock, RetBlock},
+    expression::Expression,
+  },
+  token::ident::Ident,
+};
 
 #[derive(Clone, Debug)]
 pub enum NonRetStatement {
   Let(LetStatement),
+  Block(NonRetBlock),
 }
 
 impl From<LetStatement> for NonRetStatement {
   fn from(value: LetStatement) -> Self {
     Self::Let(value)
+  }
+}
+
+impl From<NonRetBlock> for NonRetStatement {
+  fn from(value: NonRetBlock) -> Self {
+    Self::Block(value)
   }
 }
 
@@ -32,11 +45,11 @@ impl LetStatement {
 }
 
 #[derive(Clone, Debug)]
-pub struct RetStatement {
+pub struct RetExpression {
   expr: Expression,
 }
 
-impl RetStatement {
+impl RetExpression {
   pub fn new(expr: Expression) -> Self {
     Self { expr }
   }
@@ -46,12 +59,30 @@ impl RetStatement {
   }
 }
 
+#[derive(Clone, Debug)]
+pub enum RetStatement {
+  Ret(RetExpression),
+  Block(Box<RetBlock>),
+}
+
+impl From<RetExpression> for RetStatement {
+  fn from(value: RetExpression) -> Self {
+    Self::Ret(value)
+  }
+}
+
+impl<T: Into<Box<RetBlock>>> From<T> for RetStatement {
+  fn from(value: T) -> Self {
+    Self::Block(value.into())
+  }
+}
+
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use crate::parser::{
     ast::{
       expression::Expression,
-      statement::{LetStatement, NonRetStatement, RetStatement},
+      statement::{LetStatement, NonRetStatement, RetExpression, RetStatement},
     },
     token::ident::Ident,
   };
@@ -67,9 +98,9 @@ pub mod matchers {
     })))
   }
 
-  pub fn ret_statement<'a>(
+  pub fn ret_expression<'a>(
     expected: impl Matcher<&'a Expression>,
   ) -> impl Matcher<&'a RetStatement> {
-    pat!(RetStatement { expr: expected })
+    pat!(RetStatement::Ret(pat!(RetExpression { expr: expected })))
   }
 }

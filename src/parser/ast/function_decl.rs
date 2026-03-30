@@ -64,7 +64,7 @@ impl FunctionParameter {
 }
 
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use crate::parser::{
     ast::{
       block::Block,

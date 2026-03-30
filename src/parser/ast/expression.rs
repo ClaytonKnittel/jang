@@ -29,7 +29,7 @@ impl From<BinaryExpression> for Expression {
 }
 
 #[cfg(test)]
-pub mod matchers {
+pub(crate) mod matchers {
   use crate::parser::{
     ast::expression::Expression,
     token::{ident::Ident, literal::Literal},

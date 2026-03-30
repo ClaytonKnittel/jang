@@ -3,10 +3,10 @@ use parser_generator::grammar;
 use crate::parser::{
   ast::{
     binary_expression::{BinaryExpression, BinaryOp},
-    block::{Block, BlockBuilder},
+    block::{Block, BlockBuilder, NonRetBlock, RetBlock},
     expression::Expression,
     function_decl::{FunctionDecl, FunctionParameter},
-    statement::{LetStatement, NonRetStatement, RetStatement},
+    statement::{LetStatement, NonRetStatement, RetExpression, RetStatement},
     type_expr::Type,
   },
   token::{
@@ -39,16 +39,15 @@ grammar!(
 
   <type>: Type => <ident> { Type(#ident) };
 
-  <block_scope>: Block => <open_bracket> <statement_list> <close_bracket> {
-    #statement_list
+  <block_scope>: Block => <ret_block_scope> { #ret_block_scope.into() };
+  <block_scope>: Block => <non_ret_block_scope> { #non_ret_block_scope.into() };
+
+  <ret_block_scope>: RetBlock => <open_bracket> <non_ret_statement_list> <ret_statement> <close_bracket> {
+    #non_ret_statement_list.build_with_ret(#ret_statement)
   };
 
-  <statement_list>: Block => ! { BlockBuilder::new().build() };
-  <statement_list>: Block => <non_ret_statement_list> <non_ret_statement> {
-    #non_ret_statement_list.with_statement(#non_ret_statement).build()
-  };
-  <statement_list>: Block => <non_ret_statement_list> <ret_statement> {
-    #non_ret_statement_list.build_with_ret(#ret_statement)
+  <non_ret_block_scope>: NonRetBlock => <open_bracket> <non_ret_statement_list> <close_bracket> {
+    #non_ret_statement_list.build()
   };
 
   <non_ret_statement_list>: BlockBuilder => ! { BlockBuilder::new() };
@@ -57,12 +56,19 @@ grammar!(
   };
 
   <non_ret_statement>: NonRetStatement => <let_binding>;
+  <non_ret_statement>: NonRetStatement => <non_ret_block_scope> {
+    #non_ret_block_scope.into()
+  };
+
   <let_binding>: NonRetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
     LetStatement::new(#ident, #expr).into()
   };
 
+  <ret_statement>: RetStatement => <ret_block_scope> {
+    #ret_block_scope.into()
+  };
   <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
-    RetStatement::new(#expr)
+    RetExpression::new(#expr).into()
   };
 
   <expr>: Expression => <add_expr>;
@@ -158,13 +164,13 @@ mod tests {
   use crate::parser::{
     ast::{
       binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
-      block::matchers::{block, block_with_ret},
+      block::matchers::{block, block_with_ret, non_ret_block, ret_block},
       expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
         fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
         fn_return_type_none,
       },
-      statement::matchers::{let_statement as let_stmt, ret_statement as ret_stmt},
+      statement::matchers::{let_statement as let_stmt, ret_expression as ret_expr},
       type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
@@ -190,7 +196,7 @@ mod tests {
       ast,
       fn_body(block_with_ret(
         is_empty(),
-        ret_stmt(lit_exp(integral("123")))
+        ret_expr(lit_exp(integral("123")))
       ))
     );
     expect_that!(ast, fn_parameters(is_empty()));
@@ -241,7 +247,30 @@ mod tests {
 
     expect_that!(
       ast,
-      fn_body(block_with_ret(is_empty(), ret_stmt(id_exp(ident("x")))))
+      fn_body(block_with_ret(is_empty(), ret_expr(id_exp(ident("x")))))
+    );
+  }
+
+  #[gtest]
+  fn ret_in_block() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          {
+            ret x
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body(block_with_ret(
+        is_empty(),
+        ret_block(is_empty(), ret_expr(id_exp(ident("x"))))
+      ))
     );
   }
 
@@ -287,7 +316,48 @@ mod tests {
           let_stmt(ident("x"), lit_exp(integral("123"))),
           let_stmt(ident("y"), id_exp(ident("x"))),
         ],
-        ret_stmt(lit_exp(integral("789")))
+        ret_expr(lit_exp(integral("789")))
+      ))
+    );
+  }
+
+  #[gtest]
+  fn nested_blocks() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          {
+            let y = z
+          }
+          let x = 123
+          {
+            let x = x
+            {
+              {
+                ret z
+              }
+            }
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body(block_with_ret(
+        elements_are![
+          non_ret_block(elements_are![let_stmt(ident("y"), id_exp(ident("z")))]),
+          let_stmt(ident("x"), lit_exp(integral("123"))),
+        ],
+        ret_block(
+          elements_are![let_stmt(ident("x"), id_exp(ident("x")))],
+          ret_block(
+            is_empty(),
+            ret_block(is_empty(), ret_expr(id_exp(ident("z"))))
+          )
+        )
       ))
     );
   }
