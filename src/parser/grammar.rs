@@ -2,8 +2,11 @@ use parser_generator::grammar;
 
 use crate::parser::{
   ast::{
-    expression::Expression, function_decl::FunctionDecl, function_decl::FunctionParameter,
-    statement::RetStatement, statement::Statement, type_expr::Type,
+    binary_expression::{BinaryExpression, BinaryOp},
+    expression::Expression,
+    function_decl::{FunctionDecl, FunctionParameter},
+    statement::{LetStatement, RetStatement, Statement},
+    type_expr::Type,
   },
   token::{
     JangToken,
@@ -35,16 +38,50 @@ grammar!(
 
   <type>: Type => <ident> { Type(#ident) };
 
-  <statement_list>: Vec<Statement> => <statement> {
-    vec![#statement] // Just a single ret-statement atm.
+  <statement_list>: Vec<Statement> => ! { Vec::new() };
+  <statement_list>: Vec<Statement> => <non_returning_statement_list> <statement> {
+    #non_returning_statement_list.push(#statement);
+    #non_returning_statement_list
   };
 
-  <statement>: Statement => Keyword(Keyword::Ret) <expr> {
+  <non_returning_statement_list>: Vec<Statement> => ! { Vec::new() };
+  <non_returning_statement_list>: Vec<Statement> => <non_returning_statement_list> <non_return_statement> {
+    #non_returning_statement_list.push(#non_return_statement);
+    #non_returning_statement_list
+  };
+
+  <statement>: Statement => <non_return_statement>;
+  <statement>: Statement => <return_statement>;
+
+  <non_return_statement>: Statement => <let_binding>;
+  <let_binding>: Statement => Keyword(Keyword::Let) <ident> <eq> <expr> {
+    Statement::Let(LetStatement::new(#ident, #expr))
+  };
+
+  <return_statement>: Statement => Keyword(Keyword::Ret) <expr> {
     Statement::Ret(RetStatement::new(#expr))
   };
 
-  <expr>: Expression => Literal(..) {
+  <expr>: Expression => <add_expr>;
+
+  <add_expr>: Expression => <add_expr> <plus> <leaf_expr> {
+    Expression::BinaryExpression(BinaryExpression::new(
+      #add_expr, #leaf_expr, BinaryOp::Add
+    ))
+  };
+  <add_expr>: Expression => <add_expr> <minus> <leaf_expr> {
+    Expression::BinaryExpression(BinaryExpression::new(
+      #add_expr, #leaf_expr, BinaryOp::Sub
+    ))
+  };
+  <add_expr>: Expression => <leaf_expr>;
+
+  <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
+  <leaf_expr>: Expression => Literal(..) {
     Expression::Literal(#0)
+  };
+  <leaf_expr>: Expression => Ident(..) {
+    Expression::Ident(#0)
   };
 
   <parameter_list>: Vec<FunctionParameter> => ! { vec![] };
@@ -59,7 +96,8 @@ grammar!(
     ]
   };
 
-  // <eq> => Operator(Operator { op: Op::Equal, spacing: Spacing::Alone });
+  <eq> => Operator(Operator { op: Op::Equal, spacing: Spacing::Alone });
+  <eq> => Operator(Operator { op: Op::Equal, spacing: Spacing::Joint });
   <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: Spacing::Alone });
   <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: Spacing::Joint });
 
@@ -71,6 +109,12 @@ grammar!(
 
   <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: Spacing::Alone });
   <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: Spacing::Joint });
+
+  <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Alone });
+  <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Joint });
+
+  <minus> => Operator(Operator { op: Op::Dash, spacing: Spacing::Alone });
+  <minus> => Operator(Operator { op: Op::Dash, spacing: Spacing::Joint });
 
   <colon> => Operator(Operator { op: Op::Colon, spacing: Spacing::Alone });
   <comma> => Operator(Operator { op: Op::Comma, spacing: Spacing::Alone });
@@ -90,12 +134,13 @@ mod tests {
 
   use crate::parser::{
     ast::{
-      expression::matchers::literal_expression,
+      binary_expression::{BinaryOp, matchers::binary_expression},
+      expression::matchers::{ident_expression, literal_expression},
       function_decl::matchers::{
         fn_body_matches, fn_name_matches, fn_parameter_name_matches, fn_parameter_type_matches,
         fn_parameters_match, fn_return_type_matches,
       },
-      statement::matchers::ret_statement,
+      statement::matchers::{let_statement, ret_statement},
       type_expr::matchers::type_expr_name_matches,
     },
     grammar::JangGrammar,
@@ -127,6 +172,99 @@ mod tests {
       )))])
     );
     expect_that!(ast, fn_parameters_match(is_empty()));
+  }
+
+  #[gtest]
+  fn reject_two_returns() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          ret 123
+          ret 456
+        }
+        "#
+      .chars(),
+    ));
+
+    expect_that!(ast, err(displays_as(contains_substring("Failed to parse"))));
+  }
+
+  #[gtest]
+  fn ret_ident() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          ret x
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![ret_statement(ident_expression(ident("x")))])
+    );
+  }
+
+  #[gtest]
+  fn let_binding() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = 123
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        literal_expression(integral("123"))
+      )])
+    );
+  }
+
+  #[gtest]
+  fn lets_followed_by_ret() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = 123
+          let y = x
+          ret 789
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![
+        let_statement(ident("x"), literal_expression(integral("123"))),
+        let_statement(ident("y"), ident_expression(ident("x"))),
+        ret_statement(literal_expression(integral("789")))
+      ])
+    );
+  }
+
+  #[gtest]
+  fn reject_let_after_ret() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          ret 123
+          let x = 456
+        }
+        "#
+      .chars(),
+    ));
+
+    expect_that!(ast, err(displays_as(contains_substring("Failed to parse"))));
   }
 
   #[gtest]
@@ -168,6 +306,162 @@ mod tests {
         all!(fn_parameter_name_matches(ident("a"))),
         all!(fn_parameter_name_matches(ident("b")))
       ])
+    );
+  }
+
+  #[gtest]
+  fn add_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = y + 3
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          ident_expression(ident("y")),
+          &BinaryOp::Add,
+          literal_expression(integral("3"))
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn add_left_associativity() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = a + b + c
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          binary_expression(
+            ident_expression(ident("a")),
+            &BinaryOp::Add,
+            ident_expression(ident("b"))
+          ),
+          &BinaryOp::Add,
+          ident_expression(ident("c"))
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn add_sub_equal_precedence() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let add_sub = a + b - c
+          let sub_add = a - b + c
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![
+        let_statement(
+          ident("add_sub"),
+          binary_expression(
+            binary_expression(
+              ident_expression(ident("a")),
+              &BinaryOp::Add,
+              ident_expression(ident("b"))
+            ),
+            &BinaryOp::Sub,
+            ident_expression(ident("c"))
+          )
+        ),
+        let_statement(
+          ident("sub_add"),
+          binary_expression(
+            binary_expression(
+              ident_expression(ident("a")),
+              &BinaryOp::Sub,
+              ident_expression(ident("b"))
+            ),
+            &BinaryOp::Add,
+            ident_expression(ident("c"))
+          )
+        )
+      ])
+    );
+  }
+
+  #[gtest]
+  fn parenthesis_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = (y + z) - (w - 3)
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          binary_expression(
+            ident_expression(ident("y")),
+            &BinaryOp::Add,
+            ident_expression(ident("z"))
+          ),
+          &BinaryOp::Sub,
+          binary_expression(
+            ident_expression(ident("w")),
+            &BinaryOp::Sub,
+            literal_expression(integral("3"))
+          )
+        )
+      )])
+    );
+  }
+
+  #[gtest]
+  fn many_parenthesis() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() -> i32 {
+          let x = (((((((((y))))) + (((((((z)))))))))))
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      fn_body_matches(elements_are![let_statement(
+        ident("x"),
+        binary_expression(
+          ident_expression(ident("y")),
+          &BinaryOp::Add,
+          ident_expression(ident("z"))
+        )
+      )])
     );
   }
 }

@@ -24,6 +24,8 @@ pub enum Op {
   Colon,
   /// '.'
   Dot,
+  /// '+'
+  Plus,
 }
 
 impl Op {
@@ -40,6 +42,7 @@ impl Op {
       '>' => Some(Self::GreaterThan),
       ':' => Some(Self::Colon),
       '.' => Some(Self::Dot),
+      '+' => Some(Self::Plus),
       _ => None,
     }
   }
@@ -57,6 +60,7 @@ impl Op {
       Self::GreaterThan => '>',
       Self::Colon => ':',
       Self::Dot => '.',
+      Self::Plus => '+',
     }
   }
 }
