@@ -34,15 +34,23 @@ pub mod matchers {
   };
   use googletest::prelude::*;
 
-  pub fn integral(expected_value: &str) -> impl Matcher<&JangToken> {
-    pat!(JangToken::Literal(pat!(Literal::Numeric(pat!(
-      NumericLiteral::Integral(eq(expected_value))
+  pub fn integral(expected_value: &str) -> impl Matcher<&Literal> {
+    pat!(Literal::Numeric(pat!(NumericLiteral::Integral(eq(
+      expected_value
     )))))
   }
 
-  pub fn float(expected_value: &str) -> impl Matcher<&JangToken> {
-    pat!(JangToken::Literal(pat!(Literal::Numeric(pat!(
-      NumericLiteral::Float(eq(expected_value))
+  pub fn integral_token(expected_value: &str) -> impl Matcher<&JangToken> {
+    pat!(JangToken::Literal(integral(expected_value)))
+  }
+
+  pub fn float(expected_value: &str) -> impl Matcher<&Literal> {
+    pat!(Literal::Numeric(pat!(NumericLiteral::Float(eq(
+      expected_value
     )))))
+  }
+
+  pub fn float_token(expected_value: &str) -> impl Matcher<&JangToken> {
+    pat!(JangToken::Literal(float(expected_value)))
   }
 }

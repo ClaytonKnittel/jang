@@ -132,8 +132,8 @@ mod tests {
     parser::{
       lexer::lex_stream,
       token::{
-        ident::matchers::ident,
-        literal::matchers::{float, integral},
+        ident::matchers::ident_token,
+        literal::matchers::{float_token, integral_token},
       },
     },
   };
@@ -143,7 +143,7 @@ mod tests {
     let text = "my_idenT";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
-    expect_that!(tokens, elements_are![ident("my_idenT")]);
+    expect_that!(tokens, elements_are![ident_token("my_idenT")]);
   }
 
   #[gtest]
@@ -153,7 +153,7 @@ mod tests {
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
     expect_that!(
       tokens,
-      elements_are![ident("my_"), ident("iden"), ident("T")]
+      elements_are![ident_token("my_"), ident_token("iden"), ident_token("T")]
     );
   }
 
@@ -170,7 +170,10 @@ mod tests {
     let text = "fn my_fn";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
-    expect_that!(tokens, elements_are![keyword!(Function), ident("my_fn")]);
+    expect_that!(
+      tokens,
+      elements_are![keyword!(Function), ident_token("my_fn")]
+    );
   }
 
   #[gtest]
@@ -179,7 +182,7 @@ mod tests {
     let text = "fn2";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
-    expect_that!(tokens, elements_are![ident("fn2")]);
+    expect_that!(tokens, elements_are![ident_token("fn2")]);
   }
 
   #[gtest]
@@ -198,7 +201,7 @@ mod tests {
     let text = "123";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
-    expect_that!(tokens, elements_are![integral("123")]);
+    expect_that!(tokens, elements_are![integral_token("123")]);
   }
 
   #[gtest]
@@ -209,12 +212,12 @@ mod tests {
     expect_that!(
       tokens,
       elements_are![
-        float("1.3"),
-        float("0.56"),
-        float(".92"),
-        float("8."),
-        float(".0"),
-        float("0.")
+        float_token("1.3"),
+        float_token("0.56"),
+        float_token(".92"),
+        float_token("8."),
+        float_token(".0"),
+        float_token("0.")
       ]
     );
   }
@@ -244,7 +247,8 @@ mod tests {
     let text = ". .";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(tokens, ok(elements_are![operator!(Dot), operator!(Dot)]));
+    let x = elements_are![operator!(Dot), operator!(Dot)];
+    expect_that!(tokens, ok(x));
   }
 
   #[gtest]
