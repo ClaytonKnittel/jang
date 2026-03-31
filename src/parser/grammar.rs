@@ -116,38 +116,18 @@ grammar!(
     ]
   };
 
-  <eq> => Operator(Operator { op: Op::Equal, spacing: Spacing::Alone });
-  <eq> => Operator(Operator { op: Op::Equal, spacing: Spacing::Joint });
-  <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: Spacing::Alone });
-  <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: Spacing::Joint });
-
-  <close_paren> => Operator(Operator { op: Op::CloseParen, spacing: Spacing::Alone });
-  <close_paren> => Operator(Operator { op: Op::CloseParen, spacing: Spacing::Joint });
-
-  <open_bracket> => Operator(Operator { op: Op::OpenBracket, spacing: Spacing::Alone });
-  <open_bracket> => Operator(Operator { op: Op::OpenBracket, spacing: Spacing::Joint });
-
-  <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: Spacing::Alone });
-  <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: Spacing::Joint });
-
-  <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Alone });
-  <plus> => Operator(Operator { op: Op::Plus, spacing: Spacing::Joint });
-
-  <minus> => Operator(Operator { op: Op::Dash, spacing: Spacing::Alone });
-  <minus> => Operator(Operator { op: Op::Dash, spacing: Spacing::Joint });
-
-  <mul> => Operator(Operator { op: Op::Star, spacing: Spacing::Alone });
-  <mul> => Operator(Operator { op: Op::Star, spacing: Spacing::Joint });
-
-  <div> => Operator(Operator { op: Op::Slash, spacing: Spacing::Alone });
-  <div> => Operator(Operator { op: Op::Slash, spacing: Spacing::Joint });
-
-  <modulo> => Operator(Operator { op: Op::Percent, spacing: Spacing::Alone });
-  <modulo> => Operator(Operator { op: Op::Percent, spacing: Spacing::Joint });
-
-  <colon> => Operator(Operator { op: Op::Colon, spacing: Spacing::Alone });
-  <comma> => Operator(Operator { op: Op::Comma, spacing: Spacing::Alone });
-
+  <eq> => Operator(Operator { op: Op::Equal, spacing: _ });
+  <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: _ });
+  <close_paren> => Operator(Operator { op: Op::CloseParen, spacing: _ });
+  <open_bracket> => Operator(Operator { op: Op::OpenBracket, spacing: _ });
+  <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: _ });
+  <plus> => Operator(Operator { op: Op::Plus, spacing: _ });
+  <minus> => Operator(Operator { op: Op::Dash, spacing: _ });
+  <mul> => Operator(Operator { op: Op::Star, spacing: _ });
+  <div> => Operator(Operator { op: Op::Slash, spacing: _ });
+  <modulo> => Operator(Operator { op: Op::Percent, spacing: _ });
+  <colon> => Operator(Operator { op: Op::Colon, spacing: _ });
+  <comma> => Operator(Operator { op: Op::Comma, spacing: _ });
   <right_arrow> =>
       Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
       Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Alone });
