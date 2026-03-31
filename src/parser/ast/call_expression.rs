@@ -1,24 +1,21 @@
-use crate::parser::{
-  ast::{expression::Expression, expression_list::ExpressionList},
-  token::ident::Ident,
-};
+use crate::parser::ast::{expression::Expression, expression_list::ExpressionList};
 
 #[derive(Clone, Debug)]
 pub struct CallExpression {
-  name: Ident,
+  target: Box<Expression>,
   argument_list: ExpressionList,
 }
 
 impl CallExpression {
-  pub fn new(name: Ident, argument_list: impl Into<ExpressionList>) -> Self {
+  pub fn new(target: impl Into<Box<Expression>>, argument_list: impl Into<ExpressionList>) -> Self {
     Self {
-      name,
+      target: target.into(),
       argument_list: argument_list.into(),
     }
   }
 
-  pub fn name(&self) -> &Ident {
-    &self.name
+  pub fn target(&self) -> &Expression {
+    &self.target
   }
 
   pub fn argument_list(&self) -> &[Expression] {
@@ -28,16 +25,15 @@ impl CallExpression {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::{
-    ast::{call_expression::CallExpression, expression::Expression},
-    token::ident::Ident,
-  };
+  use crate::parser::ast::{call_expression::CallExpression, expression::Expression};
   use googletest::prelude::*;
 
-  pub fn call_expr_name<'a>(name_matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a Expression> {
+  pub fn call_expr_target<'a>(
+    target_matcher: impl Matcher<&'a Expression>,
+  ) -> impl Matcher<&'a Expression> {
     pat!(Expression::CallExpression(property!(
-      &CallExpression.name(),
-      name_matcher
+      &CallExpression.target(),
+      target_matcher
     )))
   }
 

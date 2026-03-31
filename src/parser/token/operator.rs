@@ -82,10 +82,10 @@ impl Op {
   pub fn can_join(&self, other_op: char) -> bool {
     match self {
       Self::Dash => other_op == '>',
+      Self::CloseParen => other_op == '(',
       Self::Equal
       | Self::Comma
       | Self::OpenParen
-      | Self::CloseParen
       | Self::OpenBracket
       | Self::CloseBracket
       | Self::LessThan
