@@ -127,7 +127,7 @@ grammar!(
   <div> => Operator(Operator { op: Op::Slash, spacing: _ });
   <modulo> => Operator(Operator { op: Op::Percent, spacing: _ });
   <colon> => Operator(Operator { op: Op::Colon, spacing: _ });
-  <comma> => Operator(Operator { op: Op::Colon, spacing: _ });
+  <comma> => Operator(Operator { op: Op::Comma, spacing: _ });
   <right_arrow> =>
       Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
       Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Alone });
