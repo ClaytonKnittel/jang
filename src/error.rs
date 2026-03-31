@@ -40,6 +40,7 @@ impl Debug for ParseError {
 #[derive(Clone)]
 pub enum JangError {
   ParseError(ParseError),
+  UnknownError(String),
 }
 
 impl JangError {
@@ -54,6 +55,7 @@ impl Display for JangError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::ParseError(parse_error) => write!(f, "{parse_error}"),
+      Self::UnknownError(err) => write!(f, "{err}"),
     }
   }
 }

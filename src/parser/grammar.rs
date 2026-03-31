@@ -1,4 +1,4 @@
-use parser_generator::grammar;
+use parser_generator::pub_grammar;
 
 use crate::parser::{
   ast::{
@@ -22,7 +22,7 @@ use crate::parser::{
   },
 };
 
-grammar!(
+pub_grammar!(
   name: JangGrammar;
   enum_terminal: JangToken;
 
