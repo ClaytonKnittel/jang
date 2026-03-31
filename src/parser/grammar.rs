@@ -6,6 +6,7 @@ use crate::parser::{
     block::{Block, BlockBuilder, NonRetBlock, RetBlock},
     call_expression::CallExpression,
     expression::Expression,
+    expression_list::{ExpressionList, ExpressionListBuilder},
     function_decl::{FunctionDecl, FunctionParameter},
     jang_file::{JangFile, JangFileBuilder},
     statement::{LetStatement, NonRetStatement, RetExpression, RetStatement},
@@ -104,10 +105,12 @@ grammar!(
   };
   <mul_expr>: Expression => <call_expr>;
 
-  <call_expr>: Expression => <ident> Joint <open_paren> <close_paren> {
-    CallExpression::new(#ident, vec![]).into()
+  <call_expr>: Expression => <ident> Joint <call_args> {
+    CallExpression::new(#ident, #call_args).into()
   };
   <call_expr>: Expression => <leaf_expr>;
+
+  <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list.build() };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
   <leaf_expr>: Expression => Literal(..) {
@@ -115,6 +118,16 @@ grammar!(
   };
   <leaf_expr>: Expression => <ident> {
     #ident.into()
+  };
+
+  <expr_list>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
+  <expr_list>: ExpressionListBuilder => <non_empty_expr_list>;
+
+  <non_empty_expr_list>: ExpressionListBuilder => <expr> {
+    ExpressionListBuilder::default().push(#expr)
+  };
+  <non_empty_expr_list>: ExpressionListBuilder => <non_empty_expr_list> <comma> <expr> {
+    #non_empty_expr_list.push(#expr)
   };
 
   <function_params>: Vec<FunctionParameter> => <open_paren> <parameter_list> <close_paren> {
@@ -158,26 +171,23 @@ mod tests {
   use googletest::prelude::*;
   use parser_generator::parser::Parser;
 
-  use crate::{
-    operator,
-    parser::{
-      ast::{
-        binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
-        block::matchers::{block, block_with_ret, non_ret_block, ret_block},
-        call_expression::matchers::{call_expr_args, call_expr_name},
-        expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
-        function_decl::matchers::{
-          fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
-          fn_return_type_none,
-        },
-        jang_file::matchers::{jang_file_functions, jang_file_with_fn},
-        statement::matchers::{let_statement as let_stmt, ret_expression as ret_expr},
-        type_expr::matchers::type_expr_name,
+  use crate::parser::{
+    ast::{
+      binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
+      block::matchers::{block, block_with_ret, non_ret_block, ret_block},
+      call_expression::matchers::{call_expr_args, call_expr_name},
+      expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
+      function_decl::matchers::{
+        fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
+        fn_return_type_none,
       },
-      grammar::JangGrammar,
-      lexer::lex_stream,
-      token::{ident::matchers::ident, literal::matchers::integral},
+      jang_file::matchers::{jang_file_functions, jang_file_with_fn},
+      statement::matchers::{let_statement as let_stmt, ret_expression as ret_expr},
+      type_expr::matchers::type_expr_name,
     },
+    grammar::JangGrammar,
+    lexer::lex_stream,
+    token::{ident::matchers::ident, literal::matchers::integral},
   };
 
   #[gtest]

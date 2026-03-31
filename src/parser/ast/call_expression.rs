@@ -1,16 +1,19 @@
-use crate::parser::{ast::expression::Expression, token::ident::Ident};
+use crate::parser::{
+  ast::{expression::Expression, expression_list::ExpressionList},
+  token::ident::Ident,
+};
 
 #[derive(Clone, Debug)]
 pub struct CallExpression {
   name: Ident,
-  argument_list: Vec<Expression>,
+  argument_list: ExpressionList,
 }
 
 impl CallExpression {
-  pub fn new(name: Ident, argument_list: Vec<Expression>) -> Self {
+  pub fn new(name: Ident, argument_list: impl Into<ExpressionList>) -> Self {
     Self {
       name,
-      argument_list,
+      argument_list: argument_list.into(),
     }
   }
 
@@ -19,7 +22,7 @@ impl CallExpression {
   }
 
   pub fn argument_list(&self) -> &[Expression] {
-    &self.argument_list
+    self.argument_list.expressions()
   }
 }
 
