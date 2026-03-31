@@ -17,6 +17,7 @@ use crate::parser::{
     JangToken,
     ident::Ident,
     keyword::Keyword,
+    literal::Literal,
     operator::{Op, Operator},
   },
 };
@@ -95,53 +96,33 @@ grammar!(
   };
   <add_expr>: Expression => <mul_expr>;
 
-  <mul_expr>: Expression => <mul_expr> <mul> <maybe_call_expr> {
-    BinaryExpression::new(#mul_expr, #maybe_call_expr, BinaryOp::Mul).into()
+  <mul_expr>: Expression => <mul_expr> <mul> <unary_expr> {
+    BinaryExpression::new(#mul_expr, #unary_expr, BinaryOp::Mul).into()
   };
-  <mul_expr>: Expression => <mul_expr> <div> <maybe_call_expr> {
-    BinaryExpression::new(#mul_expr, #maybe_call_expr, BinaryOp::Div).into()
+  <mul_expr>: Expression => <mul_expr> <div> <unary_expr> {
+    BinaryExpression::new(#mul_expr, #unary_expr, BinaryOp::Div).into()
   };
-  <mul_expr>: Expression => <mul_expr> <modulo> <maybe_call_expr> {
-    BinaryExpression::new(#mul_expr, #maybe_call_expr, BinaryOp::Mod).into()
+  <mul_expr>: Expression => <mul_expr> <modulo> <unary_expr> {
+    BinaryExpression::new(#mul_expr, #unary_expr, BinaryOp::Mod).into()
   };
-  <mul_expr>: Expression => <maybe_call_expr>;
+  <mul_expr>: Expression => <unary_expr>;
+
+  // Unary expressions:
+  <unary_expr>: Expression => <call_or_dot_expr>;
+  <unary_expr>: Expression => <literal> { #literal.into() };
 
   // Call expressions.
-  <maybe_call_expr>: Expression => <call_expr> { #call_expr.into() };
-  <maybe_call_expr>: Expression => <maybe_dot_expr>;
-
-  <call_expr>: CallExpression => <ident> Joint <call_args> {
-    CallExpression::new(Expression::from(#ident), #call_args)
+  <call_or_dot_expr>: Expression => <call_or_dot_expr> Joint <call_args> {
+    CallExpression::new(#call_or_dot_expr, #call_args).into()
   };
-  <call_expr>: CallExpression => <dot_expr> Joint <call_args> {
-    CallExpression::new(Expression::from(#dot_expr), #call_args)
+  <call_or_dot_expr>: Expression => <call_or_dot_expr> <dot> <ident> {
+    DotExpression::new(#call_or_dot_expr, #ident).into()
   };
-  <call_expr>: CallExpression => <open_paren> <expr> <close_paren> Joint <call_args> {
-    CallExpression::new(#expr, #call_args)
-  };
+  <call_or_dot_expr>: Expression => <leaf_expr>;
 
   <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list.build() };
 
-  <maybe_dot_expr>: Expression => <dot_expr>;
-  <maybe_dot_expr>: Expression => <leaf_expr>;
-
-  <dot_expr>: Expression => <ident> <dot> <ident> {
-    DotExpression::new(Expression::from(#0), #2).into()
-  };
-  <dot_expr>: Expression => <dot_expr> <dot> <ident> {
-    DotExpression::new(Expression::from(#dot_expr), #ident).into()
-  };
-  <dot_expr>: Expression => <call_expr> <dot> <ident> {
-    DotExpression::new(Expression::from(#call_expr), #ident).into()
-  };
-  <dot_expr>: Expression => <open_paren> <expr> <close_paren> <dot> <ident> {
-    #1.into()
-  };
-
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
-  <leaf_expr>: Expression => Literal(..) {
-    Expression::Literal(#0)
-  };
   <leaf_expr>: Expression => <ident> {
     #ident.into()
   };
@@ -190,11 +171,14 @@ grammar!(
       Joint
       Operator(Operator { op: Op::GreaterThan });
 
+  <literal>: Literal => Literal(..);
   <ident>: Ident => Ident(..);
 );
 
 #[cfg(test)]
 mod tests {
+  use std::{error::Error, fmt::Debug};
+
   use googletest::prelude::*;
   use parser_generator::parser::Parser;
 
@@ -217,6 +201,10 @@ mod tests {
     lexer::lex_stream,
     token::{ident::matchers::ident, literal::matchers::integral},
   };
+
+  fn failed_to_parse<'a, T: Debug, E: Error>() -> impl Matcher<&'a std::result::Result<T, E>> {
+    err(displays_as(contains_substring("Failed to parse")))
+  }
 
   #[gtest]
   fn parse_minimal_function() {
@@ -273,7 +261,7 @@ mod tests {
       .chars(),
     ));
 
-    expect_that!(ast, err(displays_as(contains_substring("Failed to parse"))));
+    expect_that!(ast, failed_to_parse());
   }
 
   #[gtest]
@@ -420,7 +408,7 @@ mod tests {
       .chars(),
     ));
 
-    expect_that!(ast, err(displays_as(contains_substring("Failed to parse"))));
+    expect_that!(ast, failed_to_parse());
   }
 
   #[gtest]
@@ -861,6 +849,34 @@ mod tests {
   }
 
   #[gtest]
+  fn dot_paren_expr() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let x = (x + 3).y
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        all![
+          dot_expr_base(bin_exp(
+            id_exp(ident("x")),
+            &BinaryOp::Add,
+            lit_exp(integral("3"))
+          )),
+          dot_expr_member(ident("y"))
+        ]
+      )])))
+    );
+  }
+
+  #[gtest]
   fn chained_dot_expr() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
@@ -891,6 +907,20 @@ mod tests {
         ]
       )])))
     );
+  }
+
+  #[gtest]
+  fn cannot_call_literal() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let x = 1()
+        }
+        "#
+      .chars(),
+    ));
+
+    expect_that!(ast, failed_to_parse());
   }
 
   #[gtest]
