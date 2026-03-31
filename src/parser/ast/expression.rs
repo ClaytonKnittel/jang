@@ -1,5 +1,5 @@
 use crate::parser::{
-  ast::binary_expression::BinaryExpression,
+  ast::{binary_expression::BinaryExpression, call_expression::CallExpression},
   token::{ident::Ident, literal::Literal},
 };
 
@@ -8,6 +8,7 @@ pub enum Expression {
   Literal(Literal),
   Ident(Ident),
   BinaryExpression(BinaryExpression),
+  CallExpression(CallExpression),
 }
 
 impl From<Literal> for Expression {
@@ -25,6 +26,12 @@ impl From<Ident> for Expression {
 impl From<BinaryExpression> for Expression {
   fn from(value: BinaryExpression) -> Self {
     Self::BinaryExpression(value)
+  }
+}
+
+impl From<CallExpression> for Expression {
+  fn from(value: CallExpression) -> Self {
+    Self::CallExpression(value)
   }
 }
 

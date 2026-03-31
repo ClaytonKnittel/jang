@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use crate::parser::token::spacing::Spacing;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
   /// '='
@@ -79,6 +77,10 @@ impl Op {
   }
 }
 
+pub fn is_op(ch: &char) -> bool {
+  Op::from_char(*ch).is_some()
+}
+
 impl Display for Op {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.to_char())
@@ -88,20 +90,15 @@ impl Display for Op {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Operator {
   pub op: Op,
-  pub spacing: Spacing,
 }
 
 impl Operator {
-  pub fn new(op: Op, spacing: Spacing) -> Operator {
-    Self { op, spacing }
+  pub fn new(op: Op) -> Operator {
+    Self { op }
   }
 
   pub fn op(&self) -> Op {
     self.op
-  }
-
-  pub fn spacing(&self) -> Spacing {
-    self.spacing
   }
 }
 
@@ -109,15 +106,12 @@ impl Operator {
 pub(crate) mod matchers {
   use crate::parser::token::{
     JangToken,
-    operator::{Op, Operator, Spacing},
+    operator::{Op, Operator},
   };
   use googletest::prelude::*;
 
-  pub fn operator_matcher<'a>(op: &'a Op, spacing: &'a Spacing) -> impl Matcher<&'a JangToken> {
-    pat!(JangToken::Operator(pat!(Operator {
-      op: op,
-      spacing: spacing
-    })))
+  pub fn operator_matcher<'a>(op: &'a Op) -> impl Matcher<&'a JangToken> {
+    pat!(JangToken::Operator(pat!(Operator { op: op })))
   }
 
   #[macro_export]
@@ -125,17 +119,6 @@ pub(crate) mod matchers {
     ($op:ident) => {
       $crate::parser::token::operator::matchers::operator_matcher(
         &$crate::parser::token::operator::Op::$op,
-        &$crate::parser::token::spacing::Spacing::Alone,
-      )
-    };
-  }
-
-  #[macro_export]
-  macro_rules! joint_operator {
-    ($op:ident) => {
-      $crate::parser::token::operator::matchers::operator_matcher(
-        &$crate::parser::token::operator::Op::$op,
-        &$crate::parser::token::spacing::Spacing::Joint,
       )
     };
   }

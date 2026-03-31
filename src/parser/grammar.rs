@@ -4,6 +4,7 @@ use crate::parser::{
   ast::{
     binary_expression::{BinaryExpression, BinaryOp},
     block::{Block, BlockBuilder, NonRetBlock, RetBlock},
+    call_expression::CallExpression,
     expression::Expression,
     function_decl::{FunctionDecl, FunctionParameter},
     jang_file::{JangFile, JangFileBuilder},
@@ -15,7 +16,6 @@ use crate::parser::{
     ident::Ident,
     keyword::Keyword,
     operator::{Op, Operator},
-    spacing::Spacing,
   },
 };
 
@@ -92,23 +92,28 @@ grammar!(
   };
   <add_expr>: Expression => <mul_expr>;
 
-  <mul_expr>: Expression => <mul_expr> <mul> <leaf_expr> {
-    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Mul).into()
+  <mul_expr>: Expression => <mul_expr> <mul> <call_expr> {
+    BinaryExpression::new(#mul_expr, #call_expr, BinaryOp::Mul).into()
   };
-  <mul_expr>: Expression => <mul_expr> <div> <leaf_expr> {
-    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Div).into()
+  <mul_expr>: Expression => <mul_expr> <div> <call_expr> {
+    BinaryExpression::new(#mul_expr, #call_expr, BinaryOp::Div).into()
   };
-  <mul_expr>: Expression => <mul_expr> <modulo> <leaf_expr> {
-    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Mod).into()
+  <mul_expr>: Expression => <mul_expr> <modulo> <call_expr> {
+    BinaryExpression::new(#mul_expr, #call_expr, BinaryOp::Mod).into()
   };
-  <mul_expr>: Expression => <leaf_expr>;
+  <mul_expr>: Expression => <call_expr>;
+
+  <call_expr>: Expression => <ident> Joint <open_paren> <close_paren> {
+    CallExpression::new(#ident, vec![]).into()
+  };
+  <call_expr>: Expression => <leaf_expr>;
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
   <leaf_expr>: Expression => Literal(..) {
     Expression::Literal(#0)
   };
-  <leaf_expr>: Expression => Ident(..) {
-    Expression::Ident(#0)
+  <leaf_expr>: Expression => <ident> {
+    #ident.into()
   };
 
   <function_params>: Vec<FunctionParameter> => <open_paren> <parameter_list> <close_paren> {
@@ -127,24 +132,22 @@ grammar!(
     ]
   };
 
-  <eq> => Operator(Operator { op: Op::Equal, spacing: _ });
-  <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: _ });
-  <close_paren> => Operator(Operator { op: Op::CloseParen, spacing: _ });
-  <open_bracket> => Operator(Operator { op: Op::OpenBracket, spacing: _ });
-  <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: _ });
-  <plus> => Operator(Operator { op: Op::Plus, spacing: _ });
-  <minus> => Operator(Operator { op: Op::Dash, spacing: _ });
-  <mul> => Operator(Operator { op: Op::Star, spacing: _ });
-  <div> => Operator(Operator { op: Op::Slash, spacing: _ });
-  <modulo> => Operator(Operator { op: Op::Percent, spacing: _ });
-  <colon> => Operator(Operator { op: Op::Colon, spacing: _ });
-  <comma> => Operator(Operator { op: Op::Comma, spacing: _ });
+  <eq> => Operator(Operator { op: Op::Equal });
+  <open_paren> => Operator(Operator { op: Op::OpenParen });
+  <close_paren> => Operator(Operator { op: Op::CloseParen });
+  <open_bracket> => Operator(Operator { op: Op::OpenBracket });
+  <close_bracket> => Operator(Operator { op: Op::CloseBracket });
+  <plus> => Operator(Operator { op: Op::Plus });
+  <minus> => Operator(Operator { op: Op::Dash });
+  <mul> => Operator(Operator { op: Op::Star });
+  <div> => Operator(Operator { op: Op::Slash });
+  <modulo> => Operator(Operator { op: Op::Percent });
+  <colon> => Operator(Operator { op: Op::Colon });
+  <comma> => Operator(Operator { op: Op::Comma });
   <right_arrow> =>
-      Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
-      Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Alone });
-  <right_arrow> =>
-      Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
-      Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Joint });
+      Operator(Operator { op: Op::Dash })
+      Joint
+      Operator(Operator { op: Op::GreaterThan });
 
   <ident>: Ident => Ident(..);
 );

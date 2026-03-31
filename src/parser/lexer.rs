@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use cknittel_util::peekable_stream::{IntoPeekableStream, PeekableStream};
 
 use crate::{
@@ -7,8 +9,7 @@ use crate::{
     ident::Ident,
     keyword::Keyword,
     literal::NumericLiteral,
-    operator::{Op, Operator},
-    spacing::Spacing,
+    operator::{Op, Operator, is_op},
   },
   source_location::SourceLocation,
 };
@@ -23,6 +24,7 @@ fn is_numeric_char(ch: &char) -> bool {
 
 struct TokenIter<I: Iterator<Item = char>> {
   char_iter: PeekableStream<I>,
+  should_emit_joint: bool,
 }
 
 impl<I: Iterator<Item = char>> TokenIter<I> {
@@ -37,19 +39,8 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
     }
   }
 
-  /// Returns `Spacing::Alone` if the next token in the stream is either
-  /// whitespace or EOF, otherwise returning `Spacing::Joint`.
-  fn spacing_for_cur_token(&mut self) -> Spacing {
-    if self
-      .char_iter
-      .peek()
-      .as_deref()
-      .is_none_or(char::is_ascii_whitespace)
-    {
-      Spacing::Alone
-    } else {
-      Spacing::Joint
-    }
+  fn peek_next_token(&mut self) -> Option<impl Deref<Target = char>> {
+    self.char_iter.peek()
   }
 
   fn collect_while<F: FnMut(&char) -> bool>(&mut self, first_char: char, mut cond: F) -> String {
@@ -64,11 +55,20 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
 
   fn parse_ident_or_keyword(&mut self, first_char: char) -> JangResult<JangToken> {
     let ident = self.collect_while(first_char, is_ident_char);
-    let spacing = self.spacing_for_cur_token();
     if let Some(keyword) = Keyword::build_from_string(&ident) {
       Ok(keyword.into())
     } else {
-      Ok(Ident::new(ident, spacing).into())
+      if self
+        .peek_next_token()
+        .as_deref()
+        .is_some_and(|ch| *ch == '(')
+      {
+        // Identifiers join to open parenthesis, to disambiguate function calls
+        // from an expression on one line that ends with an ident, followed by
+        // an expression on the next line that starts with open parenthesis.
+        self.should_emit_joint = true;
+      }
+      Ok(Ident::new(ident).into())
     }
   }
 
@@ -78,12 +78,12 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
-    Operator::new(
-      Op::from_char(first_char)
-        .expect("parse_operator should only be called on operator characters"),
-      self.spacing_for_cur_token(),
-    )
-    .into()
+    if self.peek_next_token().as_deref().is_some_and(is_op) {
+      self.should_emit_joint = true;
+    }
+    let op = Op::from_char(first_char)
+      .expect("parse_operator should only be called on operator characters");
+    Operator::new(op).into()
   }
 
   fn parse_next(&mut self) -> JangResult<Option<JangToken>> {
@@ -122,7 +122,12 @@ impl<I: Iterator<Item = char>> Iterator for TokenIter<I> {
   type Item = JangResult<JangToken>;
 
   fn next(&mut self) -> Option<Self::Item> {
-    self.parse_next().transpose()
+    if self.should_emit_joint {
+      self.should_emit_joint = false;
+      Some(Ok(JangToken::Joint))
+    } else {
+      self.parse_next().transpose()
+    }
   }
 }
 
@@ -131,6 +136,7 @@ pub fn lex_stream<I: IntoIterator<Item = char>>(
 ) -> impl Iterator<Item = JangResult<JangToken>> {
   TokenIter {
     char_iter: stream.into_iter().peekable_stream(),
+    should_emit_joint: false,
   }
 }
 
@@ -141,12 +147,13 @@ mod tests {
 
   use crate::{
     error::JangError,
-    joint_operator, keyword, operator,
+    keyword, operator,
     parser::{
       lexer::lex_stream,
       token::{
         ident::matchers::ident_token,
         literal::matchers::{float_token, integral_token},
+        matchers::joint,
       },
     },
   };
@@ -167,6 +174,23 @@ mod tests {
     expect_that!(
       tokens,
       elements_are![ident_token("my_"), ident_token("iden"), ident_token("T")]
+    );
+  }
+
+  #[gtest]
+  fn test_joint_ident() {
+    let text = "lone ( joint(";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
+    expect_that!(
+      tokens,
+      elements_are![
+        ident_token("lone"),
+        operator!(OpenParen),
+        ident_token("joint"),
+        joint(),
+        operator!(OpenParen)
+      ]
     );
   }
 
@@ -251,7 +275,7 @@ mod tests {
     let tokens = lex_stream(text.chars()).collect_result_vec();
     expect_that!(
       tokens,
-      ok(elements_are![joint_operator!(Dot), operator!(Dot)])
+      ok(elements_are![operator!(Dot), joint(), operator!(Dot)])
     );
   }
 

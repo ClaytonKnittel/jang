@@ -1,17 +1,11 @@
-use crate::parser::token::spacing::Spacing;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ident {
   name: String,
-  spacing: Spacing,
 }
 
 impl Ident {
-  pub fn new(name: impl Into<String>, spacing: Spacing) -> Self {
-    Self {
-      name: name.into(),
-      spacing,
-    }
+  pub fn new(name: impl Into<String>) -> Self {
+    Self { name: name.into() }
   }
 
   pub fn name(&self) -> &str {
@@ -27,7 +21,6 @@ pub(crate) mod matchers {
   pub fn ident(expected_name: &str) -> impl Matcher<&Ident> {
     pat!(Ident {
       name: eq(expected_name),
-      spacing: anything(),
     })
   }
 
