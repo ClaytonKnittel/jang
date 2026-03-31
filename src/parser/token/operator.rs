@@ -75,6 +75,26 @@ impl Op {
       Self::Percent => '%',
     }
   }
+
+  pub fn can_join(&self, other_op: char) -> bool {
+    match self {
+      Self::Dash => other_op == '>',
+      Self::Equal
+      | Self::Comma
+      | Self::OpenParen
+      | Self::CloseParen
+      | Self::OpenBracket
+      | Self::CloseBracket
+      | Self::LessThan
+      | Self::GreaterThan
+      | Self::Colon
+      | Self::Dot
+      | Self::Plus
+      | Self::Star
+      | Self::Slash
+      | Self::Percent => false,
+    }
+  }
 }
 
 pub fn is_op(ch: &char) -> bool {

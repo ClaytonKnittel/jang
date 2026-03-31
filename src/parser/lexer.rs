@@ -78,11 +78,17 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
-    if self.peek_next_token().as_deref().is_some_and(is_op) {
-      self.should_emit_joint = true;
-    }
     let op = Op::from_char(first_char)
       .expect("parse_operator should only be called on operator characters");
+
+    if self
+      .peek_next_token()
+      .as_deref()
+      .is_some_and(|next_char| op.can_join(*next_char))
+    {
+      self.should_emit_joint = true;
+    }
+
     Operator::new(op).into()
   }
 
@@ -269,22 +275,26 @@ mod tests {
   }
 
   #[gtest]
-  fn test_joint_dots() {
-    let text = "..";
+  fn test_joint_arrow() {
+    let text = "->";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
     expect_that!(
       tokens,
-      ok(elements_are![operator!(Dot), joint(), operator!(Dot)])
+      ok(elements_are![
+        operator!(Dash),
+        joint(),
+        operator!(GreaterThan)
+      ])
     );
   }
 
   #[gtest]
-  fn test_dots_with_space() {
-    let text = ". .";
+  fn test_arrow_with_space() {
+    let text = "- >";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    let x = elements_are![operator!(Dot), operator!(Dot)];
+    let x = elements_are![operator!(Dash), operator!(GreaterThan)];
     expect_that!(tokens, ok(x));
   }
 

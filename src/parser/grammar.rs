@@ -36,6 +36,7 @@ grammar!(
   <function_decl>: FunctionDecl =>
       Keyword(Keyword::Function)
       <ident>
+      Joint
       <function_params>
       <function_ret_type>
       <block_scope>
@@ -154,7 +155,6 @@ grammar!(
 
 #[cfg(test)]
 mod tests {
-
   use googletest::prelude::*;
   use parser_generator::parser::Parser;
 
