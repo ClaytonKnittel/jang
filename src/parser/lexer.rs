@@ -7,7 +7,8 @@ use crate::{
     ident::Ident,
     keyword::Keyword,
     literal::NumericLiteral,
-    operator::{Op, Operator, Spacing, is_op},
+    operator::{Op, Operator},
+    spacing::Spacing,
   },
   source_location::SourceLocation,
 };
@@ -36,6 +37,21 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
     }
   }
 
+  /// Returns `Spacing::Alone` if the next token in the stream is either
+  /// whitespace or EOF, otherwise returning `Spacing::Joint`.
+  fn spacing_for_cur_token(&mut self) -> Spacing {
+    if self
+      .char_iter
+      .peek()
+      .as_deref()
+      .is_none_or(char::is_ascii_whitespace)
+    {
+      Spacing::Alone
+    } else {
+      Spacing::Joint
+    }
+  }
+
   fn collect_while<F: FnMut(&char) -> bool>(&mut self, first_char: char, mut cond: F) -> String {
     let mut string_val = String::from(first_char);
     while let Some(next_char) = self.char_iter.peek()
@@ -48,10 +64,11 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
 
   fn parse_ident_or_keyword(&mut self, first_char: char) -> JangResult<JangToken> {
     let ident = self.collect_while(first_char, is_ident_char);
+    let spacing = self.spacing_for_cur_token();
     if let Some(keyword) = Keyword::build_from_string(&ident) {
       Ok(keyword.into())
     } else {
-      Ok(Ident::new(ident).into())
+      Ok(Ident::new(ident, spacing).into())
     }
   }
 
@@ -61,15 +78,10 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
-    let spacing = if self.char_iter.peek().as_deref().cloned().is_some_and(is_op) {
-      Spacing::Joint
-    } else {
-      Spacing::Alone
-    };
     Operator::new(
       Op::from_char(first_char)
         .expect("parse_operator should only be called on operator characters"),
-      spacing,
+      self.spacing_for_cur_token(),
     )
     .into()
   }

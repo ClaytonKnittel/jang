@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::parser::token::spacing::Spacing;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
   /// '='
@@ -83,22 +85,6 @@ impl Display for Op {
   }
 }
 
-pub fn is_op(ch: char) -> bool {
-  Op::from_char(ch).is_some()
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Spacing {
-  /// This operator is followed by either something that isn't an operator, or
-  /// whitespace.
-  Alone,
-  /// This operator is joined to the following operator. Joining happens
-  /// whenever two operators are adjacent without separating whitespace,
-  /// regardless of whether the two operators form a joined operator in the
-  /// grammar.
-  Joint,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Operator {
   pub op: Op,
@@ -139,7 +125,7 @@ pub(crate) mod matchers {
     ($op:ident) => {
       $crate::parser::token::operator::matchers::operator_matcher(
         &$crate::parser::token::operator::Op::$op,
-        &$crate::parser::token::operator::Spacing::Alone,
+        &$crate::parser::token::spacing::Spacing::Alone,
       )
     };
   }
@@ -149,7 +135,7 @@ pub(crate) mod matchers {
     ($op:ident) => {
       $crate::parser::token::operator::matchers::operator_matcher(
         &$crate::parser::token::operator::Op::$op,
-        &$crate::parser::token::operator::Spacing::Joint,
+        &$crate::parser::token::spacing::Spacing::Joint,
       )
     };
   }

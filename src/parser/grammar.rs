@@ -14,7 +14,8 @@ use crate::parser::{
     JangToken,
     ident::Ident,
     keyword::Keyword,
-    operator::{Op, Operator, Spacing},
+    operator::{Op, Operator},
+    spacing::Spacing,
   },
 };
 
@@ -31,6 +32,7 @@ grammar!(
     JangFileBuilder::new()
   };
 
+  // TODO: if return type is not none, require a ret, and vice versa?
   <function_decl>: FunctionDecl =>
       Keyword(Keyword::Function)
       <ident>
@@ -140,6 +142,9 @@ grammar!(
   <right_arrow> =>
       Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
       Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Alone });
+  <right_arrow> =>
+      Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
+      Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Joint });
 
   <ident>: Ident => Ident(..);
 );

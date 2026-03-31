@@ -2,6 +2,7 @@ pub mod ident;
 pub mod keyword;
 pub mod literal;
 pub mod operator;
+pub mod spacing;
 
 use crate::parser::token::{ident::Ident, keyword::Keyword, literal::Literal, operator::Operator};
 
