@@ -76,6 +76,9 @@ impl Op {
     }
   }
 
+  /// Returns true if this operator can join with `other_op`. This should
+  /// always return false for non-operator `other_op`. Joint operators are
+  /// treated differently from pairs of separated ones (e.g. "==" vs. "= =").
   pub fn can_join(&self, other_op: char) -> bool {
     match self {
       Self::Dash => other_op == '>',
