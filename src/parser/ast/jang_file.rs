@@ -11,7 +11,7 @@ impl JangFile {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct JangFileBuilder {
   function_decls: Vec<FunctionDecl>,
 }
