@@ -10,7 +10,7 @@ impl BlockBuilder {
     Self::default()
   }
 
-  pub fn with_statement(mut self, statement: impl Into<NonRetStatement>) -> Self {
+  pub fn push_statement(mut self, statement: impl Into<NonRetStatement>) -> Self {
     self.statements.push(statement.into());
     self
   }

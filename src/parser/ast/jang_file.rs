@@ -23,7 +23,7 @@ impl JangFileBuilder {
     }
   }
 
-  pub fn add_function_decl(mut self, function_decl: FunctionDecl) -> JangFileBuilder {
+  pub fn push_function_decl(mut self, function_decl: FunctionDecl) -> JangFileBuilder {
     self.function_decls.push(function_decl);
     self
   }

@@ -25,7 +25,7 @@ grammar!(
   <root>: JangFile => <jang_file> { #jang_file.build() };
 
   <jang_file>: JangFileBuilder => <jang_file> <function_decl> {
-    #jang_file.add_function_decl(#function_decl)
+    #jang_file.push_function_decl(#function_decl)
   };
   <jang_file>: JangFileBuilder => ! {
     JangFileBuilder::new()
@@ -61,7 +61,7 @@ grammar!(
 
   <non_ret_statement_list>: BlockBuilder => ! { BlockBuilder::new() };
   <non_ret_statement_list>: BlockBuilder => <non_ret_statement_list> <non_ret_statement> {
-    #non_ret_statement_list.with_statement(#non_ret_statement)
+    #non_ret_statement_list.push_statement(#non_ret_statement)
   };
 
   <non_ret_statement>: NonRetStatement => <let_binding>;
