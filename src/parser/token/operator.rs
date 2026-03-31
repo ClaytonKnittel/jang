@@ -75,6 +75,29 @@ impl Op {
       Self::Percent => '%',
     }
   }
+
+  /// Returns true if this operator can join with `other_op`. This should
+  /// always return false for non-operator `other_op`. Joint operators are
+  /// treated differently from pairs of separated ones (e.g. "==" vs. "= =").
+  pub fn can_join(&self, other_op: char) -> bool {
+    match self {
+      Self::Dash => other_op == '>',
+      Self::Equal
+      | Self::Comma
+      | Self::OpenParen
+      | Self::CloseParen
+      | Self::OpenBracket
+      | Self::CloseBracket
+      | Self::LessThan
+      | Self::GreaterThan
+      | Self::Colon
+      | Self::Dot
+      | Self::Plus
+      | Self::Star
+      | Self::Slash
+      | Self::Percent => false,
+    }
+  }
 }
 
 impl Display for Op {
@@ -83,39 +106,18 @@ impl Display for Op {
   }
 }
 
-pub fn is_op(ch: char) -> bool {
-  Op::from_char(ch).is_some()
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Spacing {
-  /// This operator is followed by either something that isn't an operator, or
-  /// whitespace.
-  Alone,
-  /// This operator is joined to the following operator. Joining happens
-  /// whenever two operators are adjacent without separating whitespace,
-  /// regardless of whether the two operators form a joined operator in the
-  /// grammar.
-  Joint,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Operator {
   pub op: Op,
-  pub spacing: Spacing,
 }
 
 impl Operator {
-  pub fn new(op: Op, spacing: Spacing) -> Operator {
-    Self { op, spacing }
+  pub fn new(op: Op) -> Operator {
+    Self { op }
   }
 
   pub fn op(&self) -> Op {
     self.op
-  }
-
-  pub fn spacing(&self) -> Spacing {
-    self.spacing
   }
 }
 
@@ -123,15 +125,12 @@ impl Operator {
 pub(crate) mod matchers {
   use crate::parser::token::{
     JangToken,
-    operator::{Op, Operator, Spacing},
+    operator::{Op, Operator},
   };
   use googletest::prelude::*;
 
-  pub fn operator_matcher<'a>(op: &'a Op, spacing: &'a Spacing) -> impl Matcher<&'a JangToken> {
-    pat!(JangToken::Operator(pat!(Operator {
-      op: op,
-      spacing: spacing
-    })))
+  pub fn operator_matcher<'a>(op: &'a Op) -> impl Matcher<&'a JangToken> {
+    pat!(JangToken::Operator(pat!(Operator { op: op })))
   }
 
   #[macro_export]
@@ -139,17 +138,6 @@ pub(crate) mod matchers {
     ($op:ident) => {
       $crate::parser::token::operator::matchers::operator_matcher(
         &$crate::parser::token::operator::Op::$op,
-        &$crate::parser::token::operator::Spacing::Alone,
-      )
-    };
-  }
-
-  #[macro_export]
-  macro_rules! joint_operator {
-    ($op:ident) => {
-      $crate::parser::token::operator::matchers::operator_matcher(
-        &$crate::parser::token::operator::Op::$op,
-        &$crate::parser::token::operator::Spacing::Joint,
       )
     };
   }

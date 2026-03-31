@@ -1,13 +1,15 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Ident(String);
+pub struct Ident {
+  name: String,
+}
 
 impl Ident {
   pub fn new(name: impl Into<String>) -> Self {
-    Self(name.into())
+    Self { name: name.into() }
   }
 
   pub fn name(&self) -> &str {
-    &self.0
+    &self.name
   }
 }
 
@@ -17,7 +19,9 @@ pub(crate) mod matchers {
   use googletest::prelude::*;
 
   pub fn ident(expected_name: &str) -> impl Matcher<&Ident> {
-    pat!(Ident(eq(expected_name)))
+    pat!(Ident {
+      name: eq(expected_name),
+    })
   }
 
   pub fn ident_token(expected_name: &str) -> impl Matcher<&JangToken> {

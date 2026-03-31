@@ -4,7 +4,9 @@ use crate::parser::{
   ast::{
     binary_expression::{BinaryExpression, BinaryOp},
     block::{Block, BlockBuilder, NonRetBlock, RetBlock},
+    call_expression::CallExpression,
     expression::Expression,
+    expression_list::{ExpressionList, ExpressionListBuilder},
     function_decl::{FunctionDecl, FunctionParameter},
     jang_file::{JangFile, JangFileBuilder},
     statement::{LetStatement, NonRetStatement, RetExpression, RetStatement},
@@ -14,7 +16,7 @@ use crate::parser::{
     JangToken,
     ident::Ident,
     keyword::Keyword,
-    operator::{Op, Operator, Spacing},
+    operator::{Op, Operator},
   },
 };
 
@@ -31,9 +33,11 @@ grammar!(
     JangFileBuilder::new()
   };
 
+  // TODO: if return type is not none, require a ret, and vice versa?
   <function_decl>: FunctionDecl =>
       Keyword(Keyword::Function)
       <ident>
+      Joint
       <function_params>
       <function_ret_type>
       <block_scope>
@@ -90,23 +94,40 @@ grammar!(
   };
   <add_expr>: Expression => <mul_expr>;
 
-  <mul_expr>: Expression => <mul_expr> <mul> <leaf_expr> {
-    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Mul).into()
+  <mul_expr>: Expression => <mul_expr> <mul> <call_expr> {
+    BinaryExpression::new(#mul_expr, #call_expr, BinaryOp::Mul).into()
   };
-  <mul_expr>: Expression => <mul_expr> <div> <leaf_expr> {
-    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Div).into()
+  <mul_expr>: Expression => <mul_expr> <div> <call_expr> {
+    BinaryExpression::new(#mul_expr, #call_expr, BinaryOp::Div).into()
   };
-  <mul_expr>: Expression => <mul_expr> <modulo> <leaf_expr> {
-    BinaryExpression::new(#mul_expr, #leaf_expr, BinaryOp::Mod).into()
+  <mul_expr>: Expression => <mul_expr> <modulo> <call_expr> {
+    BinaryExpression::new(#mul_expr, #call_expr, BinaryOp::Mod).into()
   };
-  <mul_expr>: Expression => <leaf_expr>;
+  <mul_expr>: Expression => <call_expr>;
+
+  <call_expr>: Expression => <ident> Joint <call_args> {
+    CallExpression::new(#ident, #call_args).into()
+  };
+  <call_expr>: Expression => <leaf_expr>;
+
+  <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list.build() };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
   <leaf_expr>: Expression => Literal(..) {
     Expression::Literal(#0)
   };
-  <leaf_expr>: Expression => Ident(..) {
-    Expression::Ident(#0)
+  <leaf_expr>: Expression => <ident> {
+    #ident.into()
+  };
+
+  <expr_list>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
+  <expr_list>: ExpressionListBuilder => <non_empty_expr_list>;
+
+  <non_empty_expr_list>: ExpressionListBuilder => <expr> {
+    ExpressionListBuilder::default().push(#expr)
+  };
+  <non_empty_expr_list>: ExpressionListBuilder => <non_empty_expr_list> <comma> <expr> {
+    #non_empty_expr_list.push(#expr)
   };
 
   <function_params>: Vec<FunctionParameter> => <open_paren> <parameter_list> <close_paren> {
@@ -125,28 +146,28 @@ grammar!(
     ]
   };
 
-  <eq> => Operator(Operator { op: Op::Equal, spacing: _ });
-  <open_paren> => Operator(Operator { op: Op::OpenParen, spacing: _ });
-  <close_paren> => Operator(Operator { op: Op::CloseParen, spacing: _ });
-  <open_bracket> => Operator(Operator { op: Op::OpenBracket, spacing: _ });
-  <close_bracket> => Operator(Operator { op: Op::CloseBracket, spacing: _ });
-  <plus> => Operator(Operator { op: Op::Plus, spacing: _ });
-  <minus> => Operator(Operator { op: Op::Dash, spacing: _ });
-  <mul> => Operator(Operator { op: Op::Star, spacing: _ });
-  <div> => Operator(Operator { op: Op::Slash, spacing: _ });
-  <modulo> => Operator(Operator { op: Op::Percent, spacing: _ });
-  <colon> => Operator(Operator { op: Op::Colon, spacing: _ });
-  <comma> => Operator(Operator { op: Op::Comma, spacing: _ });
+  <eq> => Operator(Operator { op: Op::Equal });
+  <open_paren> => Operator(Operator { op: Op::OpenParen });
+  <close_paren> => Operator(Operator { op: Op::CloseParen });
+  <open_bracket> => Operator(Operator { op: Op::OpenBracket });
+  <close_bracket> => Operator(Operator { op: Op::CloseBracket });
+  <plus> => Operator(Operator { op: Op::Plus });
+  <minus> => Operator(Operator { op: Op::Dash });
+  <mul> => Operator(Operator { op: Op::Star });
+  <div> => Operator(Operator { op: Op::Slash });
+  <modulo> => Operator(Operator { op: Op::Percent });
+  <colon> => Operator(Operator { op: Op::Colon });
+  <comma> => Operator(Operator { op: Op::Comma });
   <right_arrow> =>
-      Operator(Operator { op: Op::Dash, spacing: Spacing::Joint })
-      Operator(Operator { op: Op::GreaterThan, spacing: Spacing::Alone });
+      Operator(Operator { op: Op::Dash })
+      Joint
+      Operator(Operator { op: Op::GreaterThan });
 
   <ident>: Ident => Ident(..);
 );
 
 #[cfg(test)]
 mod tests {
-
   use googletest::prelude::*;
   use parser_generator::parser::Parser;
 
@@ -154,6 +175,7 @@ mod tests {
     ast::{
       binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
       block::matchers::{block, block_with_ret, non_ret_block, ret_block},
+      call_expression::matchers::{call_expr_args, call_expr_name},
       expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
         fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
@@ -660,6 +682,69 @@ mod tests {
           )
         )
       ])))
+    );
+  }
+
+  #[gtest]
+  fn call_expr() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let x = y() + z()
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        bin_exp(
+          all![call_expr_name(ident("y")), call_expr_args(is_empty())],
+          &BinaryOp::Add,
+          all![call_expr_name(ident("z")), call_expr_args(is_empty())],
+        )
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn call_expr_with_args() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let x = y(1) + z(w, 2 + 3)
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        bin_exp(
+          all![
+            call_expr_name(ident("y")),
+            call_expr_args(elements_are![lit_exp(integral("1"))])
+          ],
+          &BinaryOp::Add,
+          all![
+            call_expr_name(ident("z")),
+            call_expr_args(elements_are![
+              id_exp(ident("w")),
+              bin_exp(
+                lit_exp(integral("2")),
+                &BinaryOp::Add,
+                lit_exp(integral("3"))
+              )
+            ])
+          ],
+        )
+      )])))
     );
   }
 

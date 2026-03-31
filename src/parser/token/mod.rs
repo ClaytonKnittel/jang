@@ -11,6 +11,10 @@ pub enum JangToken {
   Keyword(Keyword),
   Literal(Literal),
   Operator(Operator),
+  /// Joint tokens are placed between operators which are not separated by
+  /// whitespcae, or between an identifier which is immediately followed by
+  /// open parenthesis.
+  Joint,
 }
 
 impl From<Ident> for JangToken {
@@ -34,5 +38,15 @@ impl<L: Into<Literal>> From<L> for JangToken {
 impl From<Operator> for JangToken {
   fn from(value: Operator) -> Self {
     Self::Operator(value)
+  }
+}
+
+#[cfg(test)]
+pub(crate) mod matchers {
+  use crate::parser::token::JangToken;
+  use googletest::prelude::*;
+
+  pub fn joint<'a>() -> impl Matcher<&'a JangToken> {
+    pat!(JangToken::Joint)
   }
 }
