@@ -9,7 +9,7 @@ use crate::{
     ident::Ident,
     keyword::Keyword,
     literal::NumericLiteral,
-    operator::{Op, Operator, is_op},
+    operator::{Op, Operator},
   },
   source_location::SourceLocation,
 };

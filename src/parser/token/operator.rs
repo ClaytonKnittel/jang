@@ -97,10 +97,6 @@ impl Op {
   }
 }
 
-pub fn is_op(ch: &char) -> bool {
-  Op::from_char(*ch).is_some()
-}
-
 impl Display for Op {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.to_char())

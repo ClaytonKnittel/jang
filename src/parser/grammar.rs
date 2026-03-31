@@ -158,22 +158,26 @@ mod tests {
   use googletest::prelude::*;
   use parser_generator::parser::Parser;
 
-  use crate::parser::{
-    ast::{
-      binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
-      block::matchers::{block, block_with_ret, non_ret_block, ret_block},
-      expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
-      function_decl::matchers::{
-        fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
-        fn_return_type_none,
+  use crate::{
+    operator,
+    parser::{
+      ast::{
+        binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
+        block::matchers::{block, block_with_ret, non_ret_block, ret_block},
+        call_expression::matchers::{call_expr_args, call_expr_name},
+        expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
+        function_decl::matchers::{
+          fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
+          fn_return_type_none,
+        },
+        jang_file::matchers::{jang_file_functions, jang_file_with_fn},
+        statement::matchers::{let_statement as let_stmt, ret_expression as ret_expr},
+        type_expr::matchers::type_expr_name,
       },
-      jang_file::matchers::{jang_file_functions, jang_file_with_fn},
-      statement::matchers::{let_statement as let_stmt, ret_expression as ret_expr},
-      type_expr::matchers::type_expr_name,
+      grammar::JangGrammar,
+      lexer::lex_stream,
+      token::{ident::matchers::ident, literal::matchers::integral},
     },
-    grammar::JangGrammar,
-    lexer::lex_stream,
-    token::{ident::matchers::ident, literal::matchers::integral},
   };
 
   #[gtest]
@@ -668,6 +672,69 @@ mod tests {
           )
         )
       ])))
+    );
+  }
+
+  #[gtest]
+  fn call_expr() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let x = y() + z()
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        bin_exp(
+          all![call_expr_name(ident("y")), call_expr_args(is_empty())],
+          &BinaryOp::Add,
+          all![call_expr_name(ident("z")), call_expr_args(is_empty())],
+        )
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn call_expr_with_args() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let x = y(1) + z(w, 2 + 3)
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        bin_exp(
+          all![
+            call_expr_name(ident("y")),
+            call_expr_args(elements_are![lit_exp(integral("1"))])
+          ],
+          &BinaryOp::Add,
+          all![
+            call_expr_name(ident("z")),
+            call_expr_args(elements_are![
+              id_exp(ident("w")),
+              bin_exp(
+                lit_exp(integral("2")),
+                &BinaryOp::Add,
+                lit_exp(integral("3"))
+              )
+            ])
+          ],
+        )
+      )])))
     );
   }
 
