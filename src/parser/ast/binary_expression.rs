@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::parser::ast::expression::Expression;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -7,6 +9,22 @@ pub enum BinaryOp {
   Mul,
   Div,
   Mod,
+}
+
+impl Display for BinaryOp {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{}",
+      match self {
+        Self::Add => '+',
+        Self::Sub => '-',
+        Self::Mul => '*',
+        Self::Div => '/',
+        Self::Mod => '%',
+      }
+    )
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -41,6 +59,12 @@ impl BinaryExpression {
       rhs: rhs.into(),
       op,
     }
+  }
+}
+
+impl Display for BinaryExpression {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{} {} {}", self.lhs, self.op, self.rhs)
   }
 }
 

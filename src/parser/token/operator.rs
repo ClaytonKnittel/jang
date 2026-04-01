@@ -129,7 +129,7 @@ pub(crate) mod matchers {
   };
   use googletest::prelude::*;
 
-  pub fn operator_matcher<'a>(op: &'a Op) -> impl Matcher<&'a JangToken> {
+  pub fn operator_matcher(op: &Op) -> impl Matcher<&JangToken> {
     pat!(JangToken::Operator(pat!(Operator { op: op })))
   }
 

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::parser::ast::statement::{NonRetStatement, RetStatement};
 
 #[derive(Default)]
@@ -39,6 +41,16 @@ impl NonRetBlock {
   }
 }
 
+impl Display for NonRetBlock {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    writeln!(f, "{{")?;
+    for statement in &self.statements {
+      writeln!(f, "{statement}")?;
+    }
+    writeln!(f, "}}")
+  }
+}
+
 #[derive(Clone, Debug)]
 pub struct RetBlock {
   statements: Vec<NonRetStatement>,
@@ -59,6 +71,17 @@ impl RetBlock {
 
   pub fn ret_statement(&self) -> &RetStatement {
     &self.ret_statement
+  }
+}
+
+impl Display for RetBlock {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    writeln!(f, "{{")?;
+    for statement in &self.statements {
+      writeln!(f, "{statement}")?;
+    }
+    writeln!(f, "{}", self.ret_statement)?;
+    writeln!(f, "}}")
   }
 }
 
@@ -94,6 +117,19 @@ impl From<NonRetBlock> for Block {
 impl From<RetBlock> for Block {
   fn from(value: RetBlock) -> Self {
     Self::new(value.statements, Some(value.ret_statement))
+  }
+}
+
+impl Display for Block {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    writeln!(f, "{{")?;
+    for statement in &self.statements {
+      writeln!(f, "{statement}")?;
+    }
+    if let Some(ret_stmt) = &self.ret_statement {
+      writeln!(f, "{ret_stmt}")?;
+    }
+    writeln!(f, "}}")
   }
 }
 
