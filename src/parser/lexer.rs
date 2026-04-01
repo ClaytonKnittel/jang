@@ -290,6 +290,21 @@ mod tests {
   }
 
   #[gtest]
+  fn test_joint_close_open_paren() {
+    let text = ")(";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![
+        operator!(CloseParen),
+        joint(),
+        operator!(OpenParen)
+      ])
+    );
+  }
+
+  #[gtest]
   fn test_arrow_with_space() {
     let text = "- >";
 
