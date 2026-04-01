@@ -71,6 +71,7 @@ pub_grammar!(
   };
 
   <non_ret_statement>: NonRetStatement => <let_binding>;
+  <non_ret_statement>: NonRetStatement => <expr> { #expr.into() };
   <non_ret_statement>: NonRetStatement => <non_ret_block_scope> {
     #non_ret_block_scope.into()
   };
@@ -194,7 +195,7 @@ mod tests {
         fn_return_type_none,
       },
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
-      statement::matchers::{let_statement as let_stmt, ret_expression as ret_expr},
+      statement::matchers::{expr_stmt, let_statement as let_stmt, ret_expression as ret_expr},
       type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
@@ -352,6 +353,37 @@ mod tests {
         ],
         ret_expr(lit_exp(integral("789")))
       )))
+    );
+  }
+
+  #[gtest]
+  fn expr_statement() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          x
+          (1 + y)
+          f(1)
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![
+        expr_stmt(id_exp(ident("x"))),
+        expr_stmt(bin_exp(
+          lit_exp(integral("1")),
+          &BinaryOp::Add,
+          id_exp(ident("y"))
+        )),
+        expr_stmt(all![
+          call_expr_target(id_exp(ident("f"))),
+          call_expr_args(elements_are![lit_exp(integral("1"))])
+        ])
+      ])))
     );
   }
 
