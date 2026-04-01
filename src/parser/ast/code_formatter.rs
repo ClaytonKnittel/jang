@@ -138,7 +138,27 @@ mod tests {
   #[gtest]
   fn roundtrip_empty_fn() -> Result<()> {
     let code = r#"
+      fn function_name() {
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_empty_fn_with_return_type() -> Result<()> {
+    let code = r#"
       fn function_name() -> i32 {
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_fn_with_args() -> Result<()> {
+    let code = r#"
+      fn function_name(x: i32, y: f32) {
       }
     "#;
 
@@ -159,7 +179,7 @@ mod tests {
   #[gtest]
   fn roundtrip_let_stmt() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name() {
         let x = 123
       }
     "#;
