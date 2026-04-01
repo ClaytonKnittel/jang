@@ -7,5 +7,6 @@ pub mod expression;
 pub mod expression_list;
 pub mod function_decl;
 pub mod jang_file;
+pub mod let_statement;
 pub mod statement;
 pub mod type_expr;

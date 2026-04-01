@@ -1,11 +1,9 @@
 use std::fmt::Display;
 
-use crate::parser::{
-  ast::{
-    block::{NonRetBlock, RetBlock},
-    expression::Expression,
-  },
-  token::ident::Ident,
+use crate::parser::ast::{
+  block::{NonRetBlock, RetBlock},
+  expression::Expression,
+  let_statement::LetStatement,
 };
 
 #[derive(Clone, Debug)]
@@ -40,32 +38,6 @@ impl Display for NonRetStatement {
       Self::Expression(expr) => write!(f, "{expr}"),
       Self::Block(block) => write!(f, "{block}"),
     }
-  }
-}
-
-#[derive(Clone, Debug)]
-pub struct LetStatement {
-  var: Ident,
-  expr: Expression,
-}
-
-impl LetStatement {
-  pub fn new(var: Ident, expr: Expression) -> Self {
-    Self { var, expr }
-  }
-
-  pub fn var(&self) -> &Ident {
-    &self.var
-  }
-
-  pub fn expr(&self) -> &Expression {
-    &self.expr
-  }
-}
-
-impl Display for LetStatement {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "let {} = {}", self.var, self.expr)
   }
 }
 
@@ -119,24 +91,11 @@ impl Display for RetStatement {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::{
-    ast::{
-      expression::Expression,
-      statement::{LetStatement, NonRetStatement, RetExpression, RetStatement},
-    },
-    token::ident::Ident,
+  use crate::parser::ast::{
+    expression::Expression,
+    statement::{NonRetStatement, RetExpression, RetStatement},
   };
   use googletest::prelude::*;
-
-  pub fn let_statement<'a>(
-    var_matcher: impl Matcher<&'a Ident>,
-    expr_matcher: impl Matcher<&'a Expression>,
-  ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::Let(pat!(LetStatement {
-      var: var_matcher,
-      expr: expr_matcher
-    })))
-  }
 
   pub fn expr_stmt<'a>(
     expr_matcher: impl Matcher<&'a Expression>,
