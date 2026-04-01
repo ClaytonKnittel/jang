@@ -1,4 +1,4 @@
-use parser_generator::grammar;
+use parser_generator::pub_grammar;
 
 use crate::parser::{
   ast::{
@@ -8,7 +8,7 @@ use crate::parser::{
     dot_expression::DotExpression,
     expression::Expression,
     expression_list::{ExpressionList, ExpressionListBuilder},
-    function_decl::{FunctionDecl, FunctionParameter},
+    function_decl::{FunctionDecl, FunctionParameter, FunctionParametersBuilder},
     jang_file::{JangFile, JangFileBuilder},
     statement::{LetStatement, NonRetStatement, RetExpression, RetStatement},
     type_expr::Type,
@@ -22,7 +22,7 @@ use crate::parser::{
   },
 };
 
-grammar!(
+pub_grammar!(
   name: JangGrammar;
   enum_terminal: JangToken;
 
@@ -137,20 +137,20 @@ grammar!(
     #non_empty_expr_list.push(#expr)
   };
 
-  <function_params>: Vec<FunctionParameter> => <open_paren> <parameter_list> <close_paren> {
+  <function_params>: FunctionParametersBuilder => <open_paren> <parameter_list> <close_paren> {
     #parameter_list
   };
 
-  <parameter_list>: Vec<FunctionParameter> => ! { vec![] };
-  <parameter_list>: Vec<FunctionParameter> => <non_empty_parameter_list>;
-  <non_empty_parameter_list>: Vec<FunctionParameter> => <non_empty_parameter_list> <comma> <ident> <colon> <type> {
-    #non_empty_parameter_list.push(FunctionParameter::new(#ident, #type));
-    #non_empty_parameter_list
+  <parameter_list>: FunctionParametersBuilder => ! { FunctionParametersBuilder::default() };
+  <parameter_list>: FunctionParametersBuilder => <non_empty_parameter_list>;
+  <non_empty_parameter_list>: FunctionParametersBuilder =>
+      <non_empty_parameter_list> <comma> <ident> <colon> <type>
+  {
+    #non_empty_parameter_list.push(FunctionParameter::new(#ident, #type))
   };
-  <non_empty_parameter_list>: Vec<FunctionParameter> => <ident> <colon> <type> {
-    vec![
-      FunctionParameter::new(#ident, #type)
-    ]
+  <non_empty_parameter_list>: FunctionParametersBuilder => <ident> <colon> <type> {
+    let builder = FunctionParametersBuilder::default();
+    builder.push(FunctionParameter::new(#ident, #type))
   };
 
   <eq> => Operator(Operator { op: Op::Equal });

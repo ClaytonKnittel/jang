@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::parser::{
   ast::{block::Block, type_expr::Type},
   token::ident::Ident,
@@ -6,7 +8,7 @@ use crate::parser::{
 #[derive(Clone, Debug)]
 pub struct FunctionDecl {
   name: Ident,
-  parameters: Vec<FunctionParameter>,
+  parameters: FunctionParameters,
   return_type: Option<Type>,
   body: Block,
 }
@@ -14,13 +16,13 @@ pub struct FunctionDecl {
 impl FunctionDecl {
   pub fn new(
     name: Ident,
-    parameters: Vec<FunctionParameter>,
+    parameters: impl Into<FunctionParameters>,
     return_type: Option<Type>,
     body: Block,
   ) -> Self {
     Self {
       name,
-      parameters,
+      parameters: parameters.into(),
       return_type,
       body,
     }
@@ -31,7 +33,7 @@ impl FunctionDecl {
   }
 
   pub fn parameters(&self) -> &[FunctionParameter] {
-    &self.parameters
+    self.parameters.parameters()
   }
 
   pub fn return_type(&self) -> Option<&Type> {
@@ -40,6 +42,67 @@ impl FunctionDecl {
 
   pub fn body(&self) -> &Block {
     &self.body
+  }
+}
+
+impl Display for FunctionDecl {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match &self.return_type {
+      Some(ty) => write!(f, "fn {}({}) -> {} ", self.name, self.parameters, ty)?,
+      None => write!(f, "fn {}({}) ", self.name, self.parameters)?,
+    }
+    writeln!(f, "{}", self.body)
+  }
+}
+
+#[derive(Default)]
+pub struct FunctionParametersBuilder {
+  parameters: Vec<FunctionParameter>,
+}
+
+impl FunctionParametersBuilder {
+  pub fn push(mut self, parameter: FunctionParameter) -> Self {
+    self.parameters.push(parameter);
+    self
+  }
+
+  pub fn build(self) -> FunctionParameters {
+    FunctionParameters {
+      parameters: self.parameters,
+    }
+  }
+}
+
+impl From<FunctionParametersBuilder> for FunctionParameters {
+  fn from(value: FunctionParametersBuilder) -> Self {
+    value.build()
+  }
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionParameters {
+  parameters: Vec<FunctionParameter>,
+}
+
+impl FunctionParameters {
+  pub fn parameters(&self) -> &[FunctionParameter] {
+    &self.parameters
+  }
+}
+
+impl Display for FunctionParameters {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut first = true;
+    for parameter in &self.parameters {
+      if first {
+        first = false;
+      } else {
+        write!(f, ", ")?;
+      }
+
+      write!(f, "{parameter}")?;
+    }
+    Ok(())
   }
 }
 
@@ -60,6 +123,12 @@ impl FunctionParameter {
 
   pub fn ty(&self) -> &Type {
     &self.ty
+  }
+}
+
+impl Display for FunctionParameter {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}: {}", self.name, self.ty)
   }
 }
 

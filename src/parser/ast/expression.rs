@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::parser::{
   ast::{
     binary_expression::BinaryExpression, call_expression::CallExpression,
@@ -42,6 +44,18 @@ impl From<CallExpression> for Expression {
 impl From<DotExpression> for Expression {
   fn from(value: DotExpression) -> Self {
     Self::DotExpression(value)
+  }
+}
+
+impl Display for Expression {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Literal(literal) => write!(f, "{literal}"),
+      Self::Ident(ident) => write!(f, "{ident}"),
+      Self::BinaryExpression(binary_expr) => write!(f, "({binary_expr})"),
+      Self::CallExpression(call_expr) => write!(f, "{call_expr}"),
+      Self::DotExpression(dot_expr) => write!(f, "{dot_expr}"),
+    }
   }
 }
 

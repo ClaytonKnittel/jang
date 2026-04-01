@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::parser::ast::function_decl::FunctionDecl;
 
 #[derive(Clone, Debug)]
@@ -8,6 +10,15 @@ pub struct JangFile {
 impl JangFile {
   pub fn function_decls(&self) -> &[FunctionDecl] {
     &self.function_decls
+  }
+}
+
+impl Display for JangFile {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    for function_decl in &self.function_decls {
+      write!(f, "{function_decl}")?;
+    }
+    Ok(())
   }
 }
 

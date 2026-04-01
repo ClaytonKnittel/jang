@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::parser::ast::{expression::Expression, expression_list::ExpressionList};
 
 #[derive(Clone, Debug)]
@@ -20,6 +22,12 @@ impl CallExpression {
 
   pub fn argument_list(&self) -> &[Expression] {
     self.argument_list.expressions()
+  }
+}
+
+impl Display for CallExpression {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}({})", self.target, self.argument_list)
   }
 }
 

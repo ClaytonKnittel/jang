@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::parser::{
   ast::{
     block::{NonRetBlock, RetBlock},
@@ -24,6 +26,15 @@ impl From<NonRetBlock> for NonRetStatement {
   }
 }
 
+impl Display for NonRetStatement {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Let(let_stmt) => write!(f, "{let_stmt}"),
+      Self::Block(block) => write!(f, "{block}"),
+    }
+  }
+}
+
 #[derive(Clone, Debug)]
 pub struct LetStatement {
   var: Ident,
@@ -44,6 +55,12 @@ impl LetStatement {
   }
 }
 
+impl Display for LetStatement {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "let {} = {}", self.var, self.expr)
+  }
+}
+
 #[derive(Clone, Debug)]
 pub struct RetExpression {
   expr: Expression,
@@ -56,6 +73,12 @@ impl RetExpression {
 
   pub fn expr(&self) -> &Expression {
     &self.expr
+  }
+}
+
+impl Display for RetExpression {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "ret {}", self.expr)
   }
 }
 
@@ -74,6 +97,15 @@ impl From<RetExpression> for RetStatement {
 impl<T: Into<Box<RetBlock>>> From<T> for RetStatement {
   fn from(value: T) -> Self {
     Self::Block(value.into())
+  }
+}
+
+impl Display for RetStatement {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Ret(ret_expr) => write!(f, "{ret_expr}"),
+      Self::Block(ret_block) => write!(f, "{ret_block}"),
+    }
   }
 }
 
