@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::parser::ast::statement::{NonRetStatement, RetStatement};
+use crate::parser::ast::{ret_statement::RetStatement, statement::NonRetStatement};
 
 #[derive(Default)]
 pub struct BlockBuilder {
@@ -137,7 +137,8 @@ impl Display for Block {
 pub(crate) mod matchers {
   use crate::parser::ast::{
     block::{Block, NonRetBlock, RetBlock},
-    statement::{NonRetStatement, RetStatement},
+    ret_statement::RetStatement,
+    statement::NonRetStatement,
   };
   use googletest::prelude::*;
 
