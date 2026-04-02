@@ -5,6 +5,8 @@ pub enum Keyword {
   Function,
   Let,
   Ret,
+  If,
+  Else,
 }
 
 impl Keyword {
@@ -13,6 +15,8 @@ impl Keyword {
       "fn" => Some(Self::Function),
       "let" => Some(Self::Let),
       "ret" => Some(Self::Ret),
+      "if" => Some(Self::If),
+      "else" => Some(Self::Else),
       _ => None,
     }
   }
@@ -27,6 +31,8 @@ impl Display for Keyword {
         Self::Function => "fn",
         Self::Let => "let",
         Self::Ret => "ret",
+        Self::If => "if",
+        Self::Else => "else",
       }
     )
   }

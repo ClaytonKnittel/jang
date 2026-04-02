@@ -9,6 +9,7 @@ use crate::parser::{
     expression::Expression,
     expression_list::{ExpressionList, ExpressionListBuilder},
     function_decl::{FunctionDecl, FunctionParameter, FunctionParametersBuilder},
+    if_statement::IfExpression,
     jang_file::{JangFile, JangFileBuilder},
     let_statement::LetStatement,
     ret_statement::{RetExpression, RetStatement},
@@ -89,7 +90,12 @@ pub_grammar!(
     RetExpression::new(#expr).into()
   };
 
-  <expr>: Expression => <add_expr>;
+  <expr>: Expression => <if_expr>;
+
+  <if_expr>: Expression => Keyword(Keyword::If) <expr> <block_scope> {
+    Box::new(IfExpression::new(#expr, #block_scope)).into()
+  };
+  <if_expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
     BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Add).into()
@@ -196,6 +202,7 @@ mod tests {
         fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
         fn_return_type_none,
       },
+      if_statement::matchers::if_statement,
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
       let_statement::matchers::let_statement as let_stmt,
       ret_statement::matchers::ret_expression as ret_expr,
@@ -681,6 +688,35 @@ mod tests {
   }
 
   #[gtest]
+  fn mul_higher_precedence() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let x = a + b * c - d / e
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        bin_exp(
+          bin_exp(
+            id_exp(ident("a")),
+            &BinaryOp::Add,
+            bin_exp(id_exp(ident("b")), &BinaryOp::Mul, id_exp(ident("c")))
+          ),
+          &BinaryOp::Sub,
+          bin_exp(id_exp(ident("d")), &BinaryOp::Div, id_exp(ident("e")))
+        )
+      )])))
+    );
+  }
+
+  #[gtest]
   fn mul_div_mod_equal_precedence() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
@@ -957,6 +993,27 @@ mod tests {
     ));
 
     expect_that!(ast, failed_to_parse());
+  }
+
+  #[gtest]
+  fn if_expr() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          if x {}
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_statement(
+        id_exp(ident("x")),
+        block(is_empty())
+      )])))
+    );
   }
 
   #[gtest]

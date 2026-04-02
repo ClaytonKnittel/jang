@@ -230,12 +230,18 @@ mod tests {
 
   #[gtest]
   fn test_all_keywords() {
-    let text = "fn let ret";
+    let text = "fn let ret if else";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
     expect_that!(
       tokens,
-      elements_are![keyword!(Function), keyword!(Let), keyword!(Ret)]
+      elements_are![
+        keyword!(Function),
+        keyword!(Let),
+        keyword!(Ret),
+        keyword!(If),
+        keyword!(Else)
+      ]
     );
   }
 
