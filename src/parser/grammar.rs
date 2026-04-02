@@ -1017,6 +1017,33 @@ mod tests {
   }
 
   #[gtest]
+  fn if_expr_with_body() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          if x + 3 {
+            let y = 1
+            ret z
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_statement(
+        bin_exp(id_exp(ident("x")), &BinaryOp::Add, lit_exp(integral("3"))),
+        block_with_ret(
+          elements_are![let_stmt(ident("y"), lit_exp(integral("1")))],
+          ret_expr(id_exp(ident("z")))
+        )
+      )])))
+    );
+  }
+
+  #[gtest]
   fn parenthesis_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
