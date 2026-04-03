@@ -100,6 +100,12 @@ pub_grammar!(
   {
     IfStatement::new_with_else(#expr, #2, #4)
   };
+  <if_statement>: IfStatement =>
+    Keyword(Keyword::If) <expr> <block_scope>
+    Keyword(Keyword::Else) <if_statement>
+  {
+    IfStatement::new_with_else_if(#expr, #block_scope, #if_statement)
+  };
 
   <expr>: Expression => <add_expr>;
 
@@ -210,7 +216,9 @@ mod tests {
         fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
         fn_return_type_none,
       },
-      if_statement::matchers::{if_else_statement, if_statement},
+      if_statement::matchers::{
+        if_else_clause, if_else_if_statement, if_else_statement, if_statement,
+      },
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
       let_statement::matchers::let_statement as let_stmt,
       ret_statement::matchers::ret_expression as ret_expr,
@@ -1085,6 +1093,42 @@ mod tests {
         ]),
         block_with_ret(is_empty(), ret_expr(id_exp(ident("z")))),
         block_with_ret(is_empty(), ret_expr(lit_exp(integral("10"))))
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn if_else_if() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          if x {
+            ret 1
+          } else if y {
+            ret 2
+          } else {
+            let a = 3
+            ret a
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_else_if_statement(
+        id_exp(ident("x")),
+        block_with_ret(is_empty(), ret_expr(lit_exp(integral("1")))),
+        if_else_clause(
+          id_exp(ident("y")),
+          block_with_ret(is_empty(), ret_expr(lit_exp(integral("2")))),
+          block_with_ret(
+            elements_are![let_stmt(ident("a"), lit_exp(integral("3")))],
+            ret_expr(id_exp(ident("a")))
+          )
+        )
       )])))
     );
   }
