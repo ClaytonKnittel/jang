@@ -31,7 +31,7 @@ impl Display for LetStatement {
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::{
-    ast::{expression::Expression, let_statement::LetStatement, statement::NonRetStatement},
+    ast::{expression::Expression, let_statement::LetStatement, statement::Statement},
     token::ident::Ident,
   };
   use googletest::prelude::*;
@@ -39,8 +39,8 @@ pub(crate) mod matchers {
   pub fn let_statement<'a>(
     var_matcher: impl Matcher<&'a Ident>,
     expr_matcher: impl Matcher<&'a Expression>,
-  ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::Let(pat!(LetStatement {
+  ) -> impl Matcher<&'a Statement> {
+    pat!(Statement::Let(pat!(LetStatement {
       var: var_matcher,
       expr: expr_matcher
     })))
