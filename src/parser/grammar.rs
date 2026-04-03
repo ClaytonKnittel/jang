@@ -73,6 +73,9 @@ pub_grammar!(
   <statement>: Statement => <if_statement>;
   <statement>: Statement => <loop_statement>;
   <statement>: Statement => <block_scope>;
+  <statement>: Statement => Keyword(Keyword::Break) {
+    Statement::Break
+  };
 
   <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
     LetStatement::new(#ident, #expr)
@@ -216,7 +219,9 @@ mod tests {
       },
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
       let_statement::matchers::let_statement as let_stmt,
+      loop_statement::matchers::loop_statement,
       ret_statement::matchers::ret_statement as ret_stmt,
+      statement::matchers::break_statement,
       type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
@@ -1084,6 +1089,73 @@ mod tests {
             ret_stmt(id_exp(ident("a")))
           ])
         )
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn empty_loop() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          loop {
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![loop_statement(is_empty())])))
+    );
+  }
+
+  #[gtest]
+  fn loop_with_statements() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          loop {
+            let x = 3
+            super_fn()
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![loop_statement(
+        elements_are![
+          let_stmt(ident("x"), lit_exp(integral("3"))),
+          call_statement(call_expr_target(id_exp(ident("super_fn"))))
+        ]
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn loop_with_break() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          loop {
+            break
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![loop_statement(
+        elements_are![break_statement()]
       )])))
     );
   }

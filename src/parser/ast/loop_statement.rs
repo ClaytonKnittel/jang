@@ -22,3 +22,19 @@ impl Display for LoopStatement {
     write!(f, "loop {}", self.body)
   }
 }
+
+#[cfg(test)]
+pub(crate) mod matchers {
+  use crate::parser::ast::{
+    block::matchers::block, loop_statement::LoopStatement, statement::Statement,
+  };
+  use googletest::prelude::*;
+
+  pub fn loop_statement<'a>(
+    body_matcher: impl Matcher<&'a [Statement]>,
+  ) -> impl Matcher<&'a Statement> {
+    pat!(Statement::LoopStatement(pat!(LoopStatement {
+      body: block(body_matcher)
+    })))
+  }
+}

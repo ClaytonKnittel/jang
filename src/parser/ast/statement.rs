@@ -13,6 +13,7 @@ pub enum Statement {
   IfStatement(IfStatement),
   LoopStatement(LoopStatement),
   Block(Block),
+  Break,
 }
 
 impl From<LetStatement> for Statement {
@@ -60,6 +61,17 @@ impl Display for Statement {
       Self::IfStatement(if_stmt) => write!(f, "{if_stmt}"),
       Self::LoopStatement(loop_stmt) => write!(f, "{loop_stmt}"),
       Self::Block(block) => write!(f, "{block}"),
+      Self::Break => write!(f, "break"),
     }
+  }
+}
+
+#[cfg(test)]
+pub(crate) mod matchers {
+  use crate::parser::ast::statement::Statement;
+  use googletest::prelude::*;
+
+  pub fn break_statement<'a>() -> impl Matcher<&'a Statement> {
+    pat!(Statement::Break)
   }
 }
