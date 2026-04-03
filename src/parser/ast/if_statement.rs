@@ -67,7 +67,19 @@ pub(crate) mod matchers {
     pat!(NonRetStatement::IfStatement(pat!(IfStatement {
       condition: result_of!(Box::as_ref, cond_matcher),
       body: body_matcher,
-      else_block: none()
+      else_block: none(),
+    })))
+  }
+
+  pub fn if_else_statement<'a>(
+    cond_matcher: impl Matcher<&'a Expression>,
+    body_matcher: impl Matcher<&'a Block>,
+    else_matcher: impl Matcher<&'a Block>,
+  ) -> impl Matcher<&'a NonRetStatement> {
+    pat!(NonRetStatement::IfStatement(pat!(IfStatement {
+      condition: result_of!(Box::as_ref, cond_matcher),
+      body: body_matcher,
+      else_block: some(else_matcher),
     })))
   }
 }

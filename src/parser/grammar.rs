@@ -210,7 +210,7 @@ mod tests {
         fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
         fn_return_type_none,
       },
-      if_statement::matchers::if_statement,
+      if_statement::matchers::{if_else_statement, if_statement},
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
       let_statement::matchers::let_statement as let_stmt,
       ret_statement::matchers::ret_expression as ret_expr,
@@ -1056,6 +1056,35 @@ mod tests {
           elements_are![let_stmt(ident("y"), lit_exp(integral("1")))],
           ret_expr(id_exp(ident("z")))
         )
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn if_else() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          if y(2) {
+            ret z
+          } else {
+            ret 10
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_else_statement(
+        call_expression(all![
+          call_expr_target(id_exp(ident("y"))),
+          call_expr_args(elements_are![lit_exp(integral("2"))])
+        ]),
+        block_with_ret(is_empty(), ret_expr(id_exp(ident("z")))),
+        block_with_ret(is_empty(), ret_expr(lit_exp(integral("10"))))
       )])))
     );
   }
