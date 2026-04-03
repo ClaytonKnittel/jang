@@ -219,4 +219,60 @@ mod tests {
 
     check_print_roundtrip(code)
   }
+
+  #[gtest]
+  fn roundtrip_if() -> Result<()> {
+    let code = r#"
+      fn function_name() -> i32 {
+        if 1 {
+        }
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_if_binary_exp() -> Result<()> {
+    let code = r#"
+      fn function_name() -> i32 {
+        if (x + 3) {
+          ret y
+        }
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_if_else() -> Result<()> {
+    let code = r#"
+      fn function_name() -> i32 {
+        if 1 {
+          ret y
+        } else {
+          ret z
+        }
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_if_else_if() -> Result<()> {
+    let code = r#"
+      fn function_name() -> i32 {
+        if 1 {
+          ret y
+        } else if 2 {
+          ret z
+        }
+        ret 0
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
 }
