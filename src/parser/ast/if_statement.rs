@@ -3,17 +3,17 @@ use std::fmt::Display;
 use crate::parser::ast::{block::Block, expression::Expression};
 
 #[derive(Clone, Debug)]
-pub struct IfExpression {
-  condition: Expression,
-  body: Block,
-  else_expr: Option<Expression>,
+pub struct IfStatement {
+  condition: Box<Expression>,
+  body: Box<Block>,
+  else_expr: Option<Box<Expression>>,
 }
 
-impl IfExpression {
-  pub fn new(condition: Expression, body: Block) -> Self {
+impl IfStatement {
+  pub fn new(condition: impl Into<Box<Expression>>, body: impl Into<Box<Block>>) -> Self {
     Self {
-      condition,
-      body,
+      condition: condition.into(),
+      body: body.into(),
       else_expr: None,
     }
   }
@@ -27,21 +27,24 @@ impl IfExpression {
   }
 
   pub fn else_expr(&self) -> Option<&Expression> {
-    self.else_expr.as_ref()
+    self.else_expr.as_deref()
   }
 }
 
-impl Display for IfExpression {
+impl Display for IfStatement {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    todo!();
+    write!(f, "if {} {}", self.condition(), self.body())?;
+    if let Some(else_expr) = self.else_expr() {
+      write!(f, "{else_expr}")?;
+    }
+    Ok(())
   }
 }
 
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::ast::{
-    block::Block, expression::Expression, if_statement::IfExpression,
-    standalone_expression::StandaloneExpression, statement::NonRetStatement,
+    block::Block, expression::Expression, if_statement::IfStatement, statement::NonRetStatement,
   };
   use googletest::prelude::*;
 
@@ -49,15 +52,10 @@ pub(crate) mod matchers {
     cond_matcher: impl Matcher<&'a Expression>,
     body_matcher: impl Matcher<&'a Block>,
   ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::StandaloneExpression(pat!(
-      StandaloneExpression::IfExpression(result_of!(
-        Box::as_ref,
-        pat!(IfExpression {
-          condition: cond_matcher,
-          body: body_matcher,
-          else_expr: none()
-        })
-      ))
-    )))
+    pat!(NonRetStatement::IfStatement(pat!(IfStatement {
+      condition: result_of!(Box::as_ref, cond_matcher),
+      body: result_of!(Box::as_ref, body_matcher),
+      else_expr: none()
+    })))
   }
 }

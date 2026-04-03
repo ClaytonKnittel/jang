@@ -1,13 +1,15 @@
 use std::fmt::Display;
 
 use crate::parser::ast::{
-  block::NonRetBlock, let_statement::LetStatement, standalone_expression::StandaloneExpression,
+  block::NonRetBlock, call_expression::CallExpression, if_statement::IfStatement,
+  let_statement::LetStatement,
 };
 
 #[derive(Clone, Debug)]
 pub enum NonRetStatement {
   Let(LetStatement),
-  StandaloneExpression(StandaloneExpression),
+  CallStatement(CallExpression),
+  IfStatement(IfStatement),
   Block(NonRetBlock),
 }
 
@@ -17,9 +19,15 @@ impl From<LetStatement> for NonRetStatement {
   }
 }
 
-impl From<StandaloneExpression> for NonRetStatement {
-  fn from(value: StandaloneExpression) -> Self {
-    Self::StandaloneExpression(value)
+impl From<CallExpression> for NonRetStatement {
+  fn from(value: CallExpression) -> Self {
+    Self::CallStatement(value)
+  }
+}
+
+impl From<IfStatement> for NonRetStatement {
+  fn from(value: IfStatement) -> Self {
+    Self::IfStatement(value)
   }
 }
 
@@ -33,7 +41,8 @@ impl Display for NonRetStatement {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Let(let_stmt) => write!(f, "{let_stmt}"),
-      Self::StandaloneExpression(expr) => write!(f, "{expr}"),
+      Self::CallStatement(call_stmt) => write!(f, "{call_stmt}"),
+      Self::IfStatement(if_stmt) => write!(f, "{if_stmt}"),
       Self::Block(block) => write!(f, "{block}"),
     }
   }

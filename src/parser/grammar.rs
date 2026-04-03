@@ -9,11 +9,10 @@ use crate::parser::{
     expression::Expression,
     expression_list::{ExpressionList, ExpressionListBuilder},
     function_decl::{FunctionDecl, FunctionParameter, FunctionParametersBuilder},
-    if_statement::IfExpression,
+    if_statement::IfStatement,
     jang_file::{JangFile, JangFileBuilder},
     let_statement::LetStatement,
     ret_statement::{RetExpression, RetStatement},
-    standalone_expression::StandaloneExpression,
     statement::NonRetStatement,
     type_expr::Type,
   },
@@ -74,14 +73,15 @@ pub_grammar!(
     #non_ret_statement_list.push_statement(#non_ret_statement)
   };
 
-  <non_ret_statement>: NonRetStatement => <let_binding>;
-  <non_ret_statement>: NonRetStatement => <standalone_expr> { #standalone_expr.into() };
+  <non_ret_statement>: NonRetStatement => <let_binding> { #let_binding.into() };
+  <non_ret_statement>: NonRetStatement => <call_expr> { #call_expr.into() };
+  <non_ret_statement>: NonRetStatement => <if_expr> { #if_expr.into() };
   <non_ret_statement>: NonRetStatement => <non_ret_block_scope> {
     #non_ret_block_scope.into()
   };
 
-  <let_binding>: NonRetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
-    LetStatement::new(#ident, #expr).into()
+  <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
+    LetStatement::new(#ident, #expr)
   };
 
   <ret_statement>: RetStatement => <ret_block_scope> {
@@ -91,18 +91,13 @@ pub_grammar!(
     RetExpression::new(#expr).into()
   };
 
-  <standalone_expr>: StandaloneExpression => <call_expr> { #call_expr.into() };
-  <standalone_expr>: StandaloneExpression => <if_expr> { Box::new(#if_expr).into() };
-
-  <if_expr>: IfExpression => Keyword(Keyword::If) <expr> <block_scope> {
-    IfExpression::new(#expr, #block_scope)
+  <if_expr>: IfStatement => Keyword(Keyword::If) <expr> <block_scope> {
+    IfStatement::new(#expr, #block_scope)
   };
 
   <expr>: Expression => <maybe_if_expr>;
 
-  <maybe_if_expr>: Expression => <if_expr> {
-    StandaloneExpression::from(Box::new(#if_expr)).into()
-  };
+  // <maybe_if_expr>: Expression => <if_expr> { #if_expr.into() };
   <maybe_if_expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
@@ -205,7 +200,9 @@ mod tests {
     ast::{
       binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
       block::matchers::{block, block_with_ret, non_ret_block, ret_block},
-      call_expression::matchers::{call_expr_args, call_expr_target},
+      call_expression::matchers::{
+        call_expr_args, call_expr_target, call_expression, call_statement,
+      },
       dot_expression::matchers::{dot_expr_base, dot_expr_member},
       expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
@@ -216,7 +213,6 @@ mod tests {
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
       let_statement::matchers::let_statement as let_stmt,
       ret_statement::matchers::ret_expression as ret_expr,
-      standalone_expression::matchers::{call_expr_stmt, call_expression},
       type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
@@ -394,11 +390,11 @@ mod tests {
     expect_that!(
       ast,
       jang_file_with_fn(fn_body(block(elements_are![
-        call_expr_stmt(all![
+        call_statement(all![
           call_expr_target(id_exp(ident("f"))),
           call_expr_args(is_empty())
         ]),
-        call_expr_stmt(all![
+        call_statement(all![
           call_expr_target(id_exp(ident("x"))),
           call_expr_args(elements_are![bin_exp(
             lit_exp(integral("1")),
@@ -406,7 +402,7 @@ mod tests {
             id_exp(ident("y"))
           )])
         ]),
-        call_expr_stmt(all![
+        call_statement(all![
           call_expr_target(bin_exp(
             id_exp(ident("x")),
             &BinaryOp::Add,
@@ -1045,6 +1041,30 @@ mod tests {
             let y = 1
             ret z
           }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_statement(
+        bin_exp(id_exp(ident("x")), &BinaryOp::Add, lit_exp(integral("3"))),
+        block_with_ret(
+          elements_are![let_stmt(ident("y"), lit_exp(integral("1")))],
+          ret_expr(id_exp(ident("z")))
+        )
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn if_expr_in_expression() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let y = if x { 1 } else { 2 }
         }
         "#
       .chars(),

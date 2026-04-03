@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use crate::parser::{
   ast::{
-    binary_expression::BinaryExpression, dot_expression::DotExpression,
-    standalone_expression::StandaloneExpression,
+    binary_expression::BinaryExpression, call_expression::CallExpression,
+    dot_expression::DotExpression,
   },
   token::{ident::Ident, literal::Literal},
 };
@@ -13,8 +13,8 @@ pub enum Expression {
   Literal(Literal),
   Ident(Ident),
   BinaryExpression(BinaryExpression),
+  CallExpression(CallExpression),
   DotExpression(DotExpression),
-  StandaloneExpression(StandaloneExpression),
 }
 
 impl From<Literal> for Expression {
@@ -35,15 +35,15 @@ impl From<BinaryExpression> for Expression {
   }
 }
 
-impl From<DotExpression> for Expression {
-  fn from(value: DotExpression) -> Self {
-    Self::DotExpression(value)
+impl From<CallExpression> for Expression {
+  fn from(value: CallExpression) -> Self {
+    Self::CallExpression(value)
   }
 }
 
-impl<T: Into<StandaloneExpression>> From<T> for Expression {
-  fn from(value: T) -> Self {
-    Self::StandaloneExpression(value.into())
+impl From<DotExpression> for Expression {
+  fn from(value: DotExpression) -> Self {
+    Self::DotExpression(value)
   }
 }
 
@@ -53,8 +53,8 @@ impl Display for Expression {
       Self::Literal(literal) => write!(f, "{literal}"),
       Self::Ident(ident) => write!(f, "{ident}"),
       Self::BinaryExpression(binary_expr) => write!(f, "({binary_expr})"),
+      Self::CallExpression(call_expr) => write!(f, "{call_expr}"),
       Self::DotExpression(dot_expr) => write!(f, "{dot_expr}"),
-      Self::StandaloneExpression(expr) => write!(f, "{expr}"),
     }
   }
 }
