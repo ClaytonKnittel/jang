@@ -129,7 +129,7 @@ impl Display for Block {
     if let Some(ret_stmt) = &self.ret_statement {
       writeln!(f, "{ret_stmt}")?;
     }
-    writeln!(f, "}}")
+    write!(f, "}}")
   }
 }
 

@@ -67,8 +67,8 @@ impl Display for IfStatement {
     write!(f, "if {} {}", self.condition(), self.body())?;
     match self.else_clause() {
       ElseClause::None => {}
-      ElseClause::Else(else_block) => write!(f, "{else_block}")?,
-      ElseClause::ElseIf(else_if) => write!(f, "{else_if}")?,
+      ElseClause::Else(else_block) => write!(f, " else {else_block}")?,
+      ElseClause::ElseIf(else_if) => write!(f, " else {else_if}")?,
     }
     Ok(())
   }
