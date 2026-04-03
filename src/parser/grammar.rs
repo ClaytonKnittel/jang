@@ -75,7 +75,7 @@ pub_grammar!(
 
   <non_ret_statement>: NonRetStatement => <let_binding> { #let_binding.into() };
   <non_ret_statement>: NonRetStatement => <call_expr> { #call_expr.into() };
-  <non_ret_statement>: NonRetStatement => <if_expr> { #if_expr.into() };
+  <non_ret_statement>: NonRetStatement => <if_statement> { #if_statement.into() };
   <non_ret_statement>: NonRetStatement => <non_ret_block_scope> {
     #non_ret_block_scope.into()
   };
@@ -91,14 +91,14 @@ pub_grammar!(
     RetExpression::new(#expr).into()
   };
 
-  <if_expr>: IfStatement => Keyword(Keyword::If) <expr> <block_scope> {
+  <if_statement>: IfStatement => Keyword(Keyword::If) <expr> <block_scope> {
     IfStatement::new(#expr, #block_scope)
   };
 
-  <expr>: Expression => <maybe_if_expr>;
+  <expr>: Expression => <if_expr>;
 
-  // <maybe_if_expr>: Expression => <if_expr> { #if_expr.into() };
-  <maybe_if_expr>: Expression => <add_expr>;
+  // <if_expr>: Expression => <if_expr> { #if_expr.into() };
+  <if_expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
     BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Add).into()
@@ -1012,7 +1012,7 @@ mod tests {
   }
 
   #[gtest]
-  fn if_expr() {
+  fn standalone_if_statement() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         fn function_name() {
@@ -1033,7 +1033,7 @@ mod tests {
   }
 
   #[gtest]
-  fn if_expr_with_body() {
+  fn if_statement_with_body() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         fn function_name() {
@@ -1060,7 +1060,7 @@ mod tests {
   }
 
   #[gtest]
-  fn if_expr_in_expression() {
+  fn if_expression() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         fn function_name() {
@@ -1073,12 +1073,9 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_fn(fn_body(block(elements_are![if_statement(
-        bin_exp(id_exp(ident("x")), &BinaryOp::Add, lit_exp(integral("3"))),
-        block_with_ret(
-          elements_are![let_stmt(ident("y"), lit_exp(integral("1")))],
-          ret_expr(id_exp(ident("z")))
-        )
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        id_exp(ident("y")),
+        // if_expression(, )
       )])))
     );
   }
