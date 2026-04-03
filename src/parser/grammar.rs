@@ -94,6 +94,12 @@ pub_grammar!(
   <if_statement>: IfStatement => Keyword(Keyword::If) <expr> <block_scope> {
     IfStatement::new(#expr, #block_scope)
   };
+  // <if_statement>: IfStatement =>
+  //   Keyword(Keyword::If) <expr> <block_scope>
+  //   Keyword(Keyword::Else) <block_scope>
+  // {
+  //   IfStatement::new_with_else(#expr, #2, Expression::from(#4))
+  // };
 
   <expr>: Expression => <if_expr>;
 

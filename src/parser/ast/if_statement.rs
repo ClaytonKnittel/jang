@@ -18,6 +18,18 @@ impl IfStatement {
     }
   }
 
+  pub fn new_with_else(
+    condition: impl Into<Box<Expression>>,
+    body: impl Into<Box<Block>>,
+    else_expr: impl Into<Box<Expression>>,
+  ) -> Self {
+    Self {
+      condition: condition.into(),
+      body: body.into(),
+      else_expr: Some(else_expr.into()),
+    }
+  }
+
   pub fn condition(&self) -> &Expression {
     &self.condition
   }
