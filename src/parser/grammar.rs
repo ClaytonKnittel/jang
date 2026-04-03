@@ -94,12 +94,12 @@ pub_grammar!(
   <if_statement>: IfStatement => Keyword(Keyword::If) <expr> <block_scope> {
     IfStatement::new(#expr, #block_scope)
   };
-  // <if_statement>: IfStatement =>
-  //   Keyword(Keyword::If) <expr> <block_scope>
-  //   Keyword(Keyword::Else) <block_scope>
-  // {
-  //   IfStatement::new_with_else(#expr, #2, Expression::from(#4))
-  // };
+  <if_statement>: IfStatement =>
+    Keyword(Keyword::If) <expr> <block_scope>
+    Keyword(Keyword::Else) <block_scope>
+  {
+    IfStatement::new_with_else(#expr, #2, #4)
+  };
 
   <expr>: Expression => <if_expr>;
 
@@ -143,6 +143,7 @@ pub_grammar!(
   <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list.build() };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
+  // <leaf_expr>: Expression => <non_ret_block_scope> { #non_ret_block_scope.into() };
   <leaf_expr>: Expression => <ident> {
     #ident.into()
   };
