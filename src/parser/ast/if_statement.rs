@@ -40,7 +40,8 @@ impl Display for IfExpression {
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::ast::{
-    block::Block, expression::Expression, if_statement::IfExpression, statement::NonRetStatement,
+    block::Block, expression::Expression, if_statement::IfExpression,
+    standalone_expression::StandaloneExpression, statement::NonRetStatement,
   };
   use googletest::prelude::*;
 
@@ -48,15 +49,15 @@ pub(crate) mod matchers {
     cond_matcher: impl Matcher<&'a Expression>,
     body_matcher: impl Matcher<&'a Block>,
   ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::Expression(pat!(Expression::IfExpression(
-      result_of!(
+    pat!(NonRetStatement::StandaloneExpression(pat!(
+      StandaloneExpression::IfExpression(result_of!(
         Box::as_ref,
         pat!(IfExpression {
           condition: cond_matcher,
           body: body_matcher,
           else_expr: none()
         })
-      )
-    ))))
+      ))
+    )))
   }
 }

@@ -13,6 +13,7 @@ use crate::parser::{
     jang_file::{JangFile, JangFileBuilder},
     let_statement::LetStatement,
     ret_statement::{RetExpression, RetStatement},
+    standalone_expression::StandaloneExpression,
     statement::NonRetStatement,
     type_expr::Type,
   },
@@ -74,7 +75,7 @@ pub_grammar!(
   };
 
   <non_ret_statement>: NonRetStatement => <let_binding>;
-  <non_ret_statement>: NonRetStatement => <expr> { #expr.into() };
+  <non_ret_statement>: NonRetStatement => <standalone_expr> { #standalone_expr.into() };
   <non_ret_statement>: NonRetStatement => <non_ret_block_scope> {
     #non_ret_block_scope.into()
   };
@@ -90,12 +91,19 @@ pub_grammar!(
     RetExpression::new(#expr).into()
   };
 
-  <expr>: Expression => <if_expr>;
+  <standalone_expr>: StandaloneExpression => <call_expr> { #call_expr.into() };
+  <standalone_expr>: StandaloneExpression => <if_expr> { Box::new(#if_expr).into() };
 
-  <if_expr>: Expression => Keyword(Keyword::If) <expr> <block_scope> {
-    Box::new(IfExpression::new(#expr, #block_scope)).into()
+  <if_expr>: IfExpression => Keyword(Keyword::If) <expr> <block_scope> {
+    IfExpression::new(#expr, #block_scope)
   };
-  <if_expr>: Expression => <add_expr>;
+
+  <expr>: Expression => <maybe_if_expr>;
+
+  <maybe_if_expr>: Expression => <if_expr> {
+    StandaloneExpression::from(Box::new(#if_expr)).into()
+  };
+  <maybe_if_expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
     BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Add).into()
@@ -121,13 +129,15 @@ pub_grammar!(
   <unary_expr>: Expression => <literal> { #literal.into() };
 
   // Call expressions.
-  <call_or_dot_expr>: Expression => <call_or_dot_expr> Joint <call_args> {
-    CallExpression::new(#call_or_dot_expr, #call_args).into()
-  };
+  <call_or_dot_expr>: Expression => <call_expr> { #call_expr.into() };
   <call_or_dot_expr>: Expression => <call_or_dot_expr> <dot> <ident> {
     DotExpression::new(#call_or_dot_expr, #ident).into()
   };
   <call_or_dot_expr>: Expression => <leaf_expr>;
+
+  <call_expr>: CallExpression => <call_or_dot_expr> Joint <call_args> {
+    CallExpression::new(#call_or_dot_expr, #call_args)
+  };
 
   <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list.build() };
 
@@ -206,7 +216,7 @@ mod tests {
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
       let_statement::matchers::let_statement as let_stmt,
       ret_statement::matchers::ret_expression as ret_expr,
-      statement::matchers::expr_stmt,
+      standalone_expression::matchers::{call_expr_stmt, call_expression},
       type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
@@ -368,13 +378,13 @@ mod tests {
   }
 
   #[gtest]
-  fn expr_statement() {
+  fn call_expr_statement() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         fn function_name() {
-          x
-          (1 + y)
-          f(1)
+          f()
+          x(1 + y)
+          (x + 1)(y)
         }
         "#
       .chars(),
@@ -384,15 +394,25 @@ mod tests {
     expect_that!(
       ast,
       jang_file_with_fn(fn_body(block(elements_are![
-        expr_stmt(id_exp(ident("x"))),
-        expr_stmt(bin_exp(
-          lit_exp(integral("1")),
-          &BinaryOp::Add,
-          id_exp(ident("y"))
-        )),
-        expr_stmt(all![
+        call_expr_stmt(all![
           call_expr_target(id_exp(ident("f"))),
-          call_expr_args(elements_are![lit_exp(integral("1"))])
+          call_expr_args(is_empty())
+        ]),
+        call_expr_stmt(all![
+          call_expr_target(id_exp(ident("x"))),
+          call_expr_args(elements_are![bin_exp(
+            lit_exp(integral("1")),
+            &BinaryOp::Add,
+            id_exp(ident("y"))
+          )])
+        ]),
+        call_expr_stmt(all![
+          call_expr_target(bin_exp(
+            id_exp(ident("x")),
+            &BinaryOp::Add,
+            lit_exp(integral("1"))
+          )),
+          call_expr_args(elements_are![id_exp(ident("y"))])
         ])
       ])))
     );
@@ -790,15 +810,15 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(
-          all![
+          call_expression(all![
             call_expr_target(id_exp(ident("y"))),
             call_expr_args(is_empty())
-          ],
+          ]),
           &BinaryOp::Add,
-          all![
+          call_expression(all![
             call_expr_target(id_exp(ident("z"))),
             call_expr_args(is_empty())
-          ],
+          ]),
         )
       )])))
     );
@@ -821,12 +841,12 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(
-          all![
+          call_expression(all![
             call_expr_target(id_exp(ident("y"))),
             call_expr_args(elements_are![lit_exp(integral("1"))])
-          ],
+          ]),
           &BinaryOp::Add,
-          all![
+          call_expression(all![
             call_expr_target(id_exp(ident("z"))),
             call_expr_args(elements_are![
               id_exp(ident("w")),
@@ -836,7 +856,7 @@ mod tests {
                 lit_exp(integral("3"))
               )
             ])
-          ],
+          ]),
         )
       )])))
     );
@@ -882,13 +902,13 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
-        all![
+        call_expression(all![
           call_expr_target(all![
             dot_expr_base(id_exp(ident("y"))),
             dot_expr_member(ident("z"))
           ]),
           call_expr_args(is_empty())
-        ]
+        ])
       )])))
     );
   }
@@ -909,13 +929,13 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
-        all![
+        call_expression(all![
           call_expr_target(all![
             dot_expr_base(id_exp(ident("y"))),
             dot_expr_member(ident("z"))
           ]),
           call_expr_args(is_empty())
-        ]
+        ])
       )])))
     );
   }
@@ -965,7 +985,7 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
         all![
-          dot_expr_base(all![
+          dot_expr_base(call_expression(all![
             call_expr_target(all![
               dot_expr_base(all![
                 dot_expr_base(id_exp(ident("a"))),
@@ -974,7 +994,7 @@ mod tests {
               dot_expr_member(ident("c"))
             ]),
             call_expr_args(is_empty())
-          ]),
+          ])),
           dot_expr_member(ident("d"))
         ]
       )])))

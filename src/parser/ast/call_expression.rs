@@ -38,19 +38,13 @@ pub(crate) mod matchers {
 
   pub fn call_expr_target<'a>(
     target_matcher: impl Matcher<&'a Expression>,
-  ) -> impl Matcher<&'a Expression> {
-    pat!(Expression::CallExpression(property!(
-      &CallExpression.target(),
-      target_matcher
-    )))
+  ) -> impl Matcher<&'a CallExpression> {
+    property!(&CallExpression.target(), target_matcher)
   }
 
   pub fn call_expr_args<'a>(
     args_matcher: impl Matcher<&'a [Expression]>,
-  ) -> impl Matcher<&'a Expression> {
-    pat!(Expression::CallExpression(property!(
-      &CallExpression.argument_list(),
-      args_matcher
-    )))
+  ) -> impl Matcher<&'a CallExpression> {
+    property!(&CallExpression.argument_list(), args_matcher)
   }
 }

@@ -10,5 +10,6 @@ pub mod if_statement;
 pub mod jang_file;
 pub mod let_statement;
 pub mod ret_statement;
+pub mod standalone_expression;
 pub mod statement;
 pub mod type_expr;
