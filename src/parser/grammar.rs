@@ -101,10 +101,7 @@ pub_grammar!(
     IfStatement::new_with_else(#expr, #2, #4)
   };
 
-  <expr>: Expression => <if_expr>;
-
-  // <if_expr>: Expression => <if_expr> { #if_expr.into() };
-  <if_expr>: Expression => <add_expr>;
+  <expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
     BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Add).into()
@@ -143,10 +140,7 @@ pub_grammar!(
   <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list.build() };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
-  // <leaf_expr>: Expression => <non_ret_block_scope> { #non_ret_block_scope.into() };
-  <leaf_expr>: Expression => <ident> {
-    #ident.into()
-  };
+  <leaf_expr>: Expression => <ident> { #ident.into() };
 
   <expr_list>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
   <expr_list>: ExpressionListBuilder => <non_empty_expr_list>;
@@ -1064,27 +1058,6 @@ mod tests {
         )
       )])))
     );
-  }
-
-  #[gtest]
-  fn if_expression() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
-      r#"
-        fn function_name() {
-          let y = if x { 1 } else { 2 }
-        }
-        "#
-      .chars(),
-    ))
-    .unwrap();
-
-    // expect_that!(
-    //   ast,
-    //   jang_file_with_fn(fn_body(block(elements_are![let_stmt(
-    //     id_exp(ident("y")),
-    //     if_expression(, )
-    //   )])))
-    // );
   }
 
   #[gtest]

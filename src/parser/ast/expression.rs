@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::parser::{
   ast::{
-    binary_expression::BinaryExpression, block::NonRetBlock, call_expression::CallExpression,
+    binary_expression::BinaryExpression, call_expression::CallExpression,
     dot_expression::DotExpression,
   },
   token::{ident::Ident, literal::Literal},
@@ -15,7 +15,6 @@ pub enum Expression {
   BinaryExpression(BinaryExpression),
   CallExpression(CallExpression),
   DotExpression(DotExpression),
-  BlockExpression(NonRetBlock),
 }
 
 impl From<Literal> for Expression {
@@ -48,12 +47,6 @@ impl From<DotExpression> for Expression {
   }
 }
 
-impl From<NonRetBlock> for Expression {
-  fn from(value: NonRetBlock) -> Self {
-    Self::BlockExpression(value)
-  }
-}
-
 impl Display for Expression {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
@@ -62,7 +55,6 @@ impl Display for Expression {
       Self::BinaryExpression(binary_expr) => write!(f, "({binary_expr})"),
       Self::CallExpression(call_expr) => write!(f, "{call_expr}"),
       Self::DotExpression(dot_expr) => write!(f, "{dot_expr}"),
-      Self::BlockExpression(block_expr) => write!(f, "{block_expr}"),
     }
   }
 }
