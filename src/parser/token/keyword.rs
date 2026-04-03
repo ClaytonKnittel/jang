@@ -7,6 +7,8 @@ pub enum Keyword {
   Ret,
   If,
   Else,
+  Loop,
+  Break,
 }
 
 impl Keyword {
@@ -17,6 +19,8 @@ impl Keyword {
       "ret" => Some(Self::Ret),
       "if" => Some(Self::If),
       "else" => Some(Self::Else),
+      "loop" => Some(Self::Loop),
+      "break" => Some(Self::Break),
       _ => None,
     }
   }
@@ -33,6 +37,8 @@ impl Display for Keyword {
         Self::Ret => "ret",
         Self::If => "if",
         Self::Else => "else",
+        Self::Loop => "loop",
+        Self::Break => "break",
       }
     )
   }
