@@ -11,6 +11,10 @@ impl LoopStatement {
   pub fn new(body: Block) -> Self {
     Self { body }
   }
+
+  pub fn body(&self) -> &Block {
+    &self.body
+  }
 }
 
 impl Display for LoopStatement {

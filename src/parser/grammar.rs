@@ -12,6 +12,7 @@ use crate::parser::{
     if_statement::IfStatement,
     jang_file::{JangFile, JangFileBuilder},
     let_statement::LetStatement,
+    loop_statement::LoopStatement,
     ret_statement::RetStatement,
     statement::Statement,
     type_expr::Type,
@@ -70,6 +71,7 @@ pub_grammar!(
   <statement>: Statement => <ret_statement>;
   <statement>: Statement => <call_expr>;
   <statement>: Statement => <if_statement>;
+  <non_ret_statement>: NonRetStatement => <loop_statement>;
   <statement>: Statement => <block_scope>;
 
   <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
@@ -94,6 +96,10 @@ pub_grammar!(
     Keyword(Keyword::Else) <if_statement>
   {
     IfStatement::new_with_else_if(#expr, #block_scope, #if_statement)
+  };
+
+  <loop_statement>: LoopStatement => Keyword(Keyword::Loop) <block_scope> {
+    LoopStatement::new(#block_scope)
   };
 
   <expr>: Expression => <add_expr>;
