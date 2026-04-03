@@ -9,8 +9,11 @@ use crate::parser::{
     expression::Expression,
     expression_list::{ExpressionList, ExpressionListBuilder},
     function_decl::{FunctionDecl, FunctionParameter, FunctionParametersBuilder},
+    if_statement::IfStatement,
     jang_file::{JangFile, JangFileBuilder},
-    statement::{LetStatement, NonRetStatement, RetExpression, RetStatement},
+    let_statement::LetStatement,
+    ret_statement::{RetExpression, RetStatement},
+    statement::NonRetStatement,
     type_expr::Type,
   },
   token::{
@@ -70,14 +73,15 @@ pub_grammar!(
     #non_ret_statement_list.push_statement(#non_ret_statement)
   };
 
-  <non_ret_statement>: NonRetStatement => <let_binding>;
-  <non_ret_statement>: NonRetStatement => <expr> { #expr.into() };
+  <non_ret_statement>: NonRetStatement => <let_binding> { #let_binding.into() };
+  <non_ret_statement>: NonRetStatement => <call_expr> { #call_expr.into() };
+  <non_ret_statement>: NonRetStatement => <if_statement> { #if_statement.into() };
   <non_ret_statement>: NonRetStatement => <non_ret_block_scope> {
     #non_ret_block_scope.into()
   };
 
-  <let_binding>: NonRetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
-    LetStatement::new(#ident, #expr).into()
+  <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
+    LetStatement::new(#ident, #expr)
   };
 
   <ret_statement>: RetStatement => <ret_block_scope> {
@@ -85,6 +89,22 @@ pub_grammar!(
   };
   <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
     RetExpression::new(#expr).into()
+  };
+
+  <if_statement>: IfStatement => Keyword(Keyword::If) <expr> <block_scope> {
+    IfStatement::new(#expr, #block_scope)
+  };
+  <if_statement>: IfStatement =>
+    Keyword(Keyword::If) <expr> <block_scope>
+    Keyword(Keyword::Else) <block_scope>
+  {
+    IfStatement::new_with_else(#expr, #2, #4)
+  };
+  <if_statement>: IfStatement =>
+    Keyword(Keyword::If) <expr> <block_scope>
+    Keyword(Keyword::Else) <if_statement>
+  {
+    IfStatement::new_with_else_if(#expr, #block_scope, #if_statement)
   };
 
   <expr>: Expression => <add_expr>;
@@ -113,20 +133,20 @@ pub_grammar!(
   <unary_expr>: Expression => <literal> { #literal.into() };
 
   // Call expressions.
-  <call_or_dot_expr>: Expression => <call_or_dot_expr> Joint <call_args> {
-    CallExpression::new(#call_or_dot_expr, #call_args).into()
-  };
+  <call_or_dot_expr>: Expression => <call_expr> { #call_expr.into() };
   <call_or_dot_expr>: Expression => <call_or_dot_expr> <dot> <ident> {
     DotExpression::new(#call_or_dot_expr, #ident).into()
   };
   <call_or_dot_expr>: Expression => <leaf_expr>;
 
+  <call_expr>: CallExpression => <call_or_dot_expr> Joint <call_args> {
+    CallExpression::new(#call_or_dot_expr, #call_args)
+  };
+
   <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list.build() };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
-  <leaf_expr>: Expression => <ident> {
-    #ident.into()
-  };
+  <leaf_expr>: Expression => <ident> { #ident.into() };
 
   <expr_list>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
   <expr_list>: ExpressionListBuilder => <non_empty_expr_list>;
@@ -187,15 +207,21 @@ mod tests {
     ast::{
       binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
       block::matchers::{block, block_with_ret, non_ret_block, ret_block},
-      call_expression::matchers::{call_expr_args, call_expr_target},
+      call_expression::matchers::{
+        call_expr_args, call_expr_target, call_expression, call_statement,
+      },
       dot_expression::matchers::{dot_expr_base, dot_expr_member},
       expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
       function_decl::matchers::{
         fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
         fn_return_type_none,
       },
+      if_statement::matchers::{
+        if_else_clause, if_else_if_statement, if_else_statement, if_statement,
+      },
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
-      statement::matchers::{expr_stmt, let_statement as let_stmt, ret_expression as ret_expr},
+      let_statement::matchers::let_statement as let_stmt,
+      ret_statement::matchers::ret_expression as ret_expr,
       type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
@@ -357,13 +383,13 @@ mod tests {
   }
 
   #[gtest]
-  fn expr_statement() {
+  fn call_expr_statement() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         fn function_name() {
-          x
-          (1 + y)
-          f(1)
+          f()
+          x(1 + y)
+          (x + 1)(y)
         }
         "#
       .chars(),
@@ -373,15 +399,25 @@ mod tests {
     expect_that!(
       ast,
       jang_file_with_fn(fn_body(block(elements_are![
-        expr_stmt(id_exp(ident("x"))),
-        expr_stmt(bin_exp(
-          lit_exp(integral("1")),
-          &BinaryOp::Add,
-          id_exp(ident("y"))
-        )),
-        expr_stmt(all![
+        call_statement(all![
           call_expr_target(id_exp(ident("f"))),
-          call_expr_args(elements_are![lit_exp(integral("1"))])
+          call_expr_args(is_empty())
+        ]),
+        call_statement(all![
+          call_expr_target(id_exp(ident("x"))),
+          call_expr_args(elements_are![bin_exp(
+            lit_exp(integral("1")),
+            &BinaryOp::Add,
+            id_exp(ident("y"))
+          )])
+        ]),
+        call_statement(all![
+          call_expr_target(bin_exp(
+            id_exp(ident("x")),
+            &BinaryOp::Add,
+            lit_exp(integral("1"))
+          )),
+          call_expr_args(elements_are![id_exp(ident("y"))])
         ])
       ])))
     );
@@ -677,6 +713,35 @@ mod tests {
   }
 
   #[gtest]
+  fn mul_higher_precedence() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          let x = a + b * c - d / e
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        bin_exp(
+          bin_exp(
+            id_exp(ident("a")),
+            &BinaryOp::Add,
+            bin_exp(id_exp(ident("b")), &BinaryOp::Mul, id_exp(ident("c")))
+          ),
+          &BinaryOp::Sub,
+          bin_exp(id_exp(ident("d")), &BinaryOp::Div, id_exp(ident("e")))
+        )
+      )])))
+    );
+  }
+
+  #[gtest]
   fn mul_div_mod_equal_precedence() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
@@ -750,15 +815,15 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(
-          all![
+          call_expression(all![
             call_expr_target(id_exp(ident("y"))),
             call_expr_args(is_empty())
-          ],
+          ]),
           &BinaryOp::Add,
-          all![
+          call_expression(all![
             call_expr_target(id_exp(ident("z"))),
             call_expr_args(is_empty())
-          ],
+          ]),
         )
       )])))
     );
@@ -781,12 +846,12 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(
-          all![
+          call_expression(all![
             call_expr_target(id_exp(ident("y"))),
             call_expr_args(elements_are![lit_exp(integral("1"))])
-          ],
+          ]),
           &BinaryOp::Add,
-          all![
+          call_expression(all![
             call_expr_target(id_exp(ident("z"))),
             call_expr_args(elements_are![
               id_exp(ident("w")),
@@ -796,7 +861,7 @@ mod tests {
                 lit_exp(integral("3"))
               )
             ])
-          ],
+          ]),
         )
       )])))
     );
@@ -842,13 +907,13 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
-        all![
+        call_expression(all![
           call_expr_target(all![
             dot_expr_base(id_exp(ident("y"))),
             dot_expr_member(ident("z"))
           ]),
           call_expr_args(is_empty())
-        ]
+        ])
       )])))
     );
   }
@@ -869,13 +934,13 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
-        all![
+        call_expression(all![
           call_expr_target(all![
             dot_expr_base(id_exp(ident("y"))),
             dot_expr_member(ident("z"))
           ]),
           call_expr_args(is_empty())
-        ]
+        ])
       )])))
     );
   }
@@ -925,7 +990,7 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
         all![
-          dot_expr_base(all![
+          dot_expr_base(call_expression(all![
             call_expr_target(all![
               dot_expr_base(all![
                 dot_expr_base(id_exp(ident("a"))),
@@ -934,7 +999,7 @@ mod tests {
               dot_expr_member(ident("c"))
             ]),
             call_expr_args(is_empty())
-          ]),
+          ])),
           dot_expr_member(ident("d"))
         ]
       )])))
@@ -953,6 +1018,119 @@ mod tests {
     ));
 
     expect_that!(ast, failed_to_parse());
+  }
+
+  #[gtest]
+  fn standalone_if_statement() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          if x {}
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_statement(
+        id_exp(ident("x")),
+        block(is_empty())
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn if_statement_with_body() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          if x + 3 {
+            let y = 1
+            ret z
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_statement(
+        bin_exp(id_exp(ident("x")), &BinaryOp::Add, lit_exp(integral("3"))),
+        block_with_ret(
+          elements_are![let_stmt(ident("y"), lit_exp(integral("1")))],
+          ret_expr(id_exp(ident("z")))
+        )
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn if_else() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          if y(2) {
+            ret z
+          } else {
+            ret 10
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_else_statement(
+        call_expression(all![
+          call_expr_target(id_exp(ident("y"))),
+          call_expr_args(elements_are![lit_exp(integral("2"))])
+        ]),
+        block_with_ret(is_empty(), ret_expr(id_exp(ident("z")))),
+        block_with_ret(is_empty(), ret_expr(lit_exp(integral("10"))))
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn if_else_if() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name() {
+          if x {
+            ret 1
+          } else if y {
+            ret 2
+          } else {
+            let a = 3
+            ret a
+          }
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![if_else_if_statement(
+        id_exp(ident("x")),
+        block_with_ret(is_empty(), ret_expr(lit_exp(integral("1")))),
+        if_else_clause(
+          id_exp(ident("y")),
+          block_with_ret(is_empty(), ret_expr(lit_exp(integral("2")))),
+          block_with_ret(
+            elements_are![let_stmt(ident("a"), lit_exp(integral("3")))],
+            ret_expr(id_exp(ident("a")))
+          )
+        )
+      )])))
+    );
   }
 
   #[gtest]

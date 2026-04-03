@@ -33,24 +33,32 @@ impl Display for CallExpression {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::ast::{call_expression::CallExpression, expression::Expression};
+  use crate::parser::ast::{
+    call_expression::CallExpression, expression::Expression, statement::NonRetStatement,
+  };
   use googletest::prelude::*;
+
+  pub fn call_statement<'a>(
+    call_expr_matcher: impl Matcher<&'a CallExpression>,
+  ) -> impl Matcher<&'a NonRetStatement> {
+    pat!(NonRetStatement::CallStatement(call_expr_matcher))
+  }
+
+  pub fn call_expression<'a>(
+    matcher: impl Matcher<&'a CallExpression>,
+  ) -> impl Matcher<&'a Expression> {
+    pat!(Expression::CallExpression(matcher))
+  }
 
   pub fn call_expr_target<'a>(
     target_matcher: impl Matcher<&'a Expression>,
-  ) -> impl Matcher<&'a Expression> {
-    pat!(Expression::CallExpression(property!(
-      &CallExpression.target(),
-      target_matcher
-    )))
+  ) -> impl Matcher<&'a CallExpression> {
+    property!(&CallExpression.target(), target_matcher)
   }
 
   pub fn call_expr_args<'a>(
     args_matcher: impl Matcher<&'a [Expression]>,
-  ) -> impl Matcher<&'a Expression> {
-    pat!(Expression::CallExpression(property!(
-      &CallExpression.argument_list(),
-      args_matcher
-    )))
+  ) -> impl Matcher<&'a CallExpression> {
+    property!(&CallExpression.argument_list(), args_matcher)
   }
 }

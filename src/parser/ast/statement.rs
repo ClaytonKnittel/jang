@@ -1,17 +1,15 @@
 use std::fmt::Display;
 
-use crate::parser::{
-  ast::{
-    block::{NonRetBlock, RetBlock},
-    expression::Expression,
-  },
-  token::ident::Ident,
+use crate::parser::ast::{
+  block::NonRetBlock, call_expression::CallExpression, if_statement::IfStatement,
+  let_statement::LetStatement,
 };
 
 #[derive(Clone, Debug)]
 pub enum NonRetStatement {
   Let(LetStatement),
-  Expression(Expression),
+  CallStatement(CallExpression),
+  IfStatement(IfStatement),
   Block(NonRetBlock),
 }
 
@@ -21,9 +19,15 @@ impl From<LetStatement> for NonRetStatement {
   }
 }
 
-impl From<Expression> for NonRetStatement {
-  fn from(value: Expression) -> Self {
-    Self::Expression(value)
+impl From<CallExpression> for NonRetStatement {
+  fn from(value: CallExpression) -> Self {
+    Self::CallStatement(value)
+  }
+}
+
+impl From<IfStatement> for NonRetStatement {
+  fn from(value: IfStatement) -> Self {
+    Self::IfStatement(value)
   }
 }
 
@@ -37,116 +41,9 @@ impl Display for NonRetStatement {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Let(let_stmt) => write!(f, "{let_stmt}"),
-      Self::Expression(expr) => write!(f, "{expr}"),
+      Self::CallStatement(call_stmt) => write!(f, "{call_stmt}"),
+      Self::IfStatement(if_stmt) => write!(f, "{if_stmt}"),
       Self::Block(block) => write!(f, "{block}"),
     }
-  }
-}
-
-#[derive(Clone, Debug)]
-pub struct LetStatement {
-  var: Ident,
-  expr: Expression,
-}
-
-impl LetStatement {
-  pub fn new(var: Ident, expr: Expression) -> Self {
-    Self { var, expr }
-  }
-
-  pub fn var(&self) -> &Ident {
-    &self.var
-  }
-
-  pub fn expr(&self) -> &Expression {
-    &self.expr
-  }
-}
-
-impl Display for LetStatement {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "let {} = {}", self.var, self.expr)
-  }
-}
-
-#[derive(Clone, Debug)]
-pub struct RetExpression {
-  expr: Expression,
-}
-
-impl RetExpression {
-  pub fn new(expr: Expression) -> Self {
-    Self { expr }
-  }
-
-  pub fn expr(&self) -> &Expression {
-    &self.expr
-  }
-}
-
-impl Display for RetExpression {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "ret {}", self.expr)
-  }
-}
-
-#[derive(Clone, Debug)]
-pub enum RetStatement {
-  Ret(RetExpression),
-  Block(Box<RetBlock>),
-}
-
-impl From<RetExpression> for RetStatement {
-  fn from(value: RetExpression) -> Self {
-    Self::Ret(value)
-  }
-}
-
-impl<T: Into<Box<RetBlock>>> From<T> for RetStatement {
-  fn from(value: T) -> Self {
-    Self::Block(value.into())
-  }
-}
-
-impl Display for RetStatement {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      Self::Ret(ret_expr) => write!(f, "{ret_expr}"),
-      Self::Block(ret_block) => write!(f, "{ret_block}"),
-    }
-  }
-}
-
-#[cfg(test)]
-pub(crate) mod matchers {
-  use crate::parser::{
-    ast::{
-      expression::Expression,
-      statement::{LetStatement, NonRetStatement, RetExpression, RetStatement},
-    },
-    token::ident::Ident,
-  };
-  use googletest::prelude::*;
-
-  pub fn let_statement<'a>(
-    var_matcher: impl Matcher<&'a Ident>,
-    expr_matcher: impl Matcher<&'a Expression>,
-  ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::Let(pat!(LetStatement {
-      var: var_matcher,
-      expr: expr_matcher
-    })))
-  }
-
-  pub fn expr_stmt<'a>(
-    expr_matcher: impl Matcher<&'a Expression>,
-  ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::Expression(expr_matcher))
-  }
-
-  pub fn ret_expression<'a>(
-    expected: impl Matcher<&'a Expression>,
-  ) -> impl Matcher<&'a RetStatement> {
-    pat!(RetStatement::Ret(pat!(RetExpression { expr: expected })))
   }
 }
