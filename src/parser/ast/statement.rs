@@ -2,13 +2,13 @@ use std::fmt::Display;
 
 use crate::parser::ast::{
   block::Block, call_expression::CallExpression, if_statement::IfStatement,
-  let_statement::LetStatement, ret_statement::RetExpression,
+  let_statement::LetStatement, ret_statement::RetStatement,
 };
 
 #[derive(Clone, Debug)]
 pub enum Statement {
   Let(LetStatement),
-  Ret(RetExpression),
+  Ret(RetStatement),
   CallStatement(CallExpression),
   IfStatement(IfStatement),
   Block(Block),
@@ -20,8 +20,8 @@ impl From<LetStatement> for Statement {
   }
 }
 
-impl From<RetExpression> for Statement {
-  fn from(value: RetExpression) -> Self {
+impl From<RetStatement> for Statement {
+  fn from(value: RetStatement) -> Self {
     Self::Ret(value)
   }
 }

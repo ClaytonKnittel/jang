@@ -12,7 +12,7 @@ use crate::parser::{
     if_statement::IfStatement,
     jang_file::{JangFile, JangFileBuilder},
     let_statement::LetStatement,
-    ret_statement::RetExpression,
+    ret_statement::RetStatement,
     statement::Statement,
     type_expr::Type,
   },
@@ -76,8 +76,8 @@ pub_grammar!(
     LetStatement::new(#ident, #expr)
   };
 
-  <ret_statement>: RetExpression => Keyword(Keyword::Ret) <expr> {
-    RetExpression::new(#expr)
+  <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
+    RetStatement::new(#expr)
   };
 
   <if_statement>: IfStatement => Keyword(Keyword::If) <expr> <block_scope> {
