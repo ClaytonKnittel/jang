@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::parser::ast::{
   block::Block, call_expression::CallExpression, if_statement::IfStatement,
-  let_statement::LetStatement, ret_statement::RetStatement,
+  let_statement::LetStatement, loop_statement::LoopStatement, ret_statement::RetStatement,
 };
 
 #[derive(Clone, Debug)]
@@ -11,7 +11,9 @@ pub enum Statement {
   Ret(RetStatement),
   CallStatement(CallExpression),
   IfStatement(IfStatement),
+  LoopStatement(LoopStatement),
   Block(Block),
+  Break,
 }
 
 impl From<LetStatement> for Statement {
@@ -38,6 +40,12 @@ impl From<IfStatement> for Statement {
   }
 }
 
+impl From<LoopStatement> for Statement {
+  fn from(value: LoopStatement) -> Self {
+    Self::LoopStatement(value)
+  }
+}
+
 impl From<Block> for Statement {
   fn from(value: Block) -> Self {
     Self::Block(value)
@@ -51,7 +59,19 @@ impl Display for Statement {
       Self::Ret(ret_stmt) => write!(f, "{ret_stmt}"),
       Self::CallStatement(call_stmt) => write!(f, "{call_stmt}"),
       Self::IfStatement(if_stmt) => write!(f, "{if_stmt}"),
+      Self::LoopStatement(loop_stmt) => write!(f, "{loop_stmt}"),
       Self::Block(block) => write!(f, "{block}"),
+      Self::Break => write!(f, "break"),
     }
+  }
+}
+
+#[cfg(test)]
+pub(crate) mod matchers {
+  use crate::parser::ast::statement::Statement;
+  use googletest::prelude::*;
+
+  pub fn break_statement<'a>() -> impl Matcher<&'a Statement> {
+    pat!(Statement::Break)
   }
 }
