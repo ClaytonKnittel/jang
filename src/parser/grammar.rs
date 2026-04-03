@@ -71,7 +71,7 @@ pub_grammar!(
   <statement>: Statement => <ret_statement>;
   <statement>: Statement => <call_expr>;
   <statement>: Statement => <if_statement>;
-  <non_ret_statement>: NonRetStatement => <loop_statement>;
+  <statement>: Statement => <loop_statement>;
   <statement>: Statement => <block_scope>;
 
   <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {

@@ -39,13 +39,7 @@ impl From<IfStatement> for Statement {
   }
 }
 
-impl From<LoopStatement> for NonRetStatement {
-  fn from(value: LoopStatement) -> Self {
-    Self::LoopStatement(value)
-  }
-}
-
-impl From<LoopStatement> for NonRetStatement {
+impl From<LoopStatement> for Statement {
   fn from(value: LoopStatement) -> Self {
     Self::LoopStatement(value)
   }
