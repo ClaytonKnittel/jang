@@ -57,8 +57,8 @@ pub_grammar!(
 
   <type>: Type => <ident> { Type(#ident) };
 
-  <block_scope>: Block => <ret_block_scope> { #ret_block_scope.into() };
-  <block_scope>: Block => <non_ret_block_scope> { #non_ret_block_scope.into() };
+  <block_scope>: Block => <ret_block_scope>;
+  <block_scope>: Block => <non_ret_block_scope>;
 
   <ret_block_scope>: RetBlock => <open_bracket> <non_ret_statement_list> <ret_statement> <close_bracket> {
     #non_ret_statement_list.build_with_ret(#ret_statement)
@@ -73,20 +73,16 @@ pub_grammar!(
     #non_ret_statement_list.push_statement(#non_ret_statement)
   };
 
-  <non_ret_statement>: NonRetStatement => <let_binding> { #let_binding.into() };
-  <non_ret_statement>: NonRetStatement => <call_expr> { #call_expr.into() };
-  <non_ret_statement>: NonRetStatement => <if_statement> { #if_statement.into() };
-  <non_ret_statement>: NonRetStatement => <non_ret_block_scope> {
-    #non_ret_block_scope.into()
-  };
+  <non_ret_statement>: NonRetStatement => <let_binding>;
+  <non_ret_statement>: NonRetStatement => <call_expr>;
+  <non_ret_statement>: NonRetStatement => <if_statement>;
+  <non_ret_statement>: NonRetStatement => <non_ret_block_scope>;
 
   <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
     LetStatement::new(#ident, #expr)
   };
 
-  <ret_statement>: RetStatement => <ret_block_scope> {
-    #ret_block_scope.into()
-  };
+  <ret_statement>: RetStatement => <ret_block_scope>;
   <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
     RetExpression::new(#expr).into()
   };
@@ -130,10 +126,10 @@ pub_grammar!(
 
   // Unary expressions:
   <unary_expr>: Expression => <call_or_dot_expr>;
-  <unary_expr>: Expression => <literal> { #literal.into() };
+  <unary_expr>: Expression => <literal>;
 
   // Call expressions.
-  <call_or_dot_expr>: Expression => <call_expr> { #call_expr.into() };
+  <call_or_dot_expr>: Expression => <call_expr>;
   <call_or_dot_expr>: Expression => <call_or_dot_expr> <dot> <ident> {
     DotExpression::new(#call_or_dot_expr, #ident).into()
   };
