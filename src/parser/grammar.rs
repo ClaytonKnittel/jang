@@ -3,7 +3,7 @@ use parser_generator::pub_grammar;
 use crate::parser::{
   ast::{
     binary_expression::{BinaryExpression, BinaryOp},
-    block::{Block, BlockBuilder, NonRetBlock, RetBlock},
+    block::{Block, BlockBuilder},
     call_expression::CallExpression,
     dot_expression::DotExpression,
     expression::Expression,
@@ -12,8 +12,8 @@ use crate::parser::{
     if_statement::IfStatement,
     jang_file::{JangFile, JangFileBuilder},
     let_statement::LetStatement,
-    ret_statement::{RetExpression, RetStatement},
-    statement::NonRetStatement,
+    ret_statement::RetExpression,
+    statement::Statement,
     type_expr::Type,
   },
   token::{
@@ -57,34 +57,27 @@ pub_grammar!(
 
   <type>: Type => <ident> { Type(#ident) };
 
-  <block_scope>: Block => <ret_block_scope>;
-  <block_scope>: Block => <non_ret_block_scope>;
-
-  <ret_block_scope>: RetBlock => <open_bracket> <non_ret_statement_list> <ret_statement> <close_bracket> {
-    #non_ret_statement_list.build_with_ret(#ret_statement)
+  <block_scope>: Block => <open_bracket> <statement_list> <close_bracket> {
+    #statement_list.build()
   };
 
-  <non_ret_block_scope>: NonRetBlock => <open_bracket> <non_ret_statement_list> <close_bracket> {
-    #non_ret_statement_list.build()
+  <statement_list>: BlockBuilder => ! { BlockBuilder::new() };
+  <statement_list>: BlockBuilder => <statement_list> <statement> {
+    #statement_list.push_statement(#statement)
   };
 
-  <non_ret_statement_list>: BlockBuilder => ! { BlockBuilder::new() };
-  <non_ret_statement_list>: BlockBuilder => <non_ret_statement_list> <non_ret_statement> {
-    #non_ret_statement_list.push_statement(#non_ret_statement)
-  };
-
-  <non_ret_statement>: NonRetStatement => <let_binding>;
-  <non_ret_statement>: NonRetStatement => <call_expr>;
-  <non_ret_statement>: NonRetStatement => <if_statement>;
-  <non_ret_statement>: NonRetStatement => <non_ret_block_scope>;
+  <statement>: Statement => <let_binding>;
+  <statement>: Statement => <ret_statement>;
+  <statement>: Statement => <call_expr>;
+  <statement>: Statement => <if_statement>;
+  <statement>: Statement => <block_scope>;
 
   <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
     LetStatement::new(#ident, #expr)
   };
 
-  <ret_statement>: RetStatement => <ret_block_scope>;
-  <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
-    RetExpression::new(#expr).into()
+  <ret_statement>: RetExpression => Keyword(Keyword::Ret) <expr> {
+    RetExpression::new(#expr)
   };
 
   <if_statement>: IfStatement => Keyword(Keyword::If) <expr> <block_scope> {
@@ -202,7 +195,7 @@ mod tests {
   use crate::parser::{
     ast::{
       binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
-      block::matchers::{block, block_with_ret, non_ret_block, ret_block},
+      block::matchers::{block, block_statement},
       call_expression::matchers::{
         call_expr_args, call_expr_target, call_expression, call_statement,
       },
@@ -217,7 +210,7 @@ mod tests {
       },
       jang_file::matchers::{jang_file_functions, jang_file_with_fn},
       let_statement::matchers::let_statement as let_stmt,
-      ret_statement::matchers::ret_expression as ret_expr,
+      ret_statement::matchers::ret_statement as ret_stmt,
       type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
@@ -248,10 +241,9 @@ mod tests {
     );
     expect_that!(
       ast,
-      jang_file_with_fn(fn_body(block_with_ret(
-        is_empty(),
-        ret_expr(lit_exp(integral("123")))
-      )))
+      jang_file_with_fn(fn_body(block(elements_are![ret_stmt(lit_exp(integral(
+        "123"
+      )))])))
     );
     expect_that!(ast, jang_file_with_fn(fn_parameters(is_empty())));
   }
@@ -273,21 +265,6 @@ mod tests {
   }
 
   #[gtest]
-  fn reject_two_returns() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
-      r#"
-        fn function_name() -> i32 {
-          ret 123
-          ret 456
-        }
-        "#
-      .chars(),
-    ));
-
-    expect_that!(ast, failed_to_parse());
-  }
-
-  #[gtest]
   fn ret_ident() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
@@ -301,10 +278,7 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_fn(fn_body(block_with_ret(
-        is_empty(),
-        ret_expr(id_exp(ident("x")))
-      )))
+      jang_file_with_fn(fn_body(block(elements_are![ret_stmt(id_exp(ident("x")))])))
     );
   }
 
@@ -324,10 +298,9 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_fn(fn_body(block_with_ret(
-        is_empty(),
-        ret_block(is_empty(), ret_expr(id_exp(ident("x"))))
-      )))
+      jang_file_with_fn(fn_body(block(elements_are![block_statement(
+        elements_are![ret_stmt(id_exp(ident("x")))]
+      )])))
     );
   }
 
@@ -368,13 +341,11 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_fn(fn_body(block_with_ret(
-        elements_are![
-          let_stmt(ident("x"), lit_exp(integral("123"))),
-          let_stmt(ident("y"), id_exp(ident("x"))),
-        ],
-        ret_expr(lit_exp(integral("789")))
-      )))
+      jang_file_with_fn(fn_body(block(elements_are![
+        let_stmt(ident("x"), lit_exp(integral("123"))),
+        let_stmt(ident("y"), id_exp(ident("x"))),
+        ret_stmt(lit_exp(integral("789")))
+      ])))
     );
   }
 
@@ -444,35 +415,17 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_fn(fn_body(block_with_ret(
-        elements_are![
-          non_ret_block(elements_are![let_stmt(ident("y"), id_exp(ident("z")))]),
-          let_stmt(ident("x"), lit_exp(integral("123"))),
-        ],
-        ret_block(
-          elements_are![let_stmt(ident("x"), id_exp(ident("x")))],
-          ret_block(
-            is_empty(),
-            ret_block(is_empty(), ret_expr(id_exp(ident("z"))))
-          )
-        )
-      )))
+      jang_file_with_fn(fn_body(block(elements_are![
+        block_statement(elements_are![let_stmt(ident("y"), id_exp(ident("z")))]),
+        let_stmt(ident("x"), lit_exp(integral("123"))),
+        block_statement(elements_are![
+          let_stmt(ident("x"), id_exp(ident("x"))),
+          block_statement(elements_are![block_statement(elements_are![ret_stmt(
+            id_exp(ident("z"))
+          )])])
+        ])
+      ])))
     );
-  }
-
-  #[gtest]
-  fn reject_let_after_ret() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
-      r#"
-        fn function_name() {
-          ret 123
-          let x = 456
-        }
-        "#
-      .chars(),
-    ));
-
-    expect_that!(ast, failed_to_parse());
   }
 
   #[gtest]
@@ -1056,10 +1009,10 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![if_statement(
         bin_exp(id_exp(ident("x")), &BinaryOp::Add, lit_exp(integral("3"))),
-        block_with_ret(
-          elements_are![let_stmt(ident("y"), lit_exp(integral("1")))],
-          ret_expr(id_exp(ident("z")))
-        )
+        block(elements_are![
+          let_stmt(ident("y"), lit_exp(integral("1"))),
+          ret_stmt(id_exp(ident("z")))
+        ])
       )])))
     );
   }
@@ -1087,8 +1040,8 @@ mod tests {
           call_expr_target(id_exp(ident("y"))),
           call_expr_args(elements_are![lit_exp(integral("2"))])
         ]),
-        block_with_ret(is_empty(), ret_expr(id_exp(ident("z")))),
-        block_with_ret(is_empty(), ret_expr(lit_exp(integral("10"))))
+        block(elements_are![ret_stmt(id_exp(ident("z")))]),
+        block(elements_are![ret_stmt(lit_exp(integral("10")))])
       )])))
     );
   }
@@ -1116,14 +1069,14 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![if_else_if_statement(
         id_exp(ident("x")),
-        block_with_ret(is_empty(), ret_expr(lit_exp(integral("1")))),
+        block(elements_are![ret_stmt(lit_exp(integral("1")))]),
         if_else_clause(
           id_exp(ident("y")),
-          block_with_ret(is_empty(), ret_expr(lit_exp(integral("2")))),
-          block_with_ret(
-            elements_are![let_stmt(ident("a"), lit_exp(integral("3")))],
-            ret_expr(id_exp(ident("a")))
-          )
+          block(elements_are![ret_stmt(lit_exp(integral("2")))]),
+          block(elements_are![
+            let_stmt(ident("a"), lit_exp(integral("3"))),
+            ret_stmt(id_exp(ident("a")))
+          ])
         )
       )])))
     );

@@ -1,46 +1,54 @@
 use std::fmt::Display;
 
 use crate::parser::ast::{
-  block::NonRetBlock, call_expression::CallExpression, if_statement::IfStatement,
-  let_statement::LetStatement,
+  block::Block, call_expression::CallExpression, if_statement::IfStatement,
+  let_statement::LetStatement, ret_statement::RetExpression,
 };
 
 #[derive(Clone, Debug)]
-pub enum NonRetStatement {
+pub enum Statement {
   Let(LetStatement),
+  Ret(RetExpression),
   CallStatement(CallExpression),
   IfStatement(IfStatement),
-  Block(NonRetBlock),
+  Block(Block),
 }
 
-impl From<LetStatement> for NonRetStatement {
+impl From<LetStatement> for Statement {
   fn from(value: LetStatement) -> Self {
     Self::Let(value)
   }
 }
 
-impl From<CallExpression> for NonRetStatement {
+impl From<RetExpression> for Statement {
+  fn from(value: RetExpression) -> Self {
+    Self::Ret(value)
+  }
+}
+
+impl From<CallExpression> for Statement {
   fn from(value: CallExpression) -> Self {
     Self::CallStatement(value)
   }
 }
 
-impl From<IfStatement> for NonRetStatement {
+impl From<IfStatement> for Statement {
   fn from(value: IfStatement) -> Self {
     Self::IfStatement(value)
   }
 }
 
-impl From<NonRetBlock> for NonRetStatement {
-  fn from(value: NonRetBlock) -> Self {
+impl From<Block> for Statement {
+  fn from(value: Block) -> Self {
     Self::Block(value)
   }
 }
 
-impl Display for NonRetStatement {
+impl Display for Statement {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Let(let_stmt) => write!(f, "{let_stmt}"),
+      Self::Ret(ret_stmt) => write!(f, "{ret_stmt}"),
       Self::CallStatement(call_stmt) => write!(f, "{call_stmt}"),
       Self::IfStatement(if_stmt) => write!(f, "{if_stmt}"),
       Self::Block(block) => write!(f, "{block}"),

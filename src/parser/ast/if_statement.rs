@@ -80,7 +80,7 @@ pub(crate) mod matchers {
     block::Block,
     expression::Expression,
     if_statement::{ElseClause, IfStatement},
-    statement::NonRetStatement,
+    statement::Statement,
   };
   use googletest::prelude::*;
 
@@ -98,8 +98,8 @@ pub(crate) mod matchers {
   pub fn if_statement<'a>(
     cond_matcher: impl Matcher<&'a Expression>,
     body_matcher: impl Matcher<&'a Block>,
-  ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::IfStatement(if_clause(
+  ) -> impl Matcher<&'a Statement> {
+    pat!(Statement::IfStatement(if_clause(
       cond_matcher,
       body_matcher
     )))
@@ -121,8 +121,8 @@ pub(crate) mod matchers {
     cond_matcher: impl Matcher<&'a Expression>,
     body_matcher: impl Matcher<&'a Block>,
     else_matcher: impl Matcher<&'a Block>,
-  ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::IfStatement(if_else_clause(
+  ) -> impl Matcher<&'a Statement> {
+    pat!(Statement::IfStatement(if_else_clause(
       cond_matcher,
       body_matcher,
       else_matcher
@@ -145,8 +145,8 @@ pub(crate) mod matchers {
     cond_matcher: impl Matcher<&'a Expression>,
     body_matcher: impl Matcher<&'a Block>,
     else_if_matcher: impl Matcher<&'a IfStatement>,
-  ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::IfStatement(if_else_if_clause(
+  ) -> impl Matcher<&'a Statement> {
+    pat!(Statement::IfStatement(if_else_if_clause(
       cond_matcher,
       body_matcher,
       else_if_matcher

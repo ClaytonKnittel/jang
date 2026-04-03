@@ -34,14 +34,14 @@ impl Display for CallExpression {
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::ast::{
-    call_expression::CallExpression, expression::Expression, statement::NonRetStatement,
+    call_expression::CallExpression, expression::Expression, statement::Statement,
   };
   use googletest::prelude::*;
 
   pub fn call_statement<'a>(
     call_expr_matcher: impl Matcher<&'a CallExpression>,
-  ) -> impl Matcher<&'a NonRetStatement> {
-    pat!(NonRetStatement::CallStatement(call_expr_matcher))
+  ) -> impl Matcher<&'a Statement> {
+    pat!(Statement::CallStatement(call_expr_matcher))
   }
 
   pub fn call_expression<'a>(
