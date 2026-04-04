@@ -1,20 +1,28 @@
 use std::fmt::Display;
 
-use crate::parser::ast::function_decl::FunctionDecl;
+use crate::parser::ast::{function_decl::FunctionDecl, type_decl::TypeDecl};
 
 #[derive(Clone, Debug)]
 pub struct JangFile {
   function_decls: Vec<FunctionDecl>,
+  type_decls: Vec<TypeDecl>,
 }
 
 impl JangFile {
   pub fn function_decls(&self) -> &[FunctionDecl] {
     &self.function_decls
   }
+
+  pub fn type_decls(&self) -> &[TypeDecl] {
+    &self.type_decls
+  }
 }
 
 impl Display for JangFile {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    for type_decl in &self.type_decls {
+      write!(f, "{type_decl}")?;
+    }
     for function_decl in &self.function_decls {
       write!(f, "{function_decl}")?;
     }
@@ -25,13 +33,12 @@ impl Display for JangFile {
 #[derive(Clone, Debug, Default)]
 pub struct JangFileBuilder {
   function_decls: Vec<FunctionDecl>,
+  type_decls: Vec<TypeDecl>,
 }
 
 impl JangFileBuilder {
   pub fn new() -> Self {
-    JangFileBuilder {
-      function_decls: Vec::new(),
-    }
+    Self::default()
   }
 
   pub fn push_function_decl(mut self, function_decl: FunctionDecl) -> JangFileBuilder {
@@ -39,9 +46,15 @@ impl JangFileBuilder {
     self
   }
 
+  pub fn push_type_decl(mut self, type_decl: TypeDecl) -> JangFileBuilder {
+    self.type_decls.push(type_decl);
+    self
+  }
+
   pub fn build(self) -> JangFile {
     JangFile {
       function_decls: self.function_decls,
+      type_decls: self.type_decls,
     }
   }
 }

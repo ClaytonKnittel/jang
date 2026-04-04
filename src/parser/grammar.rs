@@ -15,7 +15,7 @@ use crate::parser::{
     loop_statement::LoopStatement,
     ret_statement::RetStatement,
     statement::Statement,
-    type_expr::Type,
+    type_expr::TypeExpression,
   },
   token::{
     JangToken,
@@ -51,12 +51,12 @@ pub_grammar!(
     FunctionDecl::new(#ident, #function_params, #function_ret_type, #block_scope)
   };
 
-  <function_ret_type>: Option<Type> => ! { None };
-  <function_ret_type>: Option<Type> => <right_arrow> <type> {
+  <function_ret_type>: Option<TypeExpression> => ! { None };
+  <function_ret_type>: Option<TypeExpression> => <right_arrow> <type> {
     Some(#type)
   };
 
-  <type>: Type => <ident> { Type(#ident) };
+  <type>: TypeExpression => <ident> { TypeExpression(#ident) };
 
   <block_scope>: Block => <open_bracket> <statement_list> <close_bracket> {
     #statement_list.build()
