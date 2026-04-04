@@ -15,6 +15,7 @@ use crate::parser::{
     loop_statement::LoopStatement,
     ret_statement::RetStatement,
     statement::Statement,
+    type_decl::TypeDecl,
     type_expr::TypeExpression,
   },
   token::{
@@ -32,6 +33,9 @@ pub_grammar!(
 
   <root>: JangFile => <jang_file> { #jang_file.build() };
 
+  <jang_file>: JangFileBuilder => <jang_file> <type_decl> {
+    #jang_file.push_type_decl(#type_decl)
+  };
   <jang_file>: JangFileBuilder => <jang_file> <function_decl> {
     #jang_file.push_function_decl(#function_decl)
   };
@@ -39,7 +43,13 @@ pub_grammar!(
     JangFileBuilder::new()
   };
 
-  // TODO: if return type is not none, require a ret, and vice versa?
+  <type_decl>: TypeDecl => Keyword(Keyword::Type) <ident> <eq> <structured_type_decl> {
+    TypeDecl::new()
+  };
+
+  <structured_type_decl>: StructuredTypeDecl => <open_bracket> <close_bracket> {
+  };
+
   <function_decl>: FunctionDecl =>
       Keyword(Keyword::Function)
       <ident>
