@@ -3,7 +3,7 @@ use std::fmt::Display;
 use cknittel_util::builder::Builder;
 
 use crate::parser::{
-  ast::{block::Block, type_expr::Type},
+  ast::{block::Block, type_expr::TypeExpression},
   token::ident::Ident,
 };
 
@@ -11,7 +11,7 @@ use crate::parser::{
 pub struct FunctionDecl {
   name: Ident,
   parameters: FunctionParameters,
-  return_type: Option<Type>,
+  return_type: Option<TypeExpression>,
   body: Block,
 }
 
@@ -19,7 +19,7 @@ impl FunctionDecl {
   pub fn new(
     name: Ident,
     parameters: FunctionParameters,
-    return_type: Option<Type>,
+    return_type: Option<TypeExpression>,
     body: Block,
   ) -> Self {
     Self {
@@ -38,7 +38,7 @@ impl FunctionDecl {
     self.parameters.parameters()
   }
 
-  pub fn return_type(&self) -> Option<&Type> {
+  pub fn return_type(&self) -> Option<&TypeExpression> {
     self.return_type.as_ref()
   }
 
@@ -88,11 +88,11 @@ impl Display for FunctionParameters {
 #[derive(Clone, Debug)]
 pub struct FunctionParameter {
   name: Ident,
-  ty: Type,
+  ty: TypeExpression,
 }
 
 impl FunctionParameter {
-  pub fn new(name: Ident, ty: Type) -> Self {
+  pub fn new(name: Ident, ty: TypeExpression) -> Self {
     Self { name, ty }
   }
 
@@ -100,7 +100,7 @@ impl FunctionParameter {
     &self.name
   }
 
-  pub fn ty(&self) -> &Type {
+  pub fn ty(&self) -> &TypeExpression {
     &self.ty
   }
 }
@@ -117,7 +117,7 @@ pub(crate) mod matchers {
     ast::{
       block::Block,
       function_decl::{FunctionDecl, FunctionParameter},
-      type_expr::Type,
+      type_expr::TypeExpression,
     },
     token::ident::Ident,
   };
@@ -131,7 +131,9 @@ pub(crate) mod matchers {
     property!(&FunctionDecl.return_type(), none())
   }
 
-  pub fn fn_return_type<'a>(matcher: impl Matcher<&'a Type>) -> impl Matcher<&'a FunctionDecl> {
+  pub fn fn_return_type<'a>(
+    matcher: impl Matcher<&'a TypeExpression>,
+  ) -> impl Matcher<&'a FunctionDecl> {
     property!(&FunctionDecl.return_type(), some(matcher))
   }
 
@@ -152,7 +154,7 @@ pub(crate) mod matchers {
   }
 
   pub fn fn_parameter_type<'a>(
-    matcher: impl Matcher<&'a Type>,
+    matcher: impl Matcher<&'a TypeExpression>,
   ) -> impl Matcher<&'a FunctionParameter> {
     property!(&FunctionParameter.ty(), matcher)
   }
