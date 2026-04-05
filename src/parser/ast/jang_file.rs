@@ -1,8 +1,10 @@
 use std::fmt::Display;
 
+use cknittel_util::builder::Builder;
+
 use crate::parser::ast::function_decl::FunctionDecl;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Builder)]
 pub struct JangFile {
   function_decls: Vec<FunctionDecl>,
 }
@@ -19,30 +21,6 @@ impl Display for JangFile {
       write!(f, "{function_decl}")?;
     }
     Ok(())
-  }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct JangFileBuilder {
-  function_decls: Vec<FunctionDecl>,
-}
-
-impl JangFileBuilder {
-  pub fn new() -> Self {
-    JangFileBuilder {
-      function_decls: Vec::new(),
-    }
-  }
-
-  pub fn push_function_decl(mut self, function_decl: FunctionDecl) -> JangFileBuilder {
-    self.function_decls.push(function_decl);
-    self
-  }
-
-  pub fn build(self) -> JangFile {
-    JangFile {
-      function_decls: self.function_decls,
-    }
   }
 }
 

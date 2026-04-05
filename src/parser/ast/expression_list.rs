@@ -1,32 +1,10 @@
 use std::fmt::Display;
 
+use cknittel_util::builder::Builder;
+
 use crate::parser::ast::expression::Expression;
 
-#[derive(Default)]
-pub struct ExpressionListBuilder {
-  expressions: Vec<Expression>,
-}
-
-impl ExpressionListBuilder {
-  pub fn push(mut self, expression: Expression) -> Self {
-    self.expressions.push(expression);
-    self
-  }
-
-  pub fn build(self) -> ExpressionList {
-    ExpressionList {
-      expressions: self.expressions,
-    }
-  }
-}
-
-impl From<ExpressionListBuilder> for ExpressionList {
-  fn from(value: ExpressionListBuilder) -> Self {
-    value.build()
-  }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Builder)]
 pub struct ExpressionList {
   expressions: Vec<Expression>,
 }
