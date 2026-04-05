@@ -17,7 +17,7 @@ use crate::parser::{
     loop_statement::LoopStatement,
     ret_statement::RetStatement,
     statement::Statement,
-    type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, TypeDecl},
+    type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField, TypeDecl},
     type_expr::TypeExpression,
   },
   token::{
@@ -46,13 +46,20 @@ pub_grammar!(
   };
 
   <type_decl>: TypeDecl => Keyword(Keyword::Type) <ident> <eq> <open_bracket> <structured_type_decl> <close_bracket> {
-    TypeDecl::new()
+    TypeDecl::new(#ident, #structured_type_decl)
   };
 
   <structured_type_decl>: StructuredTypeDecl => <structured_type_decl_builder>;
 
   <structured_type_decl_builder>: StructuredTypeDeclBuilder => ! {
     StructuredTypeDeclBuilder::default()
+  };
+  <structured_type_decl_builder>: StructuredTypeDeclBuilder => <structured_type_decl_builder> <structured_type_field> {
+    #structured_type_decl_builder.add_fields(#structured_type_field)
+  };
+
+  <structured_type_field>: StructuredTypeField => <ident> <colon> <type_expr> {
+    StructuredTypeField::new(#ident, #type_expr)
   };
 
   <function_decl>: FunctionDecl =>
@@ -67,11 +74,11 @@ pub_grammar!(
   };
 
   <function_ret_type>: Option<TypeExpression> => ! { None };
-  <function_ret_type>: Option<TypeExpression> => <right_arrow> <type> {
-    Some(#type)
+  <function_ret_type>: Option<TypeExpression> => <right_arrow> <type_expr> {
+    Some(#type_expr)
   };
 
-  <type>: TypeExpression => <ident> { TypeExpression(#ident) };
+  <type_expr>: TypeExpression => <ident> { TypeExpression(#ident) };
 
   <block_scope>: Block => <open_bracket> <statement_list> <close_bracket> {
     #statement_list
@@ -184,13 +191,13 @@ pub_grammar!(
   <parameter_list>: FunctionParametersBuilder => ! { FunctionParametersBuilder::default() };
   <parameter_list>: FunctionParametersBuilder => <non_empty_parameter_list>;
   <non_empty_parameter_list>: FunctionParametersBuilder =>
-      <non_empty_parameter_list> <comma> <ident> <colon> <type>
+      <non_empty_parameter_list> <comma> <ident> <colon> <type_expr>
   {
-    #non_empty_parameter_list.add_parameters(FunctionParameter::new(#ident, #type))
+    #non_empty_parameter_list.add_parameters(FunctionParameter::new(#ident, #type_expr))
   };
-  <non_empty_parameter_list>: FunctionParametersBuilder => <ident> <colon> <type> {
+  <non_empty_parameter_list>: FunctionParametersBuilder => <ident> <colon> <type_expr> {
     let builder = FunctionParametersBuilder::default();
-    builder.add_parameters(FunctionParameter::new(#ident, #type))
+    builder.add_parameters(FunctionParameter::new(#ident, #type_expr))
   };
 
   <eq> => Operator(Operator { op: Op::Equal });

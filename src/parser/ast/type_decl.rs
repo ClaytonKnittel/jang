@@ -2,12 +2,18 @@ use std::fmt::Display;
 
 use cknittel_util::builder::Builder;
 
-use crate::parser::ast::type_expr::TypeExpression;
+use crate::parser::{ast::type_expr::TypeExpression, token::ident::Ident};
 
 #[derive(Clone, Debug)]
 pub struct StructuredTypeField {
-  name: String,
+  name: Ident,
   ty: TypeExpression,
+}
+
+impl StructuredTypeField {
+  pub fn new(name: Ident, ty: TypeExpression) -> Self {
+    Self { name, ty }
+  }
 }
 
 impl Display for StructuredTypeField {
@@ -18,6 +24,7 @@ impl Display for StructuredTypeField {
 
 #[derive(Clone, Debug, Builder)]
 pub struct StructuredTypeDecl {
+  #[vec]
   fields: Vec<StructuredTypeField>,
 }
 
@@ -36,6 +43,12 @@ pub enum TypeDeclVariant {
   Structured(StructuredTypeDecl),
 }
 
+impl From<StructuredTypeDecl> for TypeDeclVariant {
+  fn from(value: StructuredTypeDecl) -> Self {
+    Self::Structured(value)
+  }
+}
+
 impl Display for TypeDeclVariant {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
@@ -46,8 +59,15 @@ impl Display for TypeDeclVariant {
 
 #[derive(Clone, Debug)]
 pub struct TypeDecl {
-  name: String,
+  name: Ident,
   decl: TypeDeclVariant,
+}
+
+impl TypeDecl {
+  pub fn new(name: Ident, decl: impl Into<TypeDeclVariant>) -> Self {
+    let decl = decl.into();
+    Self { name, decl }
+  }
 }
 
 impl Display for TypeDecl {
