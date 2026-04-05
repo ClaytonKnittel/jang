@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use cknittel_util::builder::Builder;
+
 use crate::parser::ast::type_expr::TypeExpression;
 
 #[derive(Clone, Debug)]
@@ -14,7 +16,7 @@ impl Display for StructuredTypeField {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Builder)]
 pub struct StructuredTypeDecl {
   fields: Vec<StructuredTypeField>,
 }

@@ -8,6 +8,7 @@ use crate::parser::ast::{function_decl::FunctionDecl, type_decl::TypeDecl};
 pub struct JangFile {
   #[vec]
   function_decls: Vec<FunctionDecl>,
+  #[vec]
   type_decls: Vec<TypeDecl>,
 }
 

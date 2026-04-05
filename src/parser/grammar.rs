@@ -17,7 +17,7 @@ use crate::parser::{
     loop_statement::LoopStatement,
     ret_statement::RetStatement,
     statement::Statement,
-    type_decl::{StructuredTypeDecl, TypeDecl},
+    type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, TypeDecl},
     type_expr::TypeExpression,
   },
   token::{
@@ -36,7 +36,7 @@ pub_grammar!(
   <root>: JangFile => <jang_file>;
 
   <jang_file>: JangFileBuilder => <jang_file> <type_decl> {
-    #jang_file.push_type_decl(#type_decl)
+    #jang_file.add_type_decls(#type_decl)
   };
   <jang_file>: JangFileBuilder => <jang_file> <function_decl> {
     #jang_file.add_function_decls(#function_decl)
@@ -45,11 +45,14 @@ pub_grammar!(
     JangFileBuilder::default()
   };
 
-  <type_decl>: TypeDecl => Keyword(Keyword::Type) <ident> <eq> <structured_type_decl> {
+  <type_decl>: TypeDecl => Keyword(Keyword::Type) <ident> <eq> <open_bracket> <structured_type_decl> <close_bracket> {
     TypeDecl::new()
   };
 
-  <structured_type_decl>: StructuredTypeDecl => <open_bracket> <close_bracket> {
+  <structured_type_decl>: StructuredTypeDecl => <structured_type_decl_builder>;
+
+  <structured_type_decl_builder>: StructuredTypeDeclBuilder => ! {
+    StructuredTypeDeclBuilder::default()
   };
 
   <function_decl>: FunctionDecl =>
