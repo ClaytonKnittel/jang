@@ -17,7 +17,7 @@ use crate::parser::{
     loop_statement::LoopStatement,
     ret_statement::RetStatement,
     statement::Statement,
-    type_decl::TypeDecl,
+    type_decl::{StructuredTypeDecl, TypeDecl},
     type_expr::TypeExpression,
   },
   token::{

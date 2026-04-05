@@ -2,8 +2,6 @@ use std::fmt::Display;
 
 use cknittel_util::builder::Builder;
 
-use cknittel_util::builder::Builder;
-
 use crate::parser::ast::{function_decl::FunctionDecl, type_decl::TypeDecl};
 
 #[derive(Clone, Debug, Builder)]
