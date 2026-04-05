@@ -1,37 +1,16 @@
 use std::fmt::Display;
 
+use cknittel_util::builder::Builder;
+
 use crate::parser::ast::statement::Statement;
 
-#[derive(Default)]
-pub struct BlockBuilder {
-  statements: Vec<Statement>,
-}
-
-impl BlockBuilder {
-  pub fn new() -> Self {
-    Self::default()
-  }
-
-  pub fn push_statement(mut self, statement: impl Into<Statement>) -> Self {
-    self.statements.push(statement.into());
-    self
-  }
-
-  pub fn build(self) -> Block {
-    Block::new(self.statements)
-  }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Builder)]
 pub struct Block {
+  #[vec]
   statements: Vec<Statement>,
 }
 
 impl Block {
-  fn new(statements: Vec<Statement>) -> Self {
-    Self { statements }
-  }
-
   pub fn statements(&self) -> &[Statement] {
     &self.statements
   }

@@ -59,6 +59,9 @@ impl From<ParserError<JangError>> for JangError {
       ParserError::ParseError { message } => {
         JangError::GrammarError(ParserError::ParseError { message })
       }
+      ParserError::ForeignError { message } => {
+        JangError::GrammarError(ParserError::ForeignError { message })
+      }
       #[cfg(debug_assertions)]
       ParserError::OverlappingTokenMatchers { token } => {
         JangError::GrammarError(ParserError::OverlappingTokenMatchers { token })

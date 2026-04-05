@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use cknittel_util::builder::Builder;
+
 use crate::parser::{
   ast::{block::Block, type_expr::Type},
   token::ident::Ident,
@@ -16,13 +18,13 @@ pub struct FunctionDecl {
 impl FunctionDecl {
   pub fn new(
     name: Ident,
-    parameters: impl Into<FunctionParameters>,
+    parameters: FunctionParameters,
     return_type: Option<Type>,
     body: Block,
   ) -> Self {
     Self {
       name,
-      parameters: parameters.into(),
+      parameters,
       return_type,
       body,
     }
@@ -55,32 +57,9 @@ impl Display for FunctionDecl {
   }
 }
 
-#[derive(Default)]
-pub struct FunctionParametersBuilder {
-  parameters: Vec<FunctionParameter>,
-}
-
-impl FunctionParametersBuilder {
-  pub fn push(mut self, parameter: FunctionParameter) -> Self {
-    self.parameters.push(parameter);
-    self
-  }
-
-  pub fn build(self) -> FunctionParameters {
-    FunctionParameters {
-      parameters: self.parameters,
-    }
-  }
-}
-
-impl From<FunctionParametersBuilder> for FunctionParameters {
-  fn from(value: FunctionParametersBuilder) -> Self {
-    value.build()
-  }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Builder)]
 pub struct FunctionParameters {
+  #[vec]
   parameters: Vec<FunctionParameter>,
 }
 

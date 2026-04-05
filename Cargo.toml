@@ -4,9 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cknittel-util = { git = "https://github.com/ClaytonKnittel/cknittel-util.git", rev = "63d07d74820add0967a0bfe76e61b6939a421efd" }
+cknittel-util = { git = "https://github.com/ClaytonKnittel/cknittel-util.git", rev = "7e35310d1fde5753a1252900df1747390b1eb9a2", features = [
+  "builder",
+] }
 itertools = "0.14.0"
-parser_generator = { git = "https://github.com/ClaytonKnittel/parser_generator.git", rev = "1371917ab7145e077400c615d561573d9688b7a2" }
+parser_generator = { git = "https://github.com/ClaytonKnittel/parser_generator.git", rev = "ee97b0e25541c8adfe7955205de7bab143049fa0" }
 
 [dev-dependencies]
 googletest = "0.14.2"
