@@ -18,13 +18,13 @@ pub struct FunctionDecl {
 impl FunctionDecl {
   pub fn new(
     name: Ident,
-    parameters: impl Into<FunctionParameters>,
+    parameters: FunctionParameters,
     return_type: Option<Type>,
     body: Block,
   ) -> Self {
     Self {
       name,
-      parameters: parameters.into(),
+      parameters,
       return_type,
       body,
     }
@@ -59,6 +59,7 @@ impl Display for FunctionDecl {
 
 #[derive(Clone, Debug, Builder)]
 pub struct FunctionParameters {
+  #[vec]
   parameters: Vec<FunctionParameter>,
 }
 

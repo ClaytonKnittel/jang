@@ -6,14 +6,11 @@ use crate::parser::ast::statement::Statement;
 
 #[derive(Clone, Debug, Builder)]
 pub struct Block {
+  #[vec]
   statements: Vec<Statement>,
 }
 
 impl Block {
-  fn new(statements: Vec<Statement>) -> Self {
-    Self { statements }
-  }
-
   pub fn statements(&self) -> &[Statement] {
     &self.statements
   }

@@ -8,7 +8,9 @@ use crate::parser::{
     dot_expression::DotExpression,
     expression::Expression,
     expression_list::{ExpressionList, ExpressionListBuilder},
-    function_decl::{FunctionDecl, FunctionParameter, FunctionParametersBuilder},
+    function_decl::{
+      FunctionDecl, FunctionParameter, FunctionParameters, FunctionParametersBuilder,
+    },
     if_statement::IfStatement,
     jang_file::{JangFile, JangFileBuilder},
     let_statement::LetStatement,
@@ -30,13 +32,13 @@ pub_grammar!(
   name: JangGrammar;
   enum_terminal: JangToken;
 
-  <root>: JangFile => <jang_file> { #jang_file.build() };
+  <root>: JangFile => <jang_file>;
 
   <jang_file>: JangFileBuilder => <jang_file> <function_decl> {
-    #jang_file.push_function_decl(#function_decl)
+    #jang_file.add_function_decls(#function_decl)
   };
   <jang_file>: JangFileBuilder => ! {
-    JangFileBuilder::new()
+    JangFileBuilder::default()
   };
 
   // TODO: if return type is not none, require a ret, and vice versa?
@@ -59,12 +61,14 @@ pub_grammar!(
   <type>: Type => <ident> { Type(#ident) };
 
   <block_scope>: Block => <open_bracket> <statement_list> <close_bracket> {
-    #statement_list.build()
+    #statement_list
   };
 
-  <statement_list>: BlockBuilder => ! { BlockBuilder::new() };
-  <statement_list>: BlockBuilder => <statement_list> <statement> {
-    #statement_list.push_statement(#statement)
+  <statement_list>: Block => <statement_list_builder>;
+
+  <statement_list_builder>: BlockBuilder => ! { BlockBuilder::default() };
+  <statement_list_builder>: BlockBuilder => <statement_list_builder> <statement> {
+    #statement_list_builder.add_statements(#statement)
   };
 
   <statement>: Statement => <let_binding>;
@@ -141,22 +145,26 @@ pub_grammar!(
     CallExpression::new(#call_or_dot_expr, #call_args)
   };
 
-  <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list.build() };
+  <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
-  <leaf_expr>: Expression => <ident> { #ident.into() };
+  <leaf_expr>: Expression => <ident>;
 
-  <expr_list>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
-  <expr_list>: ExpressionListBuilder => <non_empty_expr_list>;
+  <expr_list>: ExpressionList => <expr_list_builder>;
+
+  <expr_list_builder>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
+  <expr_list_builder>: ExpressionListBuilder => <non_empty_expr_list>;
 
   <non_empty_expr_list>: ExpressionListBuilder => <expr> {
-    ExpressionListBuilder::default().push(#expr)
+    ExpressionListBuilder::default().add_expressions(#expr)
   };
   <non_empty_expr_list>: ExpressionListBuilder => <non_empty_expr_list> <comma> <expr> {
-    #non_empty_expr_list.push(#expr)
+    #non_empty_expr_list.add_expressions(#expr)
   };
 
-  <function_params>: FunctionParametersBuilder => <open_paren> <parameter_list> <close_paren> {
+  <function_params>: FunctionParameters => <function_params_builder>;
+
+  <function_params_builder>: FunctionParametersBuilder => <open_paren> <parameter_list> <close_paren> {
     #parameter_list
   };
 
@@ -165,11 +173,11 @@ pub_grammar!(
   <non_empty_parameter_list>: FunctionParametersBuilder =>
       <non_empty_parameter_list> <comma> <ident> <colon> <type>
   {
-    #non_empty_parameter_list.push(FunctionParameter::new(#ident, #type))
+    #non_empty_parameter_list.add_parameters(FunctionParameter::new(#ident, #type))
   };
   <non_empty_parameter_list>: FunctionParametersBuilder => <ident> <colon> <type> {
     let builder = FunctionParametersBuilder::default();
-    builder.push(FunctionParameter::new(#ident, #type))
+    builder.add_parameters(FunctionParameter::new(#ident, #type))
   };
 
   <eq> => Operator(Operator { op: Op::Equal });

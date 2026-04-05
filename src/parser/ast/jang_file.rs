@@ -6,6 +6,7 @@ use crate::parser::ast::function_decl::FunctionDecl;
 
 #[derive(Clone, Debug, Builder)]
 pub struct JangFile {
+  #[vec]
   function_decls: Vec<FunctionDecl>,
 }
 

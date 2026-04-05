@@ -20,20 +20,19 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "builder"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=16279eb80e1e08b442161f758ad1fae550f12a24#16279eb80e1e08b442161f758ad1fae550f12a24"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=7e35310d1fde5753a1252900df1747390b1eb9a2#7e35310d1fde5753a1252900df1747390b1eb9a2"
 dependencies = [
  "proc-macro-error",
  "proc-macro-util",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
- "util-impl",
 ]
 
 [[package]]
 name = "cknittel-util"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=16279eb80e1e08b442161f758ad1fae550f12a24#16279eb80e1e08b442161f758ad1fae550f12a24"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=7e35310d1fde5753a1252900df1747390b1eb9a2#7e35310d1fde5753a1252900df1747390b1eb9a2"
 dependencies = [
  "builder",
  "proc-macro-util",
@@ -91,7 +90,7 @@ dependencies = [
 [[package]]
 name = "lr_table"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=de2b3189d0003605005f4396833ec7a52bf08003#de2b3189d0003605005f4396833ec7a52bf08003"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=ee97b0e25541c8adfe7955205de7bab143049fa0#ee97b0e25541c8adfe7955205de7bab143049fa0"
 dependencies = [
  "cknittel-util",
  "googletest",
@@ -116,7 +115,7 @@ dependencies = [
 [[package]]
 name = "parser_generator"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=de2b3189d0003605005f4396833ec7a52bf08003#de2b3189d0003605005f4396833ec7a52bf08003"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=ee97b0e25541c8adfe7955205de7bab143049fa0#ee97b0e25541c8adfe7955205de7bab143049fa0"
 dependencies = [
  "googletest",
  "parser_generator_impl",
@@ -125,7 +124,7 @@ dependencies = [
 [[package]]
 name = "parser_generator_impl"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=de2b3189d0003605005f4396833ec7a52bf08003#de2b3189d0003605005f4396833ec7a52bf08003"
+source = "git+https://github.com/ClaytonKnittel/parser_generator.git?rev=ee97b0e25541c8adfe7955205de7bab143049fa0#ee97b0e25541c8adfe7955205de7bab143049fa0"
 dependencies = [
  "cknittel-util",
  "itertools",
@@ -163,7 +162,7 @@ dependencies = [
 [[package]]
 name = "proc-macro-util"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=16279eb80e1e08b442161f758ad1fae550f12a24#16279eb80e1e08b442161f758ad1fae550f12a24"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=7e35310d1fde5753a1252900df1747390b1eb9a2#7e35310d1fde5753a1252900df1747390b1eb9a2"
 dependencies = [
  "proc-macro2",
 ]
@@ -251,7 +250,7 @@ checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 [[package]]
 name = "util-impl"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=16279eb80e1e08b442161f758ad1fae550f12a24#16279eb80e1e08b442161f758ad1fae550f12a24"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=7e35310d1fde5753a1252900df1747390b1eb9a2#7e35310d1fde5753a1252900df1747390b1eb9a2"
 dependencies = [
  "num-traits",
 ]

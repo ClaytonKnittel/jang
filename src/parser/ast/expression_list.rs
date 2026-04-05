@@ -6,6 +6,7 @@ use crate::parser::ast::expression::Expression;
 
 #[derive(Clone, Debug, Builder)]
 pub struct ExpressionList {
+  #[vec]
   expressions: Vec<Expression>,
 }
 
