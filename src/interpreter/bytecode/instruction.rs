@@ -1,5 +1,5 @@
 use crate::parser::{
-  ast::binary_expression::BinaryOp,
+  ast::{binary_expression::BinaryOp, function_decl::FunctionDecl},
   token::{ident::Ident, literal::Literal},
 };
 
@@ -12,6 +12,10 @@ impl LocalId {
 
   pub fn zero() -> Self {
     LocalId(0)
+  }
+
+  pub fn as_index(self) -> usize {
+    self.0 as usize
   }
 }
 
@@ -32,6 +36,7 @@ impl BlockId {
   }
 }
 
+#[derive(Debug)]
 pub enum JitInstruction<'a> {
   // Binary operator. Pops lhs off the stack, pops rhs off the stack,
   // combines the two, and pushes the result on the stack.
@@ -50,37 +55,45 @@ pub enum JitInstruction<'a> {
   StoreLocal(LocalId),
 
   // Pops a function value off the stack,
-  // sets the stack base pointer,
   // and jumps to instructions for the desired function.
   Call(CallInstr),
 
   // Jumps to a block of instructions within the current function.
+  // TODO: move to TerminalInstruction set.
   Jump(BlockId),
 
   // Pops a value of the stack, jumps based on its true/false value.
+  // TODO: move to TerminalInstruction set.
   ConditionalJump(ConditionalJumpTargets),
 
   // Pops a value off the stack, removes the entire function's stack frame,
-  // and pushes the value onto the stack.
+  // pops the base pointer off the stack, and pushes the return value on the stack.
+  // TODO: move to TerminalInstruction set.
   Ret,
 }
 
+#[derive(Debug)]
 pub struct ConditionalJumpTargets {
   pub true_target: BlockId,
   pub false_target: BlockId,
 }
 
+#[derive(Debug)]
 pub struct CallInstr {
   pub arity: u32,
 }
 
 // A block is a sequence of instructions that are always executed
 // in order and without interruption.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct JitInstructionBlock<'a> {
   pub instructions: Vec<JitInstruction<'a>>,
 }
 
+#[derive(Debug)]
 pub struct JitCompiledFunction<'a> {
+  pub entrypoint: BlockId,
+  pub locals_size: usize,
   pub blocks: Vec<JitInstructionBlock<'a>>,
+  pub fn_decl: &'a FunctionDecl,
 }

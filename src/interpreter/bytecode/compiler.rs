@@ -41,6 +41,8 @@ impl<'a> JitCompilerLexicalBlock<'a> {
 struct JitCompilerLexicalScope<'a> {
   parent_blocks: Vec<JitCompilerLexicalBlock<'a>>,
   current_block: JitCompilerLexicalBlock<'a>,
+
+  max_size: usize,
 }
 
 impl<'a> JitCompilerLexicalScope<'a> {
@@ -51,6 +53,7 @@ impl<'a> JitCompilerLexicalScope<'a> {
         next_local_id: LocalId::zero(),
         locals: HashMap::new(),
       },
+      max_size: 0,
     }
   }
 
@@ -63,7 +66,9 @@ impl<'a> JitCompilerLexicalScope<'a> {
   }
 
   fn create_binding(&mut self, name: &'a Ident) -> LocalId {
-    self.current_block.create_binding(name)
+    let id = self.current_block.create_binding(name);
+    self.max_size = self.max_size.max(id.as_index() + 1);
+    id
   }
 
   fn push_block(mut self) -> Self {
@@ -103,15 +108,8 @@ impl<'a> JitCompilationState<'a> {
     Self {
       next_block_id: current_block_id.next(),
       current_block_id,
-      blocks: Default::default(),
+      blocks: vec![JitInstructionBlock::default()],
       lexical_scope: JitCompilerLexicalScope::new(),
-    }
-  }
-
-  fn finish(mut self) -> JitCompiledFunction<'a> {
-    self = self.emit_instr(JitInstruction::Ret);
-    JitCompiledFunction {
-      blocks: self.blocks,
     }
   }
 
@@ -126,7 +124,8 @@ impl<'a> JitCompilationState<'a> {
   }
 
   fn new_block(mut self) -> (Self, BlockId) {
-    let id = self.next_block_id.next();
+    let id = self.next_block_id;
+    self.next_block_id = id.next();
     self.blocks.push(JitInstructionBlock::default());
     (self, id)
   }
@@ -145,7 +144,6 @@ impl<'a> JitCompilationState<'a> {
   }
 
   fn bind_local(mut self, name: &'a Ident) -> Self {
-    // How to deal with rebinds?
     let local_id = self.lexical_scope.create_binding(name);
     self.emit_instr(JitInstruction::StoreLocal(local_id))
   }
@@ -172,15 +170,20 @@ impl<'a> JitCompilationState<'a> {
     self
   }
 
-  fn compile_fn_decl(self, fn_decl: &'a FunctionDecl) -> JangResult<Self> {
-    Ok(
-      fn_decl
-        .parameters()
-        .iter()
-        .fold(self, |s, param| s.bind_local(param.name()))
-        .compile_lexical_block(fn_decl.body())?
-        .emit_instr(JitInstruction::Ret),
-    )
+  fn compile_fn_decl(mut self, fn_decl: &'a FunctionDecl) -> JangResult<JitCompiledFunction<'a>> {
+    self = fn_decl
+      .parameters()
+      .iter()
+      .fold(self, |s, param| s.bind_local(param.name()))
+      .compile_lexical_block(fn_decl.body())?
+      .emit_instr(JitInstruction::Ret);
+
+    Ok(JitCompiledFunction {
+      entrypoint: BlockId::zero(),
+      locals_size: self.lexical_scope.max_size,
+      blocks: self.blocks,
+      fn_decl,
+    })
   }
 
   fn compile_statement(self, statement: &'a Statement) -> JangResult<Self> {
@@ -270,6 +273,7 @@ impl<'a> JitCompilationState<'a> {
       call_expression
         .argument_list()
         .iter()
+        .rev()
         .try_fold(self, |s, expr| s.compile_expr(expr))?
         .compile_expr(call_expression.target())?
         .emit_instr(JitInstruction::Call(CallInstr {
@@ -280,9 +284,5 @@ impl<'a> JitCompilationState<'a> {
 }
 
 pub fn compile_to_bytecode<'a>(fn_decl: &'a FunctionDecl) -> JangResult<JitCompiledFunction<'a>> {
-  Ok(
-    JitCompilationState::new()
-      .compile_fn_decl(fn_decl)?
-      .finish(),
-  )
+  JitCompilationState::new().compile_fn_decl(fn_decl)
 }
