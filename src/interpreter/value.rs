@@ -18,13 +18,6 @@ pub enum Value<'a> {
   JitCompiledFunctionRef(&'a JitCompiledFunction<'a>),
 }
 
-#[derive(Debug, Clone)]
-pub enum ValueType {
-  Int32,
-  Float32,
-  FunctionRef,
-}
-
 /// A pair of two identically-typed numeric values.
 #[derive(Debug, Clone)]
 enum NumericValuePair {
@@ -44,14 +37,6 @@ impl<'a> TryFrom<&Literal> for Value<'a> {
 }
 
 impl<'a> Value<'a> {
-  pub fn ty(&self) -> ValueType {
-    match self {
-      Self::Int32(_) => ValueType::Int32,
-      Self::Float32(_) => ValueType::Float32,
-      Self::JitCompiledFunctionRef(_) => ValueType::FunctionRef,
-    }
-  }
-
   pub fn from_literal(literal: &Literal) -> JangResult<Self> {
     literal.try_into()
   }

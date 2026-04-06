@@ -4,8 +4,8 @@ use crate::{
   error::{JangError, JangResult},
   interpreter::bytecode::{
     instruction::{
-      BlockId, CallInstr, ConditionalJumpTargets, JitCompiledFunction, JitInstruction,
-      JitInstructionBlock, JitTerminalInstruction,
+      BlockId, ConditionalJumpTargets, JitCallInstructionBuilder, JitCompiledFunction,
+      JitInstruction, JitInstructionBlock, JitTerminalInstruction,
     },
     local_table::LocalId,
   },
@@ -107,13 +107,17 @@ struct TerminatedBlock<'a> {
 
 struct JitFunctionBuilder<'a> {
   next_block_id: BlockId,
+  entrypoint: BlockId,
   blocks: Vec<Option<JitInstructionBlock<'a>>>,
 }
 
 impl<'a> JitFunctionBuilder<'a> {
   fn new() -> Self {
+    let entrypoint = BlockId::zero();
+    let next_block_id = entrypoint.next();
     Self {
-      next_block_id: BlockId::zero().next(),
+      entrypoint,
+      next_block_id,
       blocks: vec![None],
     }
   }
@@ -155,14 +159,16 @@ impl<'a> JitFunctionBuilder<'a> {
   }
 }
 
+// Function compilation state when there is an open instruction block.
 struct OpenCursor<'a> {
   fn_builder: JitFunctionBuilder<'a>,
   lexical_scope: JitCompilerLexicalScope<'a>,
   block: JitInstructionBlockBuilder<'a>,
 }
 
+// Function compilation state when all blocks have been terminated.
 struct ClosedCursor<'a> {
-  fn_build: JitFunctionBuilder<'a>,
+  fn_builder: JitFunctionBuilder<'a>,
   lexical_scope: JitCompilerLexicalScope<'a>,
 }
 
@@ -185,10 +191,12 @@ impl<'a> From<ClosedCursor<'a>> for Cursor<'a> {
 
 impl<'a> OpenCursor<'a> {
   fn new() -> Self {
+    let fn_builder = JitFunctionBuilder::new();
+    let entrypoint = fn_builder.entrypoint;
     Self {
-      fn_builder: JitFunctionBuilder::new(),
+      fn_builder,
       lexical_scope: JitCompilerLexicalScope::new(),
-      block: JitInstructionBlockBuilder::new(BlockId::zero()),
+      block: JitInstructionBlockBuilder::new(entrypoint),
     }
   }
 
@@ -212,7 +220,7 @@ impl<'a> OpenCursor<'a> {
 
   fn terminate(self, terminal: JitTerminalInstruction) -> JangResult<ClosedCursor<'a>> {
     Ok(ClosedCursor {
-      fn_build: self
+      fn_builder: self
         .fn_builder
         .finish_block(self.block.terminate_with_instr(terminal))?,
       lexical_scope: self.lexical_scope,
@@ -337,22 +345,27 @@ impl<'a> OpenCursor<'a> {
         .rev()
         .try_fold(self, |cursor, expr| cursor.compile_expr(expr))?
         .compile_expr(call_expression.target())?
-        .emit_instr(JitInstruction::Call(CallInstr {
-          arity: call_expression.argument_list().len() as u32,
-        })),
+        .emit_instr(JitInstruction::Call(
+          JitCallInstructionBuilder::default()
+            .with_arity(call_expression.argument_list().len() as u32)
+            .build()
+            .expect("internal jit error: incomplete builder"),
+        )),
     )
   }
 }
 
 impl<'a> ClosedCursor<'a> {
-  fn with_lexical_scope(mut self, lexical_scope: JitCompilerLexicalScope<'a>) -> Self {
-    self.lexical_scope = lexical_scope;
-    self
+  fn with_lexical_scope(self, lexical_scope: JitCompilerLexicalScope<'a>) -> Self {
+    Self {
+      lexical_scope,
+      ..self
+    }
   }
 
   fn start_block(self, block_id: BlockId) -> OpenCursor<'a> {
     OpenCursor {
-      fn_builder: self.fn_build,
+      fn_builder: self.fn_builder,
       lexical_scope: self.lexical_scope,
       block: JitInstructionBlockBuilder::new(block_id),
     }
@@ -390,8 +403,8 @@ impl<'a> Cursor<'a> {
       .iter()
       .fold(OpenCursor::new(), |cursor, param| {
         cursor.bind_local(param.name())
-      });
-    let cur = cur.compile_lexical_block(fn_decl.body())?;
+      })
+      .compile_lexical_block(fn_decl.body())?;
 
     // Terminate with an empty ret if not already closed.
     let cur = match cur {
@@ -400,8 +413,8 @@ impl<'a> Cursor<'a> {
     };
 
     Ok(JitCompiledFunction::new(
-      BlockId::zero(),
-      cur.fn_build.into_blocks()?,
+      cur.fn_builder.entrypoint,
+      cur.fn_builder.into_blocks()?,
       fn_decl,
     ))
   }

@@ -1,3 +1,5 @@
+use cknittel_util::builder::Builder;
+
 use crate::{
   interpreter::bytecode::local_table::LocalId,
   parser::{
@@ -43,7 +45,7 @@ pub enum JitInstruction<'a> {
 
   // Pops a function value off the stack,
   // and jumps to instructions for the desired function.
-  Call(CallInstr),
+  Call(JitCallInstruction),
 }
 
 #[derive(Debug)]
@@ -67,8 +69,8 @@ pub struct ConditionalJumpTargets {
   pub false_target: BlockId,
 }
 
-#[derive(Debug)]
-pub struct CallInstr {
+#[derive(Debug, Builder)]
+pub struct JitCallInstruction {
   pub arity: u32,
 }
 
