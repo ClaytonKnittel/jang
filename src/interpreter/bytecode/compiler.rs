@@ -201,8 +201,8 @@ impl<'a> JitCompilationState<'a> {
       Statement::CallStatement(call_expression) => self.compile_call_expression(call_expression),
       Statement::IfStatement(if_statement) => self.compile_if_statement(if_statement),
       Statement::Block(block) => self.compile_lexical_block(block),
-      Statement::LoopStatement(_) => Err(JangError::JitCompilerError()),
-      Statement::Break => Err(JangError::JitCompilerError()),
+      Statement::LoopStatement(_) => Err(JangError::interpret_error("loops are not yet supported")),
+      Statement::Break => Err(JangError::interpret_error("break is not yet supported")),
     }
   }
 
@@ -255,7 +255,9 @@ impl<'a> JitCompilationState<'a> {
       Expression::Ident(ident) => Ok(self.emit_local_load(ident)),
       Expression::BinaryExpression(expr) => self.compile_binary_expression(expr),
       Expression::CallExpression(expr) => self.compile_call_expression(expr),
-      Expression::DotExpression(_) => Err(JangError::JitCompilerError()),
+      Expression::DotExpression(_) => Err(JangError::interpret_error(
+        "dot expression not yet supported",
+      )),
     }
   }
 

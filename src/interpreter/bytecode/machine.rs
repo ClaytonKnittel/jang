@@ -7,11 +7,6 @@ use crate::{
   parser::{ast::binary_expression::BinaryOp, token::ident::Ident},
 };
 
-enum StackEntry<'a> {
-  Value(Value<'a>),
-  BasePointer(usize),
-}
-
 #[derive(Default)]
 struct MachineStack<'a> {
   items: Vec<Value<'a>>,

@@ -45,11 +45,20 @@ pub enum JangError {
   ParseError(ParseError),
   GrammarError(ParserError<Infallible>),
   JitCompilerError(),
+  InterpreterError(String),
 }
 
 impl JangError {
   pub fn parse_error(message: impl Into<String>, source_location: SourceLocation) -> Self {
     Self::ParseError(ParseError::new(message, source_location))
+  }
+
+  pub fn interpret_error(message: impl Into<String>) -> Self {
+    Self::InterpreterError(message.into())
+  }
+
+  pub fn prefix_msg(self, _: impl Into<String>) -> Self {
+    self
   }
 }
 
@@ -79,6 +88,7 @@ impl Display for JangError {
       Self::ParseError(err) => write!(f, "{err}"),
       Self::GrammarError(err) => write!(f, "Grammar error: {err}"),
       Self::JitCompilerError() => write!(f, "JIT Compiler error"),
+      Self::InterpreterError(err) => write!(f, "Interpreter error: {err}"),
     }
   }
 }

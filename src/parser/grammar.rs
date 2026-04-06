@@ -203,6 +203,20 @@ pub_grammar!(
 );
 
 #[cfg(test)]
+pub mod testing {
+  use parser_generator::parser::Parser;
+
+  use crate::{
+    error::JangResult,
+    parser::{ast::jang_file::JangFile, grammar::JangGrammar, lexer::lex_stream},
+  };
+
+  pub fn lex_and_parse_jang_file(text: impl IntoIterator<Item = char>) -> JangResult<JangFile> {
+    JangGrammar::parse_fallible(lex_stream(text)).map_err(|e| e.into())
+  }
+}
+
+#[cfg(test)]
 mod tests {
   use std::{error::Error, fmt::Debug};
 

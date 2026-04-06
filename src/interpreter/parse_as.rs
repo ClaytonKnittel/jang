@@ -14,6 +14,6 @@ where
   fn parse_as(self) -> JangResult<T> {
     self
       .parse()
-      .map_err(|err: <T as FromStr>::Err| JangError::JitCompilerError())
+      .map_err(|err: <T as FromStr>::Err| JangError::interpret_error(format!("{:?}", err)))
   }
 }

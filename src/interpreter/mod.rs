@@ -1,4 +1,4 @@
 pub mod bytecode;
-mod machine;
+pub mod machine;
 mod parse_as;
 mod value;

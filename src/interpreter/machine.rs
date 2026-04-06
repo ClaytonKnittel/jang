@@ -62,7 +62,7 @@ impl<'a> Interpreter<'a> {
 
     match machine::evaluate_function(main_fn, Vec::new(), self)? {
       Value::Int32(v) => Ok(v),
-      _ => Err(todo!()),
+      _ => todo!(),
     }
   }
 }
