@@ -3,9 +3,11 @@ pub mod keyword;
 pub mod literal;
 pub mod operator;
 
+use cknittel_util::from_variants::FromVariants;
+
 use crate::parser::token::{ident::Ident, keyword::Keyword, literal::Literal, operator::Operator};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, FromVariants)]
 pub enum JangToken {
   Ident(Ident),
   Keyword(Keyword),
@@ -15,30 +17,6 @@ pub enum JangToken {
   /// whitespcae, or between an identifier which is immediately followed by
   /// open parenthesis.
   Joint,
-}
-
-impl From<Ident> for JangToken {
-  fn from(value: Ident) -> Self {
-    Self::Ident(value)
-  }
-}
-
-impl From<Keyword> for JangToken {
-  fn from(value: Keyword) -> Self {
-    Self::Keyword(value)
-  }
-}
-
-impl<L: Into<Literal>> From<L> for JangToken {
-  fn from(value: L) -> Self {
-    Self::Literal(value.into())
-  }
-}
-
-impl From<Operator> for JangToken {
-  fn from(value: Operator) -> Self {
-    Self::Operator(value)
-  }
 }
 
 #[cfg(test)]

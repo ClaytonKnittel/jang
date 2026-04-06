@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use cknittel_util::from_variants::FromVariants;
+
 use crate::parser::{
   ast::{
     binary_expression::BinaryExpression, call_expression::CallExpression,
@@ -8,43 +10,13 @@ use crate::parser::{
   token::{ident::Ident, literal::Literal},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, FromVariants)]
 pub enum Expression {
   Literal(Literal),
   Ident(Ident),
   BinaryExpression(BinaryExpression),
   CallExpression(CallExpression),
   DotExpression(DotExpression),
-}
-
-impl From<Literal> for Expression {
-  fn from(value: Literal) -> Self {
-    Self::Literal(value)
-  }
-}
-
-impl From<Ident> for Expression {
-  fn from(value: Ident) -> Self {
-    Self::Ident(value)
-  }
-}
-
-impl From<BinaryExpression> for Expression {
-  fn from(value: BinaryExpression) -> Self {
-    Self::BinaryExpression(value)
-  }
-}
-
-impl From<CallExpression> for Expression {
-  fn from(value: CallExpression) -> Self {
-    Self::CallExpression(value)
-  }
-}
-
-impl From<DotExpression> for Expression {
-  fn from(value: DotExpression) -> Self {
-    Self::DotExpression(value)
-  }
 }
 
 impl Display for Expression {
