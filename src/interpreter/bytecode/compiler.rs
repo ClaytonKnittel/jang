@@ -1,11 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
   error::{JangError, JangResult},
   interpreter::bytecode::{
     instruction::{
       BlockId, CallInstr, ConditionalJumpTargets, JitCompiledFunction, JitInstruction,
-      JitInstructionBlock,
+      JitInstructionBlock, JitTerminalInstruction,
     },
     local_table::LocalId,
   },
@@ -23,121 +23,213 @@ use crate::{
   },
 };
 
+#[derive(Clone)]
+struct JitCompilerLexicalScope<'a>(Rc<JitCompilerLexicalBlock<'a>>);
+
 struct JitCompilerLexicalBlock<'a> {
+  parent: Option<JitCompilerLexicalScope<'a>>,
   next_local_id: LocalId,
   locals: HashMap<&'a Ident, LocalId>,
 }
 
-impl<'a> JitCompilerLexicalBlock<'a> {
-  fn get_binding(&self, name: &Ident) -> Option<LocalId> {
-    self.locals.get(name).cloned()
-  }
-
-  fn create_binding(&mut self, name: &'a Ident) -> LocalId {
-    let id = self.next_local_id;
-    self.next_local_id = self.next_local_id.next();
-    self.locals.insert(name, id);
-    id
-  }
-}
-
-struct JitCompilerLexicalScope<'a> {
-  parent_blocks: Vec<JitCompilerLexicalBlock<'a>>,
-  current_block: JitCompilerLexicalBlock<'a>,
-}
-
 impl<'a> JitCompilerLexicalScope<'a> {
   fn new() -> Self {
-    Self {
-      parent_blocks: Vec::new(),
-      current_block: JitCompilerLexicalBlock {
-        next_local_id: LocalId::default(),
-        locals: HashMap::new(),
-      },
-    }
+    Self(Rc::new(JitCompilerLexicalBlock {
+      parent: None,
+      next_local_id: LocalId::default(),
+      locals: HashMap::new(),
+    }))
   }
 
   fn get_binding(&self, name: &Ident) -> Option<LocalId> {
-    std::iter::once(&self.current_block)
-      .chain(self.parent_blocks.iter().rev())
-      .find_map(|lexical_block| lexical_block.get_binding(name))
-  }
-
-  fn create_binding(&mut self, name: &'a Ident) -> LocalId {
-    self.current_block.create_binding(name)
-  }
-
-  fn push_block(mut self) -> Self {
-    let next_local_id = self.current_block.next_local_id;
-    self.parent_blocks.push(self.current_block);
-    self.current_block = JitCompilerLexicalBlock {
-      next_local_id,
-      locals: Default::default(),
-    };
     self
+      .0
+      .locals
+      .get(name)
+      .copied()
+      .or_else(|| self.0.parent.as_ref()?.get_binding(name))
   }
 
-  fn pop_block(&mut self) -> JangResult {
-    self.current_block = self
-      .parent_blocks
-      .pop()
-      .ok_or_else(|| JangError::interpret_error("unexpected pop of lexical scope"))?;
-    Ok(())
+  fn bind(&self, name: &'a Ident) -> (Self, LocalId) {
+    let local_id = self.0.next_local_id;
+    let mut locals = self.0.locals.clone();
+    locals.insert(name, local_id);
+
+    (
+      Self(Rc::new(JitCompilerLexicalBlock {
+        parent: self.0.parent.clone(),
+        next_local_id: local_id.next(),
+        locals,
+      })),
+      local_id,
+    )
+  }
+
+  fn push_block(&self) -> Self {
+    Self(Rc::new(JitCompilerLexicalBlock {
+      parent: Some(self.clone()),
+      next_local_id: self.0.next_local_id,
+      locals: HashMap::new(),
+    }))
   }
 }
 
-struct JitCompilationState<'a> {
-  next_block_id: BlockId,
-
-  blocks: Vec<JitInstructionBlock<'a>>,
-  current_block_id: BlockId,
-
-  lexical_scope: JitCompilerLexicalScope<'a>,
+struct JitInstructionBlockBuilder<'a> {
+  id: BlockId,
+  instructions: Vec<JitInstruction<'a>>,
 }
 
-impl<'a> JitCompilationState<'a> {
-  fn new() -> Self {
-    let current_block_id = BlockId::zero();
+impl<'a> JitInstructionBlockBuilder<'a> {
+  fn new(id: BlockId) -> Self {
     Self {
-      next_block_id: current_block_id.next(),
-      current_block_id,
-      blocks: vec![JitInstructionBlock::default()],
-      lexical_scope: JitCompilerLexicalScope::new(),
+      id,
+      instructions: Vec::new(),
     }
   }
 
   fn emit_instr(mut self, instr: JitInstruction<'a>) -> Self {
-    self
-      .blocks
-      .get_mut(self.current_block_id.as_index())
-      .expect("internal jit failure: could not find block")
-      .instructions
-      .push(instr);
+    self.instructions.push(instr);
     self
   }
 
-  fn new_block(&mut self) -> BlockId {
+  fn terminate_with_instr(self, terminal: JitTerminalInstruction) -> TerminatedBlock<'a> {
+    TerminatedBlock {
+      id: self.id,
+      block: JitInstructionBlock::new(self.instructions, terminal),
+    }
+  }
+}
+
+struct TerminatedBlock<'a> {
+  id: BlockId,
+  block: JitInstructionBlock<'a>,
+}
+
+struct JitFunctionBuilder<'a> {
+  next_block_id: BlockId,
+  blocks: Vec<Option<JitInstructionBlock<'a>>>,
+}
+
+impl<'a> JitFunctionBuilder<'a> {
+  fn new() -> Self {
+    Self {
+      next_block_id: BlockId::zero().next(),
+      blocks: vec![None],
+    }
+  }
+
+  fn allocate_block(&mut self) -> BlockId {
     let id = self.next_block_id;
     self.next_block_id = id.next();
-    self.blocks.push(JitInstructionBlock::default());
+    self.blocks.push(None);
     id
   }
 
-  fn switch_to_block(mut self, block_id: BlockId) -> Self {
-    self.current_block_id = block_id;
-    self
+  fn finish_block(mut self, finished: TerminatedBlock<'a>) -> JangResult<Self> {
+    let slot = self
+      .blocks
+      .get_mut(finished.id.as_index())
+      .ok_or_else(|| JangError::interpret_error("internal jit failure: could not find block"))?;
+    if slot.is_some() {
+      return Err(JangError::interpret_error(
+        "internal jit failure: block terminated more than once",
+      ));
+    }
+    *slot = Some(finished.block);
+    Ok(self)
   }
 
-  fn bind_local(mut self, name: &'a Ident) -> Self {
-    let local_id = self.lexical_scope.create_binding(name);
-    self.emit_instr(JitInstruction::StoreLocal(local_id))
+  fn into_blocks(self) -> JangResult<Vec<JitInstructionBlock<'a>>> {
+    self
+      .blocks
+      .into_iter()
+      .enumerate()
+      .map(|(index, block)| {
+        block.ok_or_else(|| {
+          JangError::interpret_error(format!(
+            "internal jit failure: block {index} was never terminated"
+          ))
+        })
+      })
+      .collect()
+  }
+}
+
+struct OpenCursor<'a> {
+  fn_builder: JitFunctionBuilder<'a>,
+  lexical_scope: JitCompilerLexicalScope<'a>,
+  block: JitInstructionBlockBuilder<'a>,
+}
+
+struct ClosedCursor<'a> {
+  fn_build: JitFunctionBuilder<'a>,
+  lexical_scope: JitCompilerLexicalScope<'a>,
+}
+
+enum Cursor<'a> {
+  Open(OpenCursor<'a>),
+  Closed(ClosedCursor<'a>),
+}
+
+impl<'a> From<OpenCursor<'a>> for Cursor<'a> {
+  fn from(val: OpenCursor<'a>) -> Self {
+    Cursor::Open(val)
+  }
+}
+
+impl<'a> From<ClosedCursor<'a>> for Cursor<'a> {
+  fn from(val: ClosedCursor<'a>) -> Self {
+    Cursor::Closed(val)
+  }
+}
+
+impl<'a> OpenCursor<'a> {
+  fn new() -> Self {
+    Self {
+      fn_builder: JitFunctionBuilder::new(),
+      lexical_scope: JitCompilerLexicalScope::new(),
+      block: JitInstructionBlockBuilder::new(BlockId::zero()),
+    }
+  }
+
+  fn with_lexical_scope(self, lexical_scope: JitCompilerLexicalScope<'a>) -> Self {
+    Self {
+      lexical_scope,
+      ..self
+    }
+  }
+
+  fn allocate_block(&mut self) -> BlockId {
+    self.fn_builder.allocate_block()
+  }
+
+  fn emit_instr(self, instr: JitInstruction<'a>) -> Self {
+    Self {
+      block: self.block.emit_instr(instr),
+      ..self
+    }
+  }
+
+  fn terminate(self, terminal: JitTerminalInstruction) -> JangResult<ClosedCursor<'a>> {
+    Ok(ClosedCursor {
+      fn_build: self
+        .fn_builder
+        .finish_block(self.block.terminate_with_instr(terminal))?,
+      lexical_scope: self.lexical_scope,
+    })
+  }
+
+  fn bind_local(self, name: &'a Ident) -> Self {
+    let (lexical_scope, local_id) = self.lexical_scope.bind(name);
+    self
+      .with_lexical_scope(lexical_scope)
+      .emit_instr(JitInstruction::StoreLocal(local_id))
   }
 
   fn emit_local_load(self, name: &'a Ident) -> Self {
-    if let Some(local_id) = self.lexical_scope.get_binding(name) {
-      self.emit_instr(JitInstruction::LoadLocal(local_id))
-    } else {
-      self.emit_instr(JitInstruction::LoadGlobal(name))
+    match self.lexical_scope.get_binding(name) {
+      Some(local_id) => self.emit_instr(JitInstruction::LoadLocal(local_id)),
+      None => self.emit_instr(JitInstruction::LoadGlobal(name)),
     }
   }
 
@@ -145,90 +237,67 @@ impl<'a> JitCompilationState<'a> {
     self.emit_instr(JitInstruction::LoadLiteral(literal))
   }
 
-  fn enter_lexical_scope(mut self) -> Self {
-    self.lexical_scope = self.lexical_scope.push_block();
-    self
-  }
-
-  fn exit_lexical_scope(mut self) -> JangResult<Self> {
-    self.lexical_scope.pop_block()?;
-    Ok(self)
-  }
-
-  fn compile_fn_decl(mut self, fn_decl: &'a FunctionDecl) -> JangResult<JitCompiledFunction<'a>> {
-    self = fn_decl
-      .parameters()
-      .iter()
-      .fold(self, |s, param| s.bind_local(param.name()))
-      .compile_lexical_block(fn_decl.body())?
-      .emit_instr(JitInstruction::Ret);
-
-    Ok(JitCompiledFunction {
-      entrypoint: BlockId::zero(),
-      blocks: self.blocks,
-      fn_decl,
-    })
-  }
-
-  fn compile_statement(self, statement: &'a Statement) -> JangResult<Self> {
+  fn compile_statement(self, statement: &'a Statement) -> JangResult<Cursor<'a>> {
     match statement {
       Statement::Let(let_statement) => Ok(
         self
           .compile_expr(let_statement.expr())?
-          .bind_local(let_statement.var()),
+          .bind_local(let_statement.var())
+          .into(),
       ),
       Statement::Ret(ret_statement) => Ok(
         self
           .compile_expr(ret_statement.expr())?
-          .emit_instr(JitInstruction::RetWithValue),
+          .terminate(JitTerminalInstruction::RetWithValue)?
+          .into(),
       ),
-      Statement::CallStatement(call_expression) => self.compile_call_expression(call_expression),
-      Statement::IfStatement(if_statement) => self.compile_if_statement(if_statement),
+      Statement::CallStatement(call_expression) => {
+        Ok(self.compile_call_expression(call_expression)?.into())
+      }
+      Statement::IfStatement(if_statement) => Ok(self.compile_if_statement(if_statement)?.into()),
       Statement::Block(block) => self.compile_lexical_block(block),
-      Statement::LoopStatement(_) => Err(JangError::interpret_error("loops are not yet supported")),
-      Statement::Break => Err(JangError::interpret_error("break is not yet supported")),
+      Statement::LoopStatement(_) => Err(JangError::interpret_error("not yet implemented: loop")),
+      Statement::Break => Err(JangError::interpret_error("not yet implemented: break")),
     }
   }
 
-  fn compile_lexical_block(self, block: &'a Block) -> JangResult<Self> {
-    block
-      .statements()
-      .iter()
-      .try_fold(self.enter_lexical_scope(), |s, statement| {
-        s.compile_statement(statement)
-      })?
-      .exit_lexical_scope()
-  }
-
-  fn compile_if_statement(mut self, if_statement: &'a IfStatement) -> JangResult<Self> {
-    let (if_block, else_block, join_block) = (self.new_block(), self.new_block(), self.new_block());
+  fn compile_lexical_block(self, block: &'a Block) -> JangResult<Cursor<'a>> {
+    let outer_scope = self.lexical_scope.clone();
+    let inner_scope = self.lexical_scope.push_block();
     Ok(
-      self
-        // Compile the condition and jump to the appropriate block.
-        .compile_expr(if_statement.condition())?
-        .emit_instr(JitInstruction::ConditionalJump(ConditionalJumpTargets {
-          true_target: if_block,
-          false_target: else_block,
-        }))
-        // Compile the if body.
-        .switch_to_block(if_block)
-        .compile_lexical_block(if_statement.body())?
-        .emit_instr(JitInstruction::Jump(join_block))
-        // Compile the else body.
-        .switch_to_block(else_block)
-        .compile_else_block(if_statement.else_clause())?
-        .emit_instr(JitInstruction::Jump(join_block))
-        // Return to the main instruction path for the caller.
-        .switch_to_block(join_block),
+      block
+        .statements()
+        .iter()
+        .try_fold(
+          self.with_lexical_scope(inner_scope).into(),
+          |cur: Cursor<'a>, stmt| cur.compile_statement(stmt),
+        )?
+        .with_lexical_scope(outer_scope),
     )
   }
 
-  fn compile_else_block(self, else_clause: &'a ElseClause) -> JangResult<Self> {
-    Ok(match else_clause {
-      ElseClause::None => self,
-      ElseClause::Else(block) => self.compile_lexical_block(block)?,
-      ElseClause::ElseIf(if_statement) => self.compile_if_statement(if_statement)?,
-    })
+  fn compile_if_statement(mut self, if_statement: &'a IfStatement) -> JangResult<OpenCursor<'a>> {
+    let if_block_id = self.allocate_block();
+    let else_block_id = self.allocate_block();
+    let join_block_id = self.allocate_block();
+
+    Ok(
+      self
+        .compile_expr(if_statement.condition())?
+        .terminate(JitTerminalInstruction::ConditionalJump(
+          ConditionalJumpTargets {
+            true_target: if_block_id,
+            false_target: else_block_id,
+          },
+        ))?
+        .start_block(if_block_id)
+        .compile_lexical_block(if_statement.body())?
+        .finish_with_fallthrough_to(join_block_id)?
+        .start_block(else_block_id)
+        .compile_else_block(if_statement.else_clause())?
+        .finish_with_fallthrough_to(join_block_id)?
+        .start_block(join_block_id),
+    )
   }
 
   fn compile_expr(self, expr: &'a Expression) -> JangResult<Self> {
@@ -240,6 +309,14 @@ impl<'a> JitCompilationState<'a> {
       Expression::DotExpression(_) => Err(JangError::interpret_error(
         "dot expression not yet supported",
       )),
+    }
+  }
+
+  fn compile_else_block(self, else_clause: &'a ElseClause) -> JangResult<Cursor<'a>> {
+    match else_clause {
+      ElseClause::None => Ok(self.into()),
+      ElseClause::Else(block) => self.compile_lexical_block(block),
+      ElseClause::ElseIf(if_statement) => Ok(self.compile_if_statement(if_statement)?.into()),
     }
   }
 
@@ -258,7 +335,7 @@ impl<'a> JitCompilationState<'a> {
         .argument_list()
         .iter()
         .rev()
-        .try_fold(self, |s, expr| s.compile_expr(expr))?
+        .try_fold(self, |cursor, expr| cursor.compile_expr(expr))?
         .compile_expr(call_expression.target())?
         .emit_instr(JitInstruction::Call(CallInstr {
           arity: call_expression.argument_list().len() as u32,
@@ -267,6 +344,69 @@ impl<'a> JitCompilationState<'a> {
   }
 }
 
+impl<'a> ClosedCursor<'a> {
+  fn with_lexical_scope(mut self, lexical_scope: JitCompilerLexicalScope<'a>) -> Self {
+    self.lexical_scope = lexical_scope;
+    self
+  }
+
+  fn start_block(self, block_id: BlockId) -> OpenCursor<'a> {
+    OpenCursor {
+      fn_builder: self.fn_build,
+      lexical_scope: self.lexical_scope,
+      block: JitInstructionBlockBuilder::new(block_id),
+    }
+  }
+}
+
+impl<'a> Cursor<'a> {
+  fn with_lexical_scope(self, lexical_scope: JitCompilerLexicalScope<'a>) -> Self {
+    match self {
+      Cursor::Open(cursor) => Cursor::Open(cursor.with_lexical_scope(lexical_scope)),
+      Cursor::Closed(cursor) => Cursor::Closed(cursor.with_lexical_scope(lexical_scope)),
+    }
+  }
+
+  fn finish_with_fallthrough_to(self, block_id: BlockId) -> JangResult<ClosedCursor<'a>> {
+    match self {
+      Cursor::Open(cursor) => cursor.terminate(JitTerminalInstruction::Jump(block_id)),
+      Cursor::Closed(cursor) => Ok(cursor),
+    }
+  }
+
+  fn compile_statement(self, statement: &'a Statement) -> JangResult<Cursor<'a>> {
+    match self {
+      Cursor::Open(cur) => cur.compile_statement(statement),
+      Cursor::Closed(_) => Err(JangError::interpret_error(format!(
+        "jit compilation failed: unreachable statement: {:?}",
+        statement
+      ))),
+    }
+  }
+
+  fn compile_fn_decl(fn_decl: &'a FunctionDecl) -> JangResult<JitCompiledFunction<'a>> {
+    let cur = fn_decl
+      .parameters()
+      .iter()
+      .fold(OpenCursor::new(), |cursor, param| {
+        cursor.bind_local(param.name())
+      });
+    let cur = cur.compile_lexical_block(fn_decl.body())?;
+
+    // Terminate with an empty ret if not already closed.
+    let cur = match cur {
+      Cursor::Open(cur) => cur.terminate(JitTerminalInstruction::Ret)?,
+      Cursor::Closed(cur) => cur,
+    };
+
+    Ok(JitCompiledFunction::new(
+      BlockId::zero(),
+      cur.fn_build.into_blocks()?,
+      fn_decl,
+    ))
+  }
+}
+
 pub fn compile_to_bytecode<'a>(fn_decl: &'a FunctionDecl) -> JangResult<JitCompiledFunction<'a>> {
-  JitCompilationState::new().compile_fn_decl(fn_decl)
+  Cursor::compile_fn_decl(fn_decl)
 }

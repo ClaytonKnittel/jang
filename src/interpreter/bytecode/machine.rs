@@ -2,7 +2,7 @@ use crate::{
   error::{JangError, JangResult},
   interpreter::{
     bytecode::{
-      instruction::{JitCompiledFunction, JitInstruction},
+      instruction::{JitCompiledFunction, JitInstruction, JitTerminalInstruction},
       local_table::LocalTable,
     },
     value::Value,
@@ -44,11 +44,11 @@ pub fn evaluate_function<'a>(
 ) -> JangResult<Option<Value<'a>>> {
   let mut locals = LocalTable::<Value<'a>>::new();
   let mut stack = MachineStack::from_args(args);
-  let mut pc = jit_fn.entrypoint;
+  let mut pc = jit_fn.entrypoint();
 
   loop {
-    let block = &jit_fn.blocks[pc.as_index()];
-    for instr in &block.instructions {
+    let block = jit_fn.block(pc);
+    for instr in block.instructions() {
       match instr {
         JitInstruction::BinaryOp(binary_op) => {
           let lhs = stack.pop_value()?;
@@ -84,22 +84,23 @@ pub fn evaluate_function<'a>(
             stack.push_value(value);
           }
         }
-        JitInstruction::Jump(block_id) => {
-          pc = *block_id;
-          break;
-        }
-        JitInstruction::ConditionalJump(cond) => {
-          let condition = stack.pop_value()?;
-          pc = if condition.is_truthy()? {
-            cond.true_target
-          } else {
-            cond.false_target
-          };
-          break;
-        }
-        JitInstruction::RetWithValue => return Ok(Some(stack.pop_value()?)),
-        JitInstruction::Ret => return Ok(None),
       }
+    }
+
+    match block.terminator() {
+      JitTerminalInstruction::Jump(block_id) => {
+        pc = *block_id;
+      }
+      JitTerminalInstruction::ConditionalJump(cond) => {
+        let condition = stack.pop_value()?;
+        pc = if condition.is_truthy()? {
+          cond.true_target
+        } else {
+          cond.false_target
+        };
+      }
+      JitTerminalInstruction::RetWithValue => return Ok(Some(stack.pop_value()?)),
+      JitTerminalInstruction::Ret => return Ok(None),
     }
   }
 }

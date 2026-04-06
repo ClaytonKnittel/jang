@@ -63,12 +63,12 @@ impl<'a> Value<'a> {
       Self::JitCompiledFunctionRef(f) => {
         format!(
           "fn({}){}",
-          f.fn_decl
+          f.decl()
             .parameters()
             .iter()
             .map(|p| format!("{}", p.ty()))
             .join(", "),
-          f.fn_decl
+          f.decl()
             .return_type()
             .map_or_else(|| "".into(), |t| format!("->{}", t))
         )
