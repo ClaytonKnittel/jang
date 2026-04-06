@@ -28,6 +28,12 @@ pub struct StructuredTypeDecl {
   fields: Vec<StructuredTypeField>,
 }
 
+impl StructuredTypeDecl {
+  pub fn fields(&self) -> &[StructuredTypeField] {
+    &self.fields
+  }
+}
+
 impl Display for StructuredTypeDecl {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "{{")?;
@@ -67,5 +73,40 @@ impl TypeDecl {
 impl Display for TypeDecl {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{} = {}", self.name, self.decl)
+  }
+}
+
+#[cfg(test)]
+pub(crate) mod matchers {
+  use crate::parser::{
+    ast::{
+      type_decl::{StructuredTypeDecl, StructuredTypeField, TypeDecl, TypeDeclVariant},
+      type_expr::TypeExpression,
+    },
+    token::ident::Ident,
+  };
+  use googletest::prelude::*;
+
+  pub fn type_field<'a>(
+    name: impl Matcher<&'a Ident>,
+    field_type: impl Matcher<&'a TypeExpression>,
+  ) -> impl Matcher<&'a StructuredTypeField> {
+    pat!(StructuredTypeField {
+      name: name,
+      ty: field_type,
+    })
+  }
+
+  pub fn structured_type<'a>(
+    name: impl Matcher<&'a Ident>,
+    field_matchers: impl Matcher<&'a [StructuredTypeField]>,
+  ) -> impl Matcher<&'a TypeDecl> {
+    pat!(TypeDecl {
+      name: name,
+      decl: pat!(TypeDeclVariant::Structured(property!(
+        &StructuredTypeDecl.fields(),
+        field_matchers
+      ))),
+    })
   }
 }

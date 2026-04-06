@@ -36,7 +36,7 @@ impl Display for JangFile {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::ast::{function_decl::FunctionDecl, jang_file::JangFile};
+  use crate::parser::ast::{function_decl::FunctionDecl, jang_file::JangFile, type_decl::TypeDecl};
   use googletest::prelude::*;
 
   pub fn jang_file_functions<'a>(
@@ -49,5 +49,17 @@ pub(crate) mod matchers {
     function_decl_matcher: impl Matcher<&'a FunctionDecl> + 'a,
   ) -> impl Matcher<&'a JangFile> {
     jang_file_functions(elements_are![function_decl_matcher])
+  }
+
+  pub fn jang_file_with_types<'a>(
+    type_decls_matcher: impl Matcher<&'a [TypeDecl]>,
+  ) -> impl Matcher<&'a JangFile> {
+    property!(&JangFile.type_decls(), type_decls_matcher)
+  }
+
+  pub fn jang_file_with_type<'a>(
+    type_decl_matcher: impl Matcher<&'a TypeDecl> + 'a,
+  ) -> impl Matcher<&'a JangFile> {
+    jang_file_with_types(elements_are![type_decl_matcher])
   }
 }

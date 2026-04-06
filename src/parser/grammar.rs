@@ -45,7 +45,11 @@ pub_grammar!(
     JangFileBuilder::default()
   };
 
-  <type_decl>: TypeDecl => Keyword(Keyword::Type) <ident> <eq> <open_bracket> <structured_type_decl> <close_bracket> {
+  <type_decl>: TypeDecl =>
+    Keyword(Keyword::Type) <ident> <eq> <open_bracket>
+      <structured_type_decl>
+    <close_bracket>
+  {
     TypeDecl::new(#ident, #structured_type_decl)
   };
 
@@ -54,7 +58,10 @@ pub_grammar!(
   <structured_type_decl_builder>: StructuredTypeDeclBuilder => ! {
     StructuredTypeDeclBuilder::default()
   };
-  <structured_type_decl_builder>: StructuredTypeDeclBuilder => <structured_type_decl_builder> <structured_type_field> {
+  <structured_type_decl_builder>: StructuredTypeDeclBuilder =>
+    <structured_type_decl_builder>
+    <structured_type_field>
+  {
     #structured_type_decl_builder.add_fields(#structured_type_field)
   };
 
@@ -245,11 +252,12 @@ mod tests {
       if_statement::matchers::{
         if_else_clause, if_else_if_statement, if_else_statement, if_statement,
       },
-      jang_file::matchers::{jang_file_functions, jang_file_with_fn},
+      jang_file::matchers::{jang_file_functions, jang_file_with_fn, jang_file_with_type},
       let_statement::matchers::let_statement as let_stmt,
       loop_statement::matchers::loop_statement,
       ret_statement::matchers::ret_statement as ret_stmt,
       statement::matchers::break_statement,
+      type_decl::matchers::{structured_type, type_field},
       type_expr::matchers::type_expr_name,
     },
     grammar::JangGrammar,
@@ -301,6 +309,70 @@ mod tests {
     expect_that!(ast, jang_file_with_fn(fn_return_type_none()));
     expect_that!(ast, jang_file_with_fn(fn_body(block(is_empty()))));
     expect_that!(ast, jang_file_with_fn(fn_parameters(is_empty())));
+  }
+
+  #[gtest]
+  fn empty_type_decl() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        type X = {}
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(structured_type(ident("X"), is_empty()))
+    );
+  }
+
+  #[gtest]
+  fn type_decl_one_field() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        type X = {
+          field1: i32
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(structured_type(
+        ident("X"),
+        elements_are![type_field(ident("field1"), type_expr_name(ident("i32")))]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn type_decl_many_fields() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        type X = {
+          a: i32
+          b: String
+          c: MyCustomType
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(structured_type(
+        ident("X"),
+        unordered_elements_are![
+          type_field(ident("a"), type_expr_name(ident("i32"))),
+          type_field(ident("b"), type_expr_name(ident("String"))),
+          type_field(ident("c"), type_expr_name(ident("MyCustomType"))),
+        ]
+      ))
+    );
   }
 
   #[gtest]
