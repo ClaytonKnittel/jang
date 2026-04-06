@@ -60,9 +60,7 @@ impl<'a> JitCompilerLexicalScope<'a> {
   fn get_binding(&self, name: &Ident) -> Option<LocalId> {
     std::iter::once(&self.current_block)
       .chain(self.parent_blocks.iter().rev())
-      .map(|lexical_block| lexical_block.get_binding(name))
-      .find(|o| o.is_some())
-      .flatten()
+      .find_map(|lexical_block| lexical_block.get_binding(name))
   }
 
   fn create_binding(&mut self, name: &'a Ident) -> LocalId {
