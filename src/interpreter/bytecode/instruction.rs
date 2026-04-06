@@ -66,10 +66,11 @@ pub enum JitInstruction<'a> {
   // TODO: move to TerminalInstruction set.
   ConditionalJump(ConditionalJumpTargets),
 
-  // Pops a value off the stack, removes the entire function's stack frame,
-  // pops the base pointer off the stack, and pushes the return value on the stack.
-  // TODO: move to TerminalInstruction set.
+  // Returns without a value.
   Ret,
+
+  // Pops a value off the stack and returns it.
+  RetWithValue,
 }
 
 #[derive(Debug)]

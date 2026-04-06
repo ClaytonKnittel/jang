@@ -28,7 +28,7 @@ impl<'a> MachineStack<'a> {
     self.items.push(value);
   }
 
-  fn set_local(&mut self, local_id: &LocalId, value: Value<'a>) -> JangResult {
+  fn set_local(&mut self, local_id: LocalId, value: Value<'a>) -> JangResult {
     self.extend(local_id);
     match self.items.get_mut(local_id.as_index()) {
       Some(entry) => {
@@ -39,14 +39,14 @@ impl<'a> MachineStack<'a> {
     }
   }
 
-  fn get_local(&self, local_id: &LocalId) -> JangResult<&Value<'a>> {
+  fn get_local(&self, local_id: LocalId) -> JangResult<&Value<'a>> {
     match self.items.get(local_id.as_index()) {
       Some(value) => Ok(value),
       _ => Err(JangError::interpret_error("bad stack: empty")),
     }
   }
 
-  fn extend(&mut self, local_id: &LocalId) {
+  fn extend(&mut self, local_id: LocalId) {
     self.items.extend(std::iter::repeat_n(
       Value::Uninitialized,
       (1 + local_id.as_index()).saturating_sub(self.items.len()),
@@ -62,7 +62,7 @@ pub fn evaluate_function<'a>(
   jit_fn: &'a JitCompiledFunction<'a>,
   args: Vec<Value<'a>>,
   context: &'a impl JitFunctionContext<'a>,
-) -> JangResult<Value<'a>> {
+) -> JangResult<Option<Value<'a>>> {
   let mut stack = MachineStack::<'a>::from_args(args);
   let mut pc = jit_fn.entrypoint;
 
@@ -89,12 +89,12 @@ pub fn evaluate_function<'a>(
           stack.push_value(value);
         }
         JitInstruction::LoadLocal(local_id) => {
-          let value = stack.get_local(local_id)?.clone();
+          let value = stack.get_local(*local_id)?.clone();
           stack.push_value(value);
         }
         JitInstruction::StoreLocal(local_id) => {
           let value = stack.pop_value()?;
-          stack.set_local(local_id, value)?;
+          stack.set_local(*local_id, value)?;
         }
         JitInstruction::Call(call_instr) => {
           let target_fn = match stack.pop_value()? {
@@ -107,7 +107,10 @@ pub fn evaluate_function<'a>(
           for _ in 0..call_instr.arity {
             args.push(stack.pop_value()?);
           }
-          stack.push_value(evaluate_function(target_fn, args, context)?);
+          let value = evaluate_function(target_fn, args, context)?;
+          if let Some(value) = value {
+            stack.push_value(value);
+          }
         }
         JitInstruction::Jump(block_id) => {
           pc = *block_id;
@@ -127,7 +130,8 @@ pub fn evaluate_function<'a>(
           };
           break;
         }
-        JitInstruction::Ret => return stack.pop_value(),
+        JitInstruction::RetWithValue => return Ok(Some(stack.pop_value()?)),
+        JitInstruction::Ret => return Ok(None),
       }
     }
   }

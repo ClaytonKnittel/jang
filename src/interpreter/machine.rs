@@ -61,8 +61,12 @@ impl<'a> Interpreter<'a> {
     };
 
     match machine::evaluate_function(main_fn, Vec::new(), self)? {
-      Value::Int32(v) => Ok(v),
-      _ => todo!(),
+      Some(Value::Int32(v)) => Ok(v),
+      None => Err(JangError::interpret_error("main must return a value")),
+      Some(r) => Err(JangError::interpret_error(format!(
+        "invalid return value from main: {:?}",
+        r
+      ))),
     }
   }
 }
@@ -204,7 +208,7 @@ mod tests {
   }
 
   #[gtest]
-  fn if_statement() {
+  fn if_body() {
     expect_that!(
       interpret_program(
         r#"
@@ -212,12 +216,76 @@ mod tests {
           if 1 {
             ret 1
           }
-          ret 0
+          ret 2
         }
         "#
         .chars()
       ),
       ok(eq(&1))
+    );
+  }
+
+  #[gtest]
+  fn else_body() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn main() -> i32 {
+          if 0 {
+            ret 1
+          } else {
+            ret 2
+          }
+          ret 3
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&2))
+    );
+  }
+
+  #[gtest]
+  fn else_if_body() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn main() -> i32 {
+          if 0 {
+            ret 1
+          } else if 1 {
+            ret 2
+          } else {
+            ret 3
+          }
+          ret 4
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&2))
+    );
+  }
+
+  #[gtest]
+  fn else_if_else_body() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn main() -> i32 {
+          if 0 {
+            ret 1
+          } else if 0 {
+            ret 2
+          } else {
+            ret 3
+          }
+          ret 4
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&3))
     );
   }
 
@@ -240,6 +308,81 @@ mod tests {
         .chars()
       ),
       ok(eq(&55))
+    );
+  }
+
+  #[gtest]
+  fn errors_if_main_does_not_return_a_value() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn main() {}
+        "#
+        .chars()
+      ),
+      err(anything())
+    );
+  }
+
+  #[gtest]
+  fn lexical_scope() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn main() {
+          let x = 1
+          {
+            let x = 2
+            if 1 { ret x }
+          }
+          ret x
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&2))
+    );
+  }
+
+  #[gtest]
+  fn deeply_nested_lexical_scope() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn main() {
+          let x = 0
+          let y = 5
+          {
+            let x = 2
+            { {
+                if x { ret y }
+            } }
+          }
+          ret 0
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&5))
+    );
+  }
+
+  #[gtest]
+  fn let_in_inner_scope_does_not_affect_outer() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn main() {
+          let x = 1
+          {
+            let x = 0
+          }
+          ret x
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&1))
     );
   }
 }

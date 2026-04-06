@@ -59,7 +59,7 @@ impl<'a> JitCompilerLexicalScope<'a> {
 
   fn get_binding(&self, name: &Ident) -> Option<LocalId> {
     std::iter::once(&self.current_block)
-      .chain(self.parent_blocks.iter())
+      .chain(self.parent_blocks.iter().rev())
       .map(|lexical_block| lexical_block.get_binding(name))
       .find(|o| o.is_some())
       .flatten()
@@ -81,15 +81,12 @@ impl<'a> JitCompilerLexicalScope<'a> {
     self
   }
 
-  fn pop_block(mut self) -> Self {
+  fn pop_block(&mut self) -> JangResult {
     self.current_block = self
       .parent_blocks
       .pop()
-      .unwrap_or_else(|| JitCompilerLexicalBlock {
-        next_local_id: LocalId::zero(),
-        locals: Default::default(),
-      });
-    self
+      .ok_or_else(|| JangError::interpret_error("unexpected pop of lexical scope"))?;
+    Ok(())
   }
 }
 
@@ -123,19 +120,11 @@ impl<'a> JitCompilationState<'a> {
     self
   }
 
-  fn new_block(mut self) -> (Self, BlockId) {
+  fn new_block(&mut self) -> BlockId {
     let id = self.next_block_id;
     self.next_block_id = id.next();
     self.blocks.push(JitInstructionBlock::default());
-    (self, id)
-  }
-
-  fn new_block3(self) -> (Self, BlockId, BlockId, BlockId) {
-    let s = self;
-    let (s, b1) = s.new_block();
-    let (s, b2) = s.new_block();
-    let (s, b3) = s.new_block();
-    (s, b1, b2, b3)
+    id
   }
 
   fn switch_to_block(mut self, block_id: BlockId) -> Self {
@@ -165,9 +154,9 @@ impl<'a> JitCompilationState<'a> {
     self
   }
 
-  fn exit_lexical_scope(mut self) -> Self {
-    self.lexical_scope = self.lexical_scope.pop_block();
-    self
+  fn exit_lexical_scope(mut self) -> JangResult<Self> {
+    self.lexical_scope.pop_block()?;
+    Ok(self)
   }
 
   fn compile_fn_decl(mut self, fn_decl: &'a FunctionDecl) -> JangResult<JitCompiledFunction<'a>> {
@@ -196,7 +185,7 @@ impl<'a> JitCompilationState<'a> {
       Statement::Ret(ret_statement) => Ok(
         self
           .compile_expr(ret_statement.expr())?
-          .emit_instr(JitInstruction::Ret),
+          .emit_instr(JitInstruction::RetWithValue),
       ),
       Statement::CallStatement(call_expression) => self.compile_call_expression(call_expression),
       Statement::IfStatement(if_statement) => self.compile_if_statement(if_statement),
@@ -207,21 +196,19 @@ impl<'a> JitCompilationState<'a> {
   }
 
   fn compile_lexical_block(self, block: &'a Block) -> JangResult<Self> {
-    Ok(
-      block
-        .statements()
-        .iter()
-        .try_fold(self.enter_lexical_scope(), |s, statement| {
-          s.compile_statement(statement)
-        })?
-        .exit_lexical_scope(),
-    )
+    block
+      .statements()
+      .iter()
+      .try_fold(self.enter_lexical_scope(), |s, statement| {
+        s.compile_statement(statement)
+      })?
+      .exit_lexical_scope()
   }
 
-  fn compile_if_statement(self, if_statement: &'a IfStatement) -> JangResult<Self> {
-    let (state, if_block, else_block, join_block) = self.new_block3();
+  fn compile_if_statement(mut self, if_statement: &'a IfStatement) -> JangResult<Self> {
+    let (if_block, else_block, join_block) = (self.new_block(), self.new_block(), self.new_block());
     Ok(
-      state
+      self
         // Compile the condition and jump to the appropriate block.
         .compile_expr(if_statement.condition())?
         .emit_instr(JitInstruction::ConditionalJump(ConditionalJumpTargets {
