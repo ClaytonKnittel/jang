@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use cknittel_util::builder::Builder;
+use cknittel_util::{builder::Builder, from_variants::FromVariants};
 
 use crate::parser::{ast::type_expr::TypeExpression, token::ident::Ident};
 
@@ -38,15 +38,9 @@ impl Display for StructuredTypeDecl {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, FromVariants)]
 pub enum TypeDeclVariant {
   Structured(StructuredTypeDecl),
-}
-
-impl From<StructuredTypeDecl> for TypeDeclVariant {
-  fn from(value: StructuredTypeDecl) -> Self {
-    Self::Structured(value)
-  }
 }
 
 impl Display for TypeDeclVariant {
