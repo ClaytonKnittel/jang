@@ -8,7 +8,7 @@ use crate::{
     JangToken,
     ident::Ident,
     keyword::Keyword,
-    literal::NumericLiteral,
+    literal::{Literal, NumericLiteral},
     operator::{Op, Operator},
   },
   source_location::SourceLocation,
@@ -74,7 +74,7 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
 
   fn parse_numeric(&mut self, first_char: char) -> JangToken {
     let numeric = self.collect_while(first_char, is_numeric_char);
-    NumericLiteral::from_str(numeric).into()
+    Literal::from(NumericLiteral::from_str(numeric)).into()
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
