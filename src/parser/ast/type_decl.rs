@@ -38,7 +38,7 @@ impl Display for StructuredTypeDecl {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     writeln!(f, "{{")?;
     for field in &self.fields {
-      writeln!(f, "{field},")?;
+      writeln!(f, "{field}")?;
     }
     write!(f, "}}")
   }
@@ -72,7 +72,7 @@ impl TypeDecl {
 
 impl Display for TypeDecl {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{} = {}", self.name, self.decl)
+    writeln!(f, "type {} = {}", self.name, self.decl)
   }
 }
 
