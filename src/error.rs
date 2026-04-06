@@ -44,6 +44,7 @@ impl Debug for ParseError {
 pub enum JangError {
   ParseError(ParseError),
   GrammarError(ParserError<Infallible>),
+  JitCompilerError(),
 }
 
 impl JangError {
@@ -77,6 +78,7 @@ impl Display for JangError {
     match self {
       Self::ParseError(err) => write!(f, "{err}"),
       Self::GrammarError(err) => write!(f, "Grammar error: {err}"),
+      Self::JitCompilerError() => write!(f, "JIT Compiler error"),
     }
   }
 }
