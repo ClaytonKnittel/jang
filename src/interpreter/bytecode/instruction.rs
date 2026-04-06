@@ -1,23 +1,10 @@
-use crate::parser::{
-  ast::{binary_expression::BinaryOp, function_decl::FunctionDecl},
-  token::{ident::Ident, literal::Literal},
+use crate::{
+  interpreter::bytecode::local_table::LocalId,
+  parser::{
+    ast::{binary_expression::BinaryOp, function_decl::FunctionDecl},
+    token::{ident::Ident, literal::Literal},
+  },
 };
-
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
-pub struct LocalId(u32);
-impl LocalId {
-  pub fn next(self) -> Self {
-    Self(self.0 + 1)
-  }
-
-  pub fn zero() -> Self {
-    LocalId(0)
-  }
-
-  pub fn as_index(self) -> usize {
-    self.0 as usize
-  }
-}
 
 // The ID of a block within a function.
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -94,7 +81,6 @@ pub struct JitInstructionBlock<'a> {
 #[derive(Debug)]
 pub struct JitCompiledFunction<'a> {
   pub entrypoint: BlockId,
-  pub locals_size: usize,
   pub blocks: Vec<JitInstructionBlock<'a>>,
   pub fn_decl: &'a FunctionDecl,
 }

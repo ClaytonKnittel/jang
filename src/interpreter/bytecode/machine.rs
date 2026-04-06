@@ -1,7 +1,10 @@
 use crate::{
   error::{JangError, JangResult},
   interpreter::{
-    bytecode::instruction::{JitCompiledFunction, JitInstruction, LocalId},
+    bytecode::{
+      instruction::{JitCompiledFunction, JitInstruction},
+      local_table::LocalTable,
+    },
     value::Value,
   },
   parser::{ast::binary_expression::BinaryOp, token::ident::Ident},
@@ -13,44 +16,20 @@ struct MachineStack<'a> {
 }
 
 impl<'a> MachineStack<'a> {
-  fn from_args(args: Vec<Value<'a>>) -> Self {
+  fn from_args(mut args: Vec<Value<'a>>) -> Self {
+    args.reverse();
     Self { items: args }
   }
 
   fn pop_value(&mut self) -> JangResult<Value<'a>> {
     match self.items.pop() {
       Some(v) => Ok(v),
-      _ => Err(JangError::interpret_error("bad stack: empty")),
+      None => Err(JangError::interpret_error("bad stack: empty")),
     }
   }
 
   fn push_value(&mut self, value: Value<'a>) {
     self.items.push(value);
-  }
-
-  fn set_local(&mut self, local_id: LocalId, value: Value<'a>) -> JangResult {
-    self.extend(local_id);
-    match self.items.get_mut(local_id.as_index()) {
-      Some(entry) => {
-        *entry = value;
-        Ok(())
-      }
-      _ => Err(JangError::interpret_error("bad stack: empty")),
-    }
-  }
-
-  fn get_local(&self, local_id: LocalId) -> JangResult<&Value<'a>> {
-    match self.items.get(local_id.as_index()) {
-      Some(value) => Ok(value),
-      _ => Err(JangError::interpret_error("bad stack: empty")),
-    }
-  }
-
-  fn extend(&mut self, local_id: LocalId) {
-    self.items.extend(std::iter::repeat_n(
-      Value::Uninitialized,
-      (1 + local_id.as_index()).saturating_sub(self.items.len()),
-    ));
   }
 }
 
@@ -63,7 +42,8 @@ pub fn evaluate_function<'a>(
   args: Vec<Value<'a>>,
   context: &'a impl JitFunctionContext<'a>,
 ) -> JangResult<Option<Value<'a>>> {
-  let mut stack = MachineStack::<'a>::from_args(args);
+  let mut locals = LocalTable::<Value<'a>>::new();
+  let mut stack = MachineStack::from_args(args);
   let mut pc = jit_fn.entrypoint;
 
   loop {
@@ -85,24 +65,16 @@ pub fn evaluate_function<'a>(
           stack.push_value(Value::from_literal(literal)?);
         }
         JitInstruction::LoadGlobal(ident) => {
-          let value = context.resolve_ident(ident)?;
-          stack.push_value(value);
+          stack.push_value(context.resolve_ident(ident)?);
         }
         JitInstruction::LoadLocal(local_id) => {
-          let value = stack.get_local(*local_id)?.clone();
-          stack.push_value(value);
+          stack.push_value(locals.read(*local_id)?.clone());
         }
         JitInstruction::StoreLocal(local_id) => {
-          let value = stack.pop_value()?;
-          stack.set_local(*local_id, value)?;
+          locals.write(*local_id, stack.pop_value()?);
         }
         JitInstruction::Call(call_instr) => {
-          let target_fn = match stack.pop_value()? {
-            Value::JitCompiledFunctionRef(jit_compiled_function) => Ok(jit_compiled_function),
-            _ => Err(JangError::interpret_error(
-              "invocation target is not a function",
-            )),
-          }?;
+          let target_fn = stack.pop_value()?.as_jit_function()?;
           let mut args = Vec::new();
           for _ in 0..call_instr.arity {
             args.push(stack.pop_value()?);
@@ -116,17 +88,12 @@ pub fn evaluate_function<'a>(
           pc = *block_id;
           break;
         }
-        JitInstruction::ConditionalJump(conditional_jump_targets) => {
+        JitInstruction::ConditionalJump(cond) => {
           let condition = stack.pop_value()?;
-          let truthy = match condition {
-            Value::Int32(x) => x != 0,
-            Value::Float32(x) => x != 0.,
-            _ => false,
-          };
-          pc = if truthy {
-            conditional_jump_targets.true_target
+          pc = if condition.is_truthy()? {
+            cond.true_target
           } else {
-            conditional_jump_targets.false_target
+            cond.false_target
           };
           break;
         }

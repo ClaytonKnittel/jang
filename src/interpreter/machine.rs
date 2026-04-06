@@ -329,7 +329,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() {
+        fn main() -> i32 {
           let x = 1
           {
             let x = 2
@@ -349,7 +349,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() {
+        fn main() -> i32 {
           let x = 0
           let y = 5
           {
@@ -372,7 +372,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() {
+        fn main() -> i32 {
           let x = 1
           {
             let x = 0
@@ -383,6 +383,66 @@ mod tests {
         .chars()
       ),
       ok(eq(&1))
+    );
+  }
+  #[gtest]
+  fn function_call_preserves_argument_order_two_args() {
+    expect_that!(
+      interpret_program(
+        r#"
+      fn sub(x: i32, y: i32) -> i32 {
+        ret x - y
+      }
+
+      fn main() -> i32 {
+        ret sub(10, 3)
+      }
+      "#
+        .chars()
+      ),
+      ok(eq(&7))
+    );
+  }
+
+  #[gtest]
+  fn function_call_preserves_argument_order_three_args() {
+    expect_that!(
+      interpret_program(
+        r#"
+      fn combine(a: i32, b: i32, c: i32) -> i32 {
+        ret a * 100 + b * 10 + c
+      }
+
+      fn main() -> i32 {
+        ret combine(1, 2, 3)
+      }
+      "#
+        .chars()
+      ),
+      ok(eq(&123))
+    );
+  }
+
+  #[gtest]
+  fn nested_calls_preserve_argument_order() {
+    expect_that!(
+      interpret_program(
+        r#"
+      fn sub(x: i32, y: i32) -> i32 {
+        ret x - y
+      }
+
+      fn id(x: i32) -> i32 {
+        ret x
+      }
+
+      fn main() -> i32 {
+        ret sub(id(10), id(3))
+      }
+      "#
+        .chars()
+      ),
+      ok(eq(&7))
     );
   }
 }

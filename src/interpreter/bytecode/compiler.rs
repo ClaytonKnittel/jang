@@ -2,9 +2,12 @@ use std::collections::HashMap;
 
 use crate::{
   error::{JangError, JangResult},
-  interpreter::bytecode::instruction::{
-    BlockId, CallInstr, ConditionalJumpTargets, JitCompiledFunction, JitInstruction,
-    JitInstructionBlock, LocalId,
+  interpreter::bytecode::{
+    instruction::{
+      BlockId, CallInstr, ConditionalJumpTargets, JitCompiledFunction, JitInstruction,
+      JitInstructionBlock,
+    },
+    local_table::LocalId,
   },
   parser::{
     ast::{
@@ -41,8 +44,6 @@ impl<'a> JitCompilerLexicalBlock<'a> {
 struct JitCompilerLexicalScope<'a> {
   parent_blocks: Vec<JitCompilerLexicalBlock<'a>>,
   current_block: JitCompilerLexicalBlock<'a>,
-
-  max_size: usize,
 }
 
 impl<'a> JitCompilerLexicalScope<'a> {
@@ -50,10 +51,9 @@ impl<'a> JitCompilerLexicalScope<'a> {
     Self {
       parent_blocks: Vec::new(),
       current_block: JitCompilerLexicalBlock {
-        next_local_id: LocalId::zero(),
+        next_local_id: LocalId::default(),
         locals: HashMap::new(),
       },
-      max_size: 0,
     }
   }
 
@@ -64,9 +64,7 @@ impl<'a> JitCompilerLexicalScope<'a> {
   }
 
   fn create_binding(&mut self, name: &'a Ident) -> LocalId {
-    let id = self.current_block.create_binding(name);
-    self.max_size = self.max_size.max(id.as_index() + 1);
-    id
+    self.current_block.create_binding(name)
   }
 
   fn push_block(mut self) -> Self {
@@ -167,7 +165,6 @@ impl<'a> JitCompilationState<'a> {
 
     Ok(JitCompiledFunction {
       entrypoint: BlockId::zero(),
-      locals_size: self.lexical_scope.max_size,
       blocks: self.blocks,
       fn_decl,
     })

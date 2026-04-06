@@ -13,7 +13,6 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub enum Value<'a> {
-  Uninitialized,
   Int32(i32),
   Float32(f32),
   JitCompiledFunctionRef(&'a JitCompiledFunction<'a>),
@@ -21,7 +20,6 @@ pub enum Value<'a> {
 
 #[derive(Debug, Clone)]
 pub enum ValueType {
-  Uninitialized,
   Int32,
   Float32,
   FunctionRef,
@@ -48,7 +46,6 @@ impl<'a> TryFrom<&Literal> for Value<'a> {
 impl<'a> Value<'a> {
   pub fn ty(&self) -> ValueType {
     match self {
-      Self::Uninitialized => ValueType::Uninitialized,
       Self::Int32(_) => ValueType::Int32,
       Self::Float32(_) => ValueType::Float32,
       Self::JitCompiledFunctionRef(_) => ValueType::FunctionRef,
@@ -61,7 +58,6 @@ impl<'a> Value<'a> {
 
   pub fn debug_type_name(&self) -> String {
     match self {
-      Self::Uninitialized => "uninitialized".into(),
       Self::Int32(_) => "i32".into(),
       Self::Float32(_) => "f32".into(),
       Self::JitCompiledFunctionRef(f) => {
@@ -93,7 +89,6 @@ impl<'a> Value<'a> {
         "non-numeric value: {}",
         self.debug_type_name()
       ))),
-      (Self::Uninitialized, _) => Err(JangError::interpret_error("uninialized value")),
     }
   }
 
@@ -148,6 +143,27 @@ impl<'a> Value<'a> {
         JangError::interpret_error(format!("modulo by zero: {:?} / {:?}", self, divisor))
       })?)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a.rem(b))),
+    }
+  }
+
+  pub fn is_truthy(&self) -> JangResult<bool> {
+    match self {
+      Value::Int32(v) => Ok(*v != 0),
+      Value::Float32(v) => Ok(*v != 0.),
+      v => Err(JangError::interpret_error(format!(
+        "unexpected value in truthy check: {:?}",
+        v
+      ))),
+    }
+  }
+
+  pub fn as_jit_function(&self) -> JangResult<&'a JitCompiledFunction<'a>> {
+    match self {
+      Value::JitCompiledFunctionRef(jit_compiled_function) => Ok(*jit_compiled_function),
+      value => Err(JangError::interpret_error(format!(
+        "expected value to be a JIT-compiled function: {:?}",
+        value
+      ))),
     }
   }
 }
