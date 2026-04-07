@@ -46,7 +46,9 @@ pub fn evaluate_function<'a>(
   let mut pc = jit_fn.entrypoint();
 
   loop {
-    let block = jit_fn.block(pc);
+    let block = jit_fn
+      .block(pc)
+      .ok_or_else(|| InterpreterError::jit_err("block does not exist"))?;
     for instr in block.instructions() {
       match instr {
         JitInstruction::BinaryOp(binary_op) => {
@@ -104,5 +106,125 @@ pub fn evaluate_function<'a>(
       JitTerminalInstruction::RetWithValue => return Ok(Some(stack.pop_value()?)),
       JitTerminalInstruction::Ret => return Ok(None),
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::JitFunctionContext;
+  use crate::{
+    interpreter::{
+      bytecode::{
+        instruction::{
+          JitInstruction, JitTerminalInstruction,
+          testing::{block, function_bytecode},
+        },
+        local_table::testing::local_id,
+        machine::evaluate_function,
+      },
+      error::{InterpreterError, InterpreterResult},
+      value::{Value, matchers::i32_value},
+    },
+    parser::{
+      ast::binary_expression::BinaryOp,
+      token::{
+        ident::Ident,
+        literal::{Literal, NumericLiteral},
+      },
+    },
+  };
+  use googletest::prelude::*;
+
+  struct EmptyContext;
+
+  impl<'a> JitFunctionContext<'a> for EmptyContext {
+    fn resolve_ident(&'a self, name: &'_ Ident) -> InterpreterResult<Value<'a>> {
+      Err(InterpreterError::generic_err(format!(
+        "not found in empty context: {name:?}"
+      )))
+    }
+  }
+
+  #[gtest]
+  fn ret_returns_none() {
+    let code = function_bytecode(vec![block(vec![], JitTerminalInstruction::Ret)]);
+    expect_that!(
+      evaluate_function(&code, Vec::new(), &EmptyContext),
+      ok(none())
+    )
+  }
+
+  #[gtest]
+  fn ret_with_value_on_empty_stack_errors() {
+    let code = function_bytecode(vec![block(vec![], JitTerminalInstruction::RetWithValue)]);
+    expect_that!(
+      evaluate_function(&code, Vec::new(), &EmptyContext),
+      err(displays_as(contains_substring("bad stack: empty")))
+    )
+  }
+
+  #[gtest]
+  fn load_uninitialized_local_errors() {
+    let code = function_bytecode(vec![block(
+      vec![JitInstruction::LoadLocal(local_id(0))],
+      JitTerminalInstruction::RetWithValue,
+    )]);
+    expect_that!(
+      evaluate_function(&code, Vec::new(), &EmptyContext),
+      err(displays_as(contains_substring("bad local read")))
+    )
+  }
+
+  #[gtest]
+  fn store_then_load_local_round_trips() {
+    let one = Literal::Numeric(NumericLiteral::from_str("1"));
+    let code = function_bytecode(vec![block(
+      vec![
+        JitInstruction::LoadLiteral(&one),
+        JitInstruction::StoreLocal(local_id(0)),
+        JitInstruction::LoadLocal(local_id(0)),
+      ],
+      JitTerminalInstruction::RetWithValue,
+    )]);
+
+    expect_that!(
+      evaluate_function(&code, Vec::new(), &EmptyContext),
+      ok(pat!(Some(i32_value(eq(&1))))),
+    )
+  }
+
+  #[gtest]
+  fn global_not_found() {
+    let global = Ident::new("x");
+    let code = function_bytecode(vec![block(
+      vec![JitInstruction::LoadGlobal(&global)],
+      JitTerminalInstruction::Ret,
+    )]);
+
+    expect_that!(
+      evaluate_function(&code, Vec::new(), &EmptyContext),
+      err(displays_as(contains_substring(
+        "not found in empty context"
+      ))),
+    )
+  }
+
+  #[gtest]
+  fn subtraction_uses_rhs_lhs_order() {
+    let two = Literal::Numeric(NumericLiteral::from_str("2"));
+    let one = Literal::Numeric(NumericLiteral::from_str("1"));
+    let code = function_bytecode(vec![block(
+      vec![
+        JitInstruction::LoadLiteral(&two),
+        JitInstruction::LoadLiteral(&one),
+        JitInstruction::BinaryOp(BinaryOp::Sub),
+      ],
+      JitTerminalInstruction::RetWithValue,
+    )]);
+
+    expect_that!(
+      evaluate_function(&code, Vec::new(), &EmptyContext),
+      ok(pat!(Some(i32_value(eq(&1))))),
+    )
   }
 }

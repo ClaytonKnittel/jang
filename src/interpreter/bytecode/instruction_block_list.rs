@@ -16,8 +16,8 @@ pub struct BlockList<T> {
 }
 
 impl<T> BlockList<T> {
-  pub fn block(&self, id: BlockId) -> &T {
-    &self.blocks[id.0]
+  pub fn block(&self, id: BlockId) -> Option<&T> {
+    self.blocks.get(id.0)
   }
 }
 
@@ -58,9 +58,13 @@ impl<T> BlockListBuilder<T> {
 
 #[cfg(test)]
 pub mod testing {
-  use crate::interpreter::bytecode::instruction_block_list::BlockId;
+  use crate::interpreter::bytecode::instruction_block_list::{BlockId, BlockList};
 
   pub fn block_id(index: usize) -> BlockId {
     BlockId(index)
+  }
+
+  pub fn block_list<T>(blocks: Vec<T>) -> BlockList<T> {
+    BlockList { blocks }
   }
 }

@@ -16,9 +16,9 @@ pub enum JitInstruction<'a> {
   // Binary operator. Pops rhs off the stack, pops lhs off the stack,
   // combines the two, and pushes the result on the stack.
   //
-  // For example, for 1 + 2, the stack would look like:
-  //   top -> 2
-  //          1
+  // For example, for (2 - 1), the stack would look like:
+  //   top -> 1 (rhs)
+  //          2 (lhs)
   BinaryOp(BinaryOp),
 
   // Push a literal value onto the stack.
@@ -126,7 +126,7 @@ impl<'a> JitCompiledFunction<'a> {
     self.entrypoint
   }
 
-  pub fn block(&self, block_id: BlockId) -> &JitInstructionBlock<'a> {
+  pub fn block(&self, block_id: BlockId) -> Option<&JitInstructionBlock<'a>> {
     self.blocks.block(block_id)
   }
 }
@@ -259,7 +259,10 @@ pub mod matchers {
     block_matcher: impl Matcher<&'a JitInstructionBlock<'a>>,
   ) -> impl Matcher<&'a JitCompiledFunction<'a>> {
     result_of!(
-      move |f: &'a JitCompiledFunction<'a>| f.blocks.block(block_id),
+      move |f: &'a JitCompiledFunction<'a>| f
+        .blocks
+        .block(block_id)
+        .expect("expected present in test"),
       block_matcher
     )
   }
@@ -268,8 +271,38 @@ pub mod matchers {
     block_matcher: impl Matcher<&'a JitInstructionBlock<'a>>,
   ) -> impl Matcher<&'a JitCompiledFunction<'a>> {
     all!(result_of!(
-      |f: &'a JitCompiledFunction<'a>| f.blocks.block(f.entrypoint),
+      |f: &'a JitCompiledFunction<'a>| f
+        .blocks
+        .block(f.entrypoint)
+        .expect("expected present in test"),
       block_matcher
     ))
+  }
+}
+
+#[cfg(test)]
+pub mod testing {
+  use crate::interpreter::bytecode::{
+    instruction::{
+      JitCompiledFunction, JitInstruction, JitInstructionBlock, JitTerminalInstruction,
+    },
+    instruction_block_list::testing::{block_id, block_list},
+  };
+
+  pub fn block<'a>(
+    instructions: Vec<JitInstruction<'a>>,
+    terminator: JitTerminalInstruction,
+  ) -> JitInstructionBlock<'a> {
+    JitInstructionBlock {
+      instructions,
+      terminator,
+    }
+  }
+
+  pub fn function_bytecode<'a>(blocks: Vec<JitInstructionBlock<'a>>) -> JitCompiledFunction<'a> {
+    JitCompiledFunction {
+      entrypoint: block_id(0),
+      blocks: block_list(blocks),
+    }
   }
 }

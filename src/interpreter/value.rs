@@ -137,3 +137,13 @@ impl<'a> Value<'a> {
     }
   }
 }
+
+#[cfg(test)]
+pub mod matchers {
+  use crate::interpreter::value::Value;
+  use googletest::prelude::*;
+
+  pub fn i32_value<'a>(matcher: impl Matcher<&'a i32>) -> impl Matcher<&'a Value<'a>> {
+    pat!(Value::Int32(matcher))
+  }
+}
