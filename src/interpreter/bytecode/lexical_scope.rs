@@ -1,10 +1,17 @@
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
-use crate::{interpreter::bytecode::local_table::LocalId, parser::token::ident::Ident};
+use crate::{
+  interpreter::{
+    bytecode::local_table::LocalId,
+    error::{InterpreterError, InterpreterResult},
+  },
+  parser::token::ident::Ident,
+};
 
-#[derive(Clone)]
-pub struct JitCompilerLexicalScope<'a>(Rc<JitCompilerLexicalBlock<'a>>);
+#[derive(Debug)]
+pub struct JitCompilerLexicalScope<'a>(Box<JitCompilerLexicalBlock<'a>>);
 
+#[derive(Debug)]
 struct JitCompilerLexicalBlock<'a> {
   parent: Option<JitCompilerLexicalScope<'a>>,
   next_local_id: LocalId,
@@ -13,7 +20,7 @@ struct JitCompilerLexicalBlock<'a> {
 
 impl<'a> JitCompilerLexicalScope<'a> {
   pub fn new() -> Self {
-    Self(Rc::new(JitCompilerLexicalBlock {
+    Self(Box::new(JitCompilerLexicalBlock {
       parent: None,
       next_local_id: LocalId::default(),
       locals: HashMap::new(),
@@ -29,26 +36,27 @@ impl<'a> JitCompilerLexicalScope<'a> {
       .or_else(|| self.0.parent.as_ref()?.get_binding(name))
   }
 
-  pub fn bind(&self, name: &'a Ident) -> (Self, LocalId) {
+  pub fn bind(&mut self, name: &'a Ident) -> LocalId {
     let local_id = self.0.next_local_id;
-    let mut locals = self.0.locals.clone();
-    locals.insert(name, local_id);
+    self.0.next_local_id = local_id.next();
+    self.0.locals.insert(name, local_id);
 
-    (
-      Self(Rc::new(JitCompilerLexicalBlock {
-        parent: self.0.parent.clone(),
-        next_local_id: local_id.next(),
-        locals,
-      })),
-      local_id,
-    )
+    local_id
   }
 
-  pub fn push_block(&self) -> Self {
-    Self(Rc::new(JitCompilerLexicalBlock {
-      parent: Some(self.clone()),
-      next_local_id: self.0.next_local_id,
+  pub fn enter_block(self) -> Self {
+    let next_local_id = self.0.next_local_id;
+    Self(Box::new(JitCompilerLexicalBlock {
+      parent: Some(self),
+      next_local_id,
       locals: HashMap::new(),
     }))
+  }
+
+  pub fn exit_block(self) -> InterpreterResult<Self> {
+    self
+      .0
+      .parent
+      .ok_or_else(|| InterpreterError::jit_err("tried to exit from top-level scope"))
   }
 }

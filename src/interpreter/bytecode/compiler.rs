@@ -125,11 +125,18 @@ impl<'a> OpenCursor<'a> {
     }
   }
 
-  fn with_lexical_scope(self, lexical_scope: JitCompilerLexicalScope<'a>) -> Self {
+  fn enter_lexical_scope(self) -> Self {
     Self {
-      lexical_scope,
+      lexical_scope: self.lexical_scope.enter_block(),
       ..self
     }
+  }
+
+  fn exit_lexical_scope(self) -> InterpreterResult<Self> {
+    Ok(Self {
+      lexical_scope: self.lexical_scope.exit_block()?,
+      ..self
+    })
   }
 
   fn allocate_block(&mut self) -> BlockId {
@@ -152,11 +159,9 @@ impl<'a> OpenCursor<'a> {
     })
   }
 
-  fn bind_local(self, name: &'a Ident) -> Self {
-    let (lexical_scope, local_id) = self.lexical_scope.bind(name);
-    self
-      .with_lexical_scope(lexical_scope)
-      .emit_instr(JitInstruction::StoreLocal(local_id))
+  fn emit_local_store(mut self, name: &'a Ident) -> Self {
+    let local_id = self.lexical_scope.bind(name);
+    self.emit_instr(JitInstruction::StoreLocal(local_id))
   }
 
   fn emit_local_load(self, name: &'a Ident) -> Self {
@@ -175,7 +180,7 @@ impl<'a> OpenCursor<'a> {
       Statement::Let(let_statement) => Ok(
         self
           .compile_expr(let_statement.expr())?
-          .bind_local(let_statement.var())
+          .emit_local_store(let_statement.var())
           .into(),
       ),
       Statement::Ret(ret_statement) => Ok(
@@ -199,18 +204,14 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_lexical_block(self, block: &'a Block) -> InterpreterResult<Cursor<'a>> {
-    let outer_scope = self.lexical_scope.clone();
-    let inner_scope = self.lexical_scope.push_block();
-    Ok(
-      block
-        .statements()
-        .iter()
-        .try_fold(
-          self.with_lexical_scope(inner_scope).into(),
-          |cur: Cursor<'a>, stmt| cur.compile_statement(stmt),
-        )?
-        .with_lexical_scope(outer_scope),
-    )
+    block
+      .statements()
+      .iter()
+      .try_fold(
+        self.enter_lexical_scope().into(),
+        |cur: Cursor<'a>, stmt| cur.compile_statement(stmt),
+      )?
+      .exit_lexical_scope()
   }
 
   fn compile_if_statement(
@@ -288,13 +289,6 @@ impl<'a> OpenCursor<'a> {
 }
 
 impl<'a> ClosedCursor<'a> {
-  fn with_lexical_scope(self, lexical_scope: JitCompilerLexicalScope<'a>) -> Self {
-    Self {
-      lexical_scope,
-      ..self
-    }
-  }
-
   fn start_block(self, block_id: BlockId) -> OpenCursor<'a> {
     OpenCursor {
       fn_builder: self.fn_builder,
@@ -302,16 +296,16 @@ impl<'a> ClosedCursor<'a> {
       block: JitInstructionBlockBuilder::new(block_id),
     }
   }
+
+  fn exit_lexical_scope(self) -> InterpreterResult<Self> {
+    Ok(Self {
+      lexical_scope: self.lexical_scope.exit_block()?,
+      ..self
+    })
+  }
 }
 
 impl<'a> Cursor<'a> {
-  fn with_lexical_scope(self, lexical_scope: JitCompilerLexicalScope<'a>) -> Self {
-    match self {
-      Cursor::Open(cursor) => Cursor::Open(cursor.with_lexical_scope(lexical_scope)),
-      Cursor::Closed(cursor) => Cursor::Closed(cursor.with_lexical_scope(lexical_scope)),
-    }
-  }
-
   fn finish_with_fallthrough_to(self, block_id: BlockId) -> InterpreterResult<ClosedCursor<'a>> {
     match self {
       Cursor::Open(cursor) => cursor.terminate(JitTerminalInstruction::Jump(block_id)),
@@ -329,13 +323,20 @@ impl<'a> Cursor<'a> {
     }
   }
 
+  fn exit_lexical_scope(self) -> InterpreterResult<Self> {
+    match self {
+      Cursor::Open(cur) => Ok(cur.exit_lexical_scope()?.into()),
+      Cursor::Closed(cur) => Ok(cur.exit_lexical_scope()?.into()),
+    }
+  }
+
   fn compile_fn_decl(fn_decl: &'a FunctionDecl) -> InterpreterResult<JitCompiledFunction<'a>> {
     let cur = fn_decl
       .parameters()
       .iter()
       .rev()
       .fold(OpenCursor::new(), |cursor, param| {
-        cursor.bind_local(param.name())
+        cursor.emit_local_store(param.name())
       })
       .compile_lexical_block(fn_decl.body())?;
 
