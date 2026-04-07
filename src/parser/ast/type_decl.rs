@@ -45,6 +45,7 @@ impl Display for TypeDecl {
 pub(crate) mod matchers {
   use crate::parser::{
     ast::{
+      enum_type_decl::{EnumTypeDecl, EnumVariant},
       structured_type_decl::StructuredTypeField,
       type_decl::{StructuredTypeDecl, TypeDecl, TypeDeclVariant},
     },
@@ -61,6 +62,19 @@ pub(crate) mod matchers {
       decl: pat!(TypeDeclVariant::Structured(property!(
         &StructuredTypeDecl.fields(),
         field_matchers
+      ))),
+    })
+  }
+
+  pub fn enum_type<'a>(
+    name: impl Matcher<&'a Ident>,
+    variant_matchers: impl Matcher<&'a [EnumVariant]>,
+  ) -> impl Matcher<&'a TypeDecl> {
+    pat!(TypeDecl {
+      name: name,
+      decl: pat!(TypeDeclVariant::Enum(property!(
+        &EnumTypeDecl.variants(),
+        variant_matchers
       ))),
     })
   }
