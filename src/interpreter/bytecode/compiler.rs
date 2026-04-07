@@ -1,5 +1,3 @@
-use std::{collections::HashMap, rc::Rc};
-
 use crate::{
   interpreter::{
     bytecode::{
@@ -8,7 +6,7 @@ use crate::{
         JitInstruction, JitInstructionBlock, JitTerminalInstruction,
       },
       instruction_block_list::{BlockId, BlockList, BlockListBuilder},
-      local_table::LocalId,
+      lexical_scope::JitCompilerLexicalScope,
     },
     error::{InterpreterError, InterpreterResult},
   },
@@ -25,57 +23,6 @@ use crate::{
     token::{ident::Ident, literal::Literal},
   },
 };
-
-#[derive(Clone)]
-struct JitCompilerLexicalScope<'a>(Rc<JitCompilerLexicalBlock<'a>>);
-
-struct JitCompilerLexicalBlock<'a> {
-  parent: Option<JitCompilerLexicalScope<'a>>,
-  next_local_id: LocalId,
-  locals: HashMap<&'a Ident, LocalId>,
-}
-
-impl<'a> JitCompilerLexicalScope<'a> {
-  fn new() -> Self {
-    Self(Rc::new(JitCompilerLexicalBlock {
-      parent: None,
-      next_local_id: LocalId::default(),
-      locals: HashMap::new(),
-    }))
-  }
-
-  fn get_binding(&self, name: &Ident) -> Option<LocalId> {
-    self
-      .0
-      .locals
-      .get(name)
-      .copied()
-      .or_else(|| self.0.parent.as_ref()?.get_binding(name))
-  }
-
-  fn bind(&self, name: &'a Ident) -> (Self, LocalId) {
-    let local_id = self.0.next_local_id;
-    let mut locals = self.0.locals.clone();
-    locals.insert(name, local_id);
-
-    (
-      Self(Rc::new(JitCompilerLexicalBlock {
-        parent: self.0.parent.clone(),
-        next_local_id: local_id.next(),
-        locals,
-      })),
-      local_id,
-    )
-  }
-
-  fn push_block(&self) -> Self {
-    Self(Rc::new(JitCompilerLexicalBlock {
-      parent: Some(self.clone()),
-      next_local_id: self.0.next_local_id,
-      locals: HashMap::new(),
-    }))
-  }
-}
 
 struct JitInstructionBlockBuilder<'a> {
   id: BlockId,
@@ -124,12 +71,12 @@ impl<'a> JitFunctionBuilder<'a> {
     self.blocks.allocate_uninitialized()
   }
 
-  fn finish_block(mut self, finished: TerminatedBlock<'a>) -> InterpreterResult<Self> {
-    self.blocks.set(finished.id, finished.block)?;
+  fn finish_block(mut self, block: TerminatedBlock<'a>) -> InterpreterResult<Self> {
+    self.blocks.set(block.id, block.block)?;
     Ok(self)
   }
 
-  fn into_blocks(self) -> InterpreterResult<BlockList<JitInstructionBlock<'a>>> {
+  fn build(self) -> InterpreterResult<BlockList<JitInstructionBlock<'a>>> {
     self
       .blocks
       .build()
@@ -137,7 +84,7 @@ impl<'a> JitFunctionBuilder<'a> {
   }
 }
 
-// Function compilation state when there is an open instruction block.
+// Function compilation state when there is an unterminated instruction block.
 struct OpenCursor<'a> {
   fn_builder: JitFunctionBuilder<'a>,
   lexical_scope: JitCompilerLexicalScope<'a>,
@@ -400,7 +347,7 @@ impl<'a> Cursor<'a> {
 
     Ok(JitCompiledFunction::new(
       cur.fn_builder.entrypoint,
-      cur.fn_builder.into_blocks()?,
+      cur.fn_builder.build()?,
     ))
   }
 }
