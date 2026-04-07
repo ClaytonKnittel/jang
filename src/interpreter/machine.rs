@@ -56,7 +56,7 @@ impl<'a> Interpreter<'a> {
 
   pub fn run_main(&self) -> InterpreterResult<i32> {
     let Some(main_fn) = self.program.functions.get(&Ident::new(MAIN_FN_NAME)) else {
-      todo!();
+      return Err(InterpreterError::generic_err("main function not found"));
     };
 
     match machine::evaluate_function(main_fn, Vec::new(), self)? {
