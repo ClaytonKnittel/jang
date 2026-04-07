@@ -275,4 +275,16 @@ mod tests {
 
     check_print_roundtrip(code)
   }
+
+  #[gtest]
+  fn roundtrip_structured_type() -> Result<()> {
+    let code = r#"
+      type X = {
+        field1: i32
+        field2: String
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
 }
