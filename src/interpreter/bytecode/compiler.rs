@@ -4,9 +4,10 @@ use crate::{
   interpreter::{
     bytecode::{
       instruction::{
-        BlockId, ConditionalJumpTargets, JitCallInstructionBuilder, JitCompiledFunction,
-        JitInstruction, JitInstructionBlock, JitTerminalInstruction,
+        ConditionalJumpTargets, JitCallInstructionBuilder, JitCompiledFunction, JitInstruction,
+        JitInstructionBlock, JitTerminalInstruction,
       },
+      instruction_block_list::{BlockId, BlockList, BlockListBuilder},
       local_table::LocalId,
     },
     error::{InterpreterError, InterpreterResult},
@@ -108,56 +109,31 @@ struct TerminatedBlock<'a> {
 }
 
 struct JitFunctionBuilder<'a> {
-  next_block_id: BlockId,
   entrypoint: BlockId,
-  blocks: Vec<Option<JitInstructionBlock<'a>>>,
+  blocks: BlockListBuilder<JitInstructionBlock<'a>>,
 }
 
 impl<'a> JitFunctionBuilder<'a> {
   fn new() -> Self {
-    let entrypoint = BlockId::zero();
-    let next_block_id = entrypoint.next();
-    Self {
-      entrypoint,
-      next_block_id,
-      blocks: vec![None],
-    }
+    let mut blocks = BlockListBuilder::new();
+    let entrypoint = blocks.allocate_uninitialized();
+    Self { entrypoint, blocks }
   }
 
   fn allocate_block(&mut self) -> BlockId {
-    let id = self.next_block_id;
-    self.next_block_id = id.next();
-    self.blocks.push(None);
-    id
+    self.blocks.allocate_uninitialized()
   }
 
   fn finish_block(mut self, finished: TerminatedBlock<'a>) -> InterpreterResult<Self> {
-    let slot = self
-      .blocks
-      .get_mut(finished.id.as_index())
-      .ok_or_else(|| InterpreterError::jit_err("internal jit failure: could not find block"))?;
-    if slot.is_some() {
-      return Err(InterpreterError::jit_err(
-        "internal jit failure: block terminated more than once",
-      ));
-    }
-    *slot = Some(finished.block);
+    self.blocks.set(finished.id, finished.block)?;
     Ok(self)
   }
 
-  fn into_blocks(self) -> InterpreterResult<Vec<JitInstructionBlock<'a>>> {
+  fn into_blocks(self) -> InterpreterResult<BlockList<JitInstructionBlock<'a>>> {
     self
       .blocks
-      .into_iter()
-      .enumerate()
-      .map(|(index, block)| {
-        block.ok_or_else(|| {
-          InterpreterError::jit_err(format!(
-            "internal jit failure: block {index} was never terminated"
-          ))
-        })
-      })
-      .collect()
+      .build()
+      .map_err(|err| InterpreterError::jit_err(format!("block was never terminated: {err}",)))
   }
 }
 

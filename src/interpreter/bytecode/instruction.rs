@@ -1,29 +1,15 @@
 use cknittel_util::builder::Builder;
 
 use crate::{
-  interpreter::bytecode::local_table::LocalId,
+  interpreter::bytecode::{
+    instruction_block_list::{BlockId, BlockList},
+    local_table::LocalId,
+  },
   parser::{
     ast::{binary_expression::BinaryOp, function_decl::FunctionDecl},
     token::{ident::Ident, literal::Literal},
   },
 };
-
-// The ID of a block within a function.
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
-pub struct BlockId(u32);
-impl BlockId {
-  pub fn next(self) -> Self {
-    Self(self.0 + 1)
-  }
-
-  pub fn zero() -> Self {
-    BlockId(0)
-  }
-
-  pub fn as_index(&self) -> usize {
-    self.0 as usize
-  }
-}
 
 #[derive(Debug)]
 pub enum JitInstruction<'a> {
@@ -102,14 +88,14 @@ impl<'a> JitInstructionBlock<'a> {
 #[derive(Debug)]
 pub struct JitCompiledFunction<'a> {
   entrypoint: BlockId,
-  blocks: Vec<JitInstructionBlock<'a>>,
+  blocks: BlockList<JitInstructionBlock<'a>>,
   fn_decl: &'a FunctionDecl,
 }
 
 impl<'a> JitCompiledFunction<'a> {
   pub fn new(
     entrypoint: BlockId,
-    blocks: Vec<JitInstructionBlock<'a>>,
+    blocks: BlockList<JitInstructionBlock<'a>>,
     fn_decl: &'a FunctionDecl,
   ) -> Self {
     Self {
@@ -124,7 +110,7 @@ impl<'a> JitCompiledFunction<'a> {
   }
 
   pub fn block(&self, block_id: BlockId) -> &JitInstructionBlock<'a> {
-    &self.blocks[block_id.0 as usize]
+    self.blocks.block(block_id)
   }
 
   pub fn decl(&self) -> &'a FunctionDecl {
