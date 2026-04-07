@@ -442,8 +442,8 @@ mod tests {
   fn empty_function() {
     let decl = parse_fn_decl(
       r#"
-              fn f() { }
-             "#
+      fn f() { }
+      "#
       .chars(),
     )
     .unwrap();
@@ -460,10 +460,10 @@ mod tests {
   fn binary_operators() {
     let decl = parse_fn_decl(
       r#"
-              fn f() -> i32 {
-                ret 2 * (3 + 4)
-              }
-             "#
+      fn f() -> i32 {
+        ret 2 * (3 + 4)
+      }
+      "#
       .chars(),
     )
     .unwrap();
@@ -487,14 +487,14 @@ mod tests {
   fn if_statement() {
     let decl = parse_fn_decl(
       r#"
-              fn f() -> i32 {
-                if 0 {
-                  ret 1
-                } else {
-                }
-                ret 2
-              }
-             "#
+      fn f() -> i32 {
+        if 0 {
+          ret 1
+        } else {
+        }
+        ret 2
+      }
+      "#
       .chars(),
     )
     .unwrap();
@@ -540,17 +540,17 @@ mod tests {
   fn lexical_scoping() {
     let decl = parse_fn_decl(
       r#"
-              fn f() -> i32 {
-                let x = 1
-                {
-                  let x = 2
-                  {
-                    let x = 3
-                  }
-                  ret x
-                }
-              }
-             "#
+      fn f() -> i32 {
+        let x = 1
+        {
+          let x = 2
+          {
+            let x = 3
+          }
+          ret x
+        }
+      }
+      "#
       .chars(),
     )
     .unwrap();
@@ -576,10 +576,10 @@ mod tests {
   fn function_call_no_args() {
     let decl = parse_fn_decl(
       r#"
-              fn f() {
-                func()
-              }
-             "#
+      fn f() {
+        func()
+      }
+      "#
       .chars(),
     )
     .unwrap();
@@ -600,11 +600,11 @@ mod tests {
   fn store_and_load_local() {
     let decl = parse_fn_decl(
       r#"
-              fn f() -> i32 {
-                let x = 1 + 2
-                ret x
-              }
-             "#
+      fn f() -> i32 {
+        let x = 1 + 2
+        ret x
+      }
+      "#
       .chars(),
     )
     .unwrap();
@@ -628,10 +628,10 @@ mod tests {
   fn call_with_multiple_args() {
     let decl = parse_fn_decl(
       r#"
-              fn f() {
-                func(1, 2, 3)
-              }
-             "#
+      fn f() {
+        func(1, 2, 3)
+      }
+      "#
       .chars(),
     )
     .unwrap();
@@ -655,10 +655,10 @@ mod tests {
   fn call_argument_eval_order() {
     let decl = parse_fn_decl(
       r#"
-              fn f() {
-                func(1 + 2, 3 + 4)
-              }
-             "#
+      fn f() {
+        func(1 + 2, 3 + 4)
+      }
+      "#
       .chars(),
     )
     .unwrap();
@@ -685,10 +685,10 @@ mod tests {
   fn fn_decl_with_parameters() {
     let decl = parse_fn_decl(
       r#"
-              fn f(a: i32, b: i32, c: i32) {
-                ret a + (b + c)
-              }
-             "#
+      fn f(a: i32, b: i32, c: i32) {
+        ret a + (b + c)
+      }
+      "#
       .chars(),
     )
     .unwrap();
@@ -718,11 +718,11 @@ mod tests {
   fn values_as_functions() {
     let decl = parse_fn_decl(
       r#"
-              fn f() {
-                let x = global_fn
-                ret x(1)
-              }
-             "#
+      fn f() {
+        let x = global_fn
+        ret x(1)
+      }
+      "#
       .chars(),
     )
     .unwrap();

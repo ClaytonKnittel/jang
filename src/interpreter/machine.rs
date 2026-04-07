@@ -390,14 +390,14 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-      fn sub(x: i32, y: i32) -> i32 {
-        ret x - y
-      }
+        fn sub(x: i32, y: i32) -> i32 {
+          ret x - y
+        }
 
-      fn main() -> i32 {
-        ret sub(10, 3)
-      }
-      "#
+        fn main() -> i32 {
+          ret sub(10, 3)
+        }
+        "#
         .chars()
       ),
       ok(eq(&7))
@@ -409,14 +409,14 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-      fn combine(a: i32, b: i32, c: i32) -> i32 {
-        ret a * 100 + b * 10 + c
-      }
+        fn combine(a: i32, b: i32, c: i32) -> i32 {
+          ret a * 100 + b * 10 + c
+        }
 
-      fn main() -> i32 {
-        ret combine(1, 2, 3)
-      }
-      "#
+        fn main() -> i32 {
+          ret combine(1, 2, 3)
+        }
+        "#
         .chars()
       ),
       ok(eq(&123))
@@ -428,18 +428,18 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-      fn sub(x: i32, y: i32) -> i32 {
-        ret x - y
-      }
+        fn sub(x: i32, y: i32) -> i32 {
+          ret x - y
+        }
 
-      fn id(x: i32) -> i32 {
-        ret x
-      }
+        fn id(x: i32) -> i32 {
+          ret x
+        }
 
-      fn main() -> i32 {
-        ret sub(id(10), id(3))
-      }
-      "#
+        fn main() -> i32 {
+          ret sub(id(10), id(3))
+        }
+        "#
         .chars()
       ),
       ok(eq(&7))
@@ -451,14 +451,14 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-      fn test(x: i32) -> i32 {
-        ret x + main
-      }
+        fn test(x: i32) -> i32 {
+          ret x + main
+        }
 
-      fn main() -> i32 {
-        ret test(1)
-      }
-      "#
+        fn main() -> i32 {
+          ret test(1)
+        }
+        "#
         .chars()
       ),
       err(displays_as(contains_substring("type mismatch")))
