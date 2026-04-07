@@ -137,9 +137,9 @@ impl<'a> JitFunctionBuilder<'a> {
       .get_mut(finished.id.as_index())
       .ok_or_else(|| InterpreterError::jit_err("internal jit failure: could not find block"))?;
     if slot.is_some() {
-      return Err(
-        InterpreterError::jit_err("internal jit failure: block terminated more than once").into(),
-      );
+      return Err(InterpreterError::jit_err(
+        "internal jit failure: block terminated more than once",
+      ));
     }
     *slot = Some(finished.block);
     Ok(self)
@@ -155,7 +155,6 @@ impl<'a> JitFunctionBuilder<'a> {
           InterpreterError::jit_err(format!(
             "internal jit failure: block {index} was never terminated"
           ))
-          .into()
         })
       })
       .collect()
@@ -268,9 +267,11 @@ impl<'a> OpenCursor<'a> {
       Statement::IfStatement(if_statement) => Ok(self.compile_if_statement(if_statement)?.into()),
       Statement::Block(block) => self.compile_lexical_block(block),
       Statement::LoopStatement(_) => {
-        Err(InterpreterError::unimplemented("not yet implemented: loop").into())
+        Err(InterpreterError::unimplemented("not yet implemented: loop"))
       }
-      Statement::Break => Err(InterpreterError::unimplemented("not yet implemented: break").into()),
+      Statement::Break => Err(InterpreterError::unimplemented(
+        "not yet implemented: break",
+      )),
     }
   }
 
@@ -322,9 +323,9 @@ impl<'a> OpenCursor<'a> {
       Expression::Ident(ident) => Ok(self.emit_local_load(ident)),
       Expression::BinaryExpression(expr) => self.compile_binary_expression(expr),
       Expression::CallExpression(expr) => self.compile_call_expression(expr),
-      Expression::DotExpression(_) => {
-        Err(InterpreterError::unimplemented("dot expression not yet supported").into())
-      }
+      Expression::DotExpression(_) => Err(InterpreterError::unimplemented(
+        "dot expression not yet supported",
+      )),
     }
   }
 
@@ -398,13 +399,10 @@ impl<'a> Cursor<'a> {
   fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a>> {
     match self {
       Cursor::Open(cur) => cur.compile_statement(statement),
-      Cursor::Closed(_) => Err(
-        InterpreterError::jit_err(format!(
-          "jit compilation failed: unreachable statement: {:?}",
-          statement
-        ))
-        .into(),
-      ),
+      Cursor::Closed(_) => Err(InterpreterError::jit_err(format!(
+        "jit compilation failed: unreachable statement: {:?}",
+        statement
+      ))),
     }
   }
 

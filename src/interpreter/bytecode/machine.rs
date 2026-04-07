@@ -24,7 +24,7 @@ impl<'a> MachineStack<'a> {
   fn pop_value(&mut self) -> InterpreterResult<Value<'a>> {
     match self.items.pop() {
       Some(v) => Ok(v),
-      None => Err(InterpreterError::generic_err("bad stack: empty").into()),
+      None => Err(InterpreterError::generic_err("bad stack: empty")),
     }
   }
 
