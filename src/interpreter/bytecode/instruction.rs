@@ -49,15 +49,31 @@ pub enum JitTerminalInstruction {
   RetWithValue,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Builder)]
 pub struct ConditionalJumpTargets {
-  pub true_target: BlockId,
-  pub false_target: BlockId,
+  true_target: BlockId,
+  false_target: BlockId,
+}
+
+impl ConditionalJumpTargets {
+  pub fn true_target(&self) -> BlockId {
+    self.true_target
+  }
+
+  pub fn false_target(&self) -> BlockId {
+    self.false_target
+  }
 }
 
 #[derive(Debug, Builder)]
 pub struct JitCallInstruction {
-  pub arity: u32,
+  arity: u32,
+}
+
+impl JitCallInstruction {
+  pub fn arity(&self) -> usize {
+    self.arity as usize
+  }
 }
 
 // A block is a sequence of instructions that are always executed
@@ -117,3 +133,6 @@ impl<'a> JitCompiledFunction<'a> {
     self.fn_decl
   }
 }
+
+#[cfg(test)]
+pub mod matchers {}

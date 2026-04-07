@@ -76,7 +76,7 @@ pub fn evaluate_function<'a>(
         JitInstruction::Call(call_instr) => {
           let target_fn = stack.pop_value()?.as_jit_function()?;
           let mut args = Vec::new();
-          for _ in 0..call_instr.arity {
+          for _ in 0..call_instr.arity() {
             args.push(stack.pop_value()?);
           }
           let value = evaluate_function(target_fn, args, context)?;
@@ -94,9 +94,9 @@ pub fn evaluate_function<'a>(
       JitTerminalInstruction::ConditionalJump(cond) => {
         let condition = stack.pop_value()?;
         pc = if condition.is_truthy()? {
-          cond.true_target
+          cond.true_target()
         } else {
-          cond.false_target
+          cond.false_target()
         };
       }
       JitTerminalInstruction::RetWithValue => return Ok(Some(stack.pop_value()?)),

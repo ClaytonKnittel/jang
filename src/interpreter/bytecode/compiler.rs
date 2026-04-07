@@ -4,8 +4,8 @@ use crate::{
   interpreter::{
     bytecode::{
       instruction::{
-        ConditionalJumpTargets, JitCallInstructionBuilder, JitCompiledFunction, JitInstruction,
-        JitInstructionBlock, JitTerminalInstruction,
+        ConditionalJumpTargetsBuilder, JitCallInstructionBuilder, JitCompiledFunction,
+        JitInstruction, JitInstructionBlock, JitTerminalInstruction,
       },
       instruction_block_list::{BlockId, BlockList, BlockListBuilder},
       local_table::LocalId,
@@ -278,10 +278,11 @@ impl<'a> OpenCursor<'a> {
       self
         .compile_expr(if_statement.condition())?
         .terminate(JitTerminalInstruction::ConditionalJump(
-          ConditionalJumpTargets {
-            true_target: if_block_id,
-            false_target: else_block_id,
-          },
+          ConditionalJumpTargetsBuilder::default()
+            .with_true_target(if_block_id)
+            .with_false_target(else_block_id)
+            .build()
+            .expect("error building ConditionalJumpTargets"),
         ))?
         .start_block(if_block_id)
         .compile_lexical_block(if_statement.body())?
