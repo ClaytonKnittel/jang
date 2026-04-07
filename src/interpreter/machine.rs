@@ -32,9 +32,10 @@ pub struct Interpreter<'a> {
 impl<'a> JitFunctionContext<'a> for Interpreter<'a> {
   fn resolve_ident(&'a self, name: &Ident) -> InterpreterResult<Value<'a>> {
     Ok(Value::JitCompiledFunctionRef(
-      self.program.lookup_function(name).ok_or_else(|| {
-        InterpreterError::generic_err(format!("identifier not found: {:?}", name))
-      })?,
+      self
+        .program
+        .lookup_function(name)
+        .ok_or_else(|| InterpreterError::generic_err(format!("unbound variable: {}", name)))?,
     ))
   }
 }
@@ -170,7 +171,7 @@ mod tests {
         "#
         .chars()
       ),
-      err(anything())
+      err(displays_as(contains_substring("unbound variable")))
     );
   }
 
@@ -202,7 +203,7 @@ mod tests {
         "#
         .chars()
       ),
-      err(anything())
+      err(displays_as(contains_substring("division by zero")))
     );
   }
 
@@ -319,7 +320,7 @@ mod tests {
         "#
         .chars()
       ),
-      err(anything())
+      err(displays_as(contains_substring("main must return a value")))
     );
   }
 
@@ -442,6 +443,25 @@ mod tests {
         .chars()
       ),
       ok(eq(&7))
+    );
+  }
+
+  #[gtest]
+  fn arithmetic_value_type_mismatch() {
+    expect_that!(
+      interpret_program(
+        r#"
+      fn test(x: i32) -> i32 {
+        ret x + main
+      }
+
+      fn main() -> i32 {
+        ret test(1)
+      }
+      "#
+        .chars()
+      ),
+      err(displays_as(contains_substring("type mismatch")))
     );
   }
 }

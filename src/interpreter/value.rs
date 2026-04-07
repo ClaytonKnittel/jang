@@ -134,7 +134,6 @@ impl<'a> Value<'a> {
   pub fn is_truthy(&self) -> InterpreterResult<bool> {
     match self {
       Value::Int32(v) => Ok(*v != 0),
-      Value::Float32(v) => Ok(*v != 0.),
       value => Err(InterpreterError::value_err(format!(
         "unexpected value in truthy check: {:?}",
         value
