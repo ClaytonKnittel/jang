@@ -12,4 +12,5 @@ pub mod let_statement;
 pub mod loop_statement;
 pub mod ret_statement;
 pub mod statement;
+pub mod type_decl;
 pub mod type_expr;

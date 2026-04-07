@@ -9,6 +9,7 @@ pub enum Keyword {
   Else,
   Loop,
   Break,
+  Type,
 }
 
 impl Keyword {
@@ -21,6 +22,7 @@ impl Keyword {
       "else" => Some(Self::Else),
       "loop" => Some(Self::Loop),
       "break" => Some(Self::Break),
+      "type" => Some(Self::Type),
       _ => None,
     }
   }
@@ -39,6 +41,7 @@ impl Display for Keyword {
         Self::Else => "else",
         Self::Loop => "loop",
         Self::Break => "break",
+        Self::Type => "type",
       }
     )
   }

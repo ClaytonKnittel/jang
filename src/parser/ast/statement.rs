@@ -1,11 +1,13 @@
 use std::fmt::Display;
 
+use cknittel_util::from_variants::FromVariants;
+
 use crate::parser::ast::{
   block::Block, call_expression::CallExpression, if_statement::IfStatement,
   let_statement::LetStatement, loop_statement::LoopStatement, ret_statement::RetStatement,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, FromVariants)]
 pub enum Statement {
   Let(LetStatement),
   Ret(RetStatement),
@@ -14,42 +16,6 @@ pub enum Statement {
   LoopStatement(LoopStatement),
   Block(Block),
   Break,
-}
-
-impl From<LetStatement> for Statement {
-  fn from(value: LetStatement) -> Self {
-    Self::Let(value)
-  }
-}
-
-impl From<RetStatement> for Statement {
-  fn from(value: RetStatement) -> Self {
-    Self::Ret(value)
-  }
-}
-
-impl From<CallExpression> for Statement {
-  fn from(value: CallExpression) -> Self {
-    Self::CallStatement(value)
-  }
-}
-
-impl From<IfStatement> for Statement {
-  fn from(value: IfStatement) -> Self {
-    Self::IfStatement(value)
-  }
-}
-
-impl From<LoopStatement> for Statement {
-  fn from(value: LoopStatement) -> Self {
-    Self::LoopStatement(value)
-  }
-}
-
-impl From<Block> for Statement {
-  fn from(value: Block) -> Self {
-    Self::Block(value)
-  }
 }
 
 impl Display for Statement {
