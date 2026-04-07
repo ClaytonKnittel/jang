@@ -6,7 +6,7 @@ use std::{
 
 use parser_generator::error::ParserError;
 
-use crate::source_location::SourceLocation;
+use crate::{interpreter::error::InterpreterError, source_location::SourceLocation};
 
 #[derive(Clone)]
 pub struct ParseError {
@@ -44,21 +44,12 @@ impl Debug for ParseError {
 pub enum JangError {
   ParseError(ParseError),
   GrammarError(ParserError<Infallible>),
-  JitCompilerError(),
-  InterpreterError(String),
+  InterpreterError(InterpreterError),
 }
 
 impl JangError {
   pub fn parse_error(message: impl Into<String>, source_location: SourceLocation) -> Self {
     Self::ParseError(ParseError::new(message, source_location))
-  }
-
-  pub fn interpret_error(message: impl Into<String>) -> Self {
-    Self::InterpreterError(message.into())
-  }
-
-  pub fn prefix_msg(self, _: impl Into<String>) -> Self {
-    self
   }
 }
 
@@ -80,6 +71,12 @@ impl From<ParserError<JangError>> for JangError {
   }
 }
 
+impl From<InterpreterError> for JangError {
+  fn from(err: InterpreterError) -> Self {
+    JangError::InterpreterError(err)
+  }
+}
+
 impl Error for JangError {}
 
 impl Display for JangError {
@@ -87,7 +84,6 @@ impl Display for JangError {
     match self {
       Self::ParseError(err) => write!(f, "{err}"),
       Self::GrammarError(err) => write!(f, "Grammar error: {err}"),
-      Self::JitCompilerError() => write!(f, "JIT Compiler error"),
       Self::InterpreterError(err) => write!(f, "Interpreter error: {err}"),
     }
   }

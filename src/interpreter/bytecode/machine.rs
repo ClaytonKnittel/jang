@@ -1,10 +1,10 @@
 use crate::{
-  error::{JangError, JangResult},
   interpreter::{
     bytecode::{
       instruction::{JitCompiledFunction, JitInstruction, JitTerminalInstruction},
       local_table::LocalTable,
     },
+    error::{InterpreterError, InterpreterResult},
     value::Value,
   },
   parser::{ast::binary_expression::BinaryOp, token::ident::Ident},
@@ -21,10 +21,10 @@ impl<'a> MachineStack<'a> {
     Self { items: args }
   }
 
-  fn pop_value(&mut self) -> JangResult<Value<'a>> {
+  fn pop_value(&mut self) -> InterpreterResult<Value<'a>> {
     match self.items.pop() {
       Some(v) => Ok(v),
-      None => Err(JangError::interpret_error("bad stack: empty")),
+      None => Err(InterpreterError::generic_err("bad stack: empty").into()),
     }
   }
 
@@ -34,14 +34,14 @@ impl<'a> MachineStack<'a> {
 }
 
 pub trait JitFunctionContext<'a> {
-  fn resolve_ident(&'a self, name: &'_ Ident) -> JangResult<Value<'a>>;
+  fn resolve_ident(&'a self, name: &'_ Ident) -> InterpreterResult<Value<'a>>;
 }
 
 pub fn evaluate_function<'a>(
   jit_fn: &'a JitCompiledFunction<'a>,
   args: Vec<Value<'a>>,
   context: &'a impl JitFunctionContext<'a>,
-) -> JangResult<Option<Value<'a>>> {
+) -> InterpreterResult<Option<Value<'a>>> {
   let mut locals = LocalTable::<Value<'a>>::new();
   let mut stack = MachineStack::from_args(args);
   let mut pc = jit_fn.entrypoint();

@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use crate::{
-  error::{JangError, JangResult},
   interpreter::{
     bytecode::{
       compiler::compile_to_bytecode,
       instruction::JitCompiledFunction,
       machine::{self, JitFunctionContext},
     },
+    error::{InterpreterError, InterpreterResult},
     value::Value,
   },
   parser::{ast::jang_file::JangFile, token::ident::Ident},
@@ -30,23 +30,22 @@ pub struct Interpreter<'a> {
 }
 
 impl<'a> JitFunctionContext<'a> for Interpreter<'a> {
-  fn resolve_ident(&'a self, name: &Ident) -> JangResult<Value<'a>> {
+  fn resolve_ident(&'a self, name: &Ident) -> InterpreterResult<Value<'a>> {
     Ok(Value::JitCompiledFunctionRef(
-      self
-        .program
-        .lookup_function(name)
-        .ok_or_else(|| JangError::interpret_error(format!("identifier not found: {:?}", name)))?,
+      self.program.lookup_function(name).ok_or_else(|| {
+        InterpreterError::generic_err(format!("identifier not found: {:?}", name))
+      })?,
     ))
   }
 }
 
 impl<'a> Interpreter<'a> {
-  pub fn new(jang_file: &'a JangFile) -> JangResult<Self> {
+  pub fn new(jang_file: &'a JangFile) -> InterpreterResult<Self> {
     let function_decls_by_name: HashMap<Ident, JitCompiledFunction<'a>> = jang_file
       .function_decls()
       .iter()
       .map(|f| Ok((f.name().clone(), compile_to_bytecode(f)?)))
-      .collect::<JangResult<_>>()?;
+      .collect::<InterpreterResult<_>>()?;
 
     Ok(Interpreter {
       program: Program {
@@ -55,15 +54,15 @@ impl<'a> Interpreter<'a> {
     })
   }
 
-  pub fn run_main(&self) -> JangResult<i32> {
+  pub fn run_main(&self) -> InterpreterResult<i32> {
     let Some(main_fn) = self.program.functions.get(&Ident::new(MAIN_FN_NAME)) else {
       todo!();
     };
 
     match machine::evaluate_function(main_fn, Vec::new(), self)? {
       Some(Value::Int32(v)) => Ok(v),
-      None => Err(JangError::interpret_error("main must return a value")),
-      Some(r) => Err(JangError::interpret_error(format!(
+      None => Err(InterpreterError::value_err("main must return a value")),
+      Some(r) => Err(InterpreterError::value_err(format!(
         "invalid return value from main: {:?}",
         r
       ))),
@@ -83,7 +82,7 @@ mod tests {
   fn interpret_program(text: impl IntoIterator<Item = char>) -> JangResult<i32> {
     let ast = lex_and_parse_jang_file(text).unwrap();
     let interp = Interpreter::new(&ast).unwrap();
-    interp.run_main()
+    interp.run_main().map_err(|err| err.into())
   }
 
   #[gtest]

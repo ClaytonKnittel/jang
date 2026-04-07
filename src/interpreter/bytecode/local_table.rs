@@ -1,4 +1,4 @@
-use crate::error::{JangError, JangResult};
+use crate::interpreter::error::{InterpreterError, InterpreterResult};
 use std::default::Default;
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy, Default)]
@@ -24,11 +24,13 @@ impl<T> LocalTable<T> {
     Self { slots: Vec::new() }
   }
 
-  pub fn read(&self, local_id: LocalId) -> JangResult<&T> {
+  pub fn read(&self, local_id: LocalId) -> InterpreterResult<&T> {
     match self.slots.get(local_id.0 as usize) {
       Some(LocalSlot::Val(value)) => Ok(value),
-      Some(LocalSlot::Uninitialized) => Err(JangError::interpret_error("uninitialized local")),
-      None => Err(JangError::interpret_error("bad local read")),
+      Some(LocalSlot::Uninitialized) => {
+        Err(InterpreterError::generic_err("uninitialized local").into())
+      }
+      None => Err(InterpreterError::generic_err("bad local read").into()),
     }
   }
 

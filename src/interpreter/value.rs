@@ -6,8 +6,11 @@ use std::{
 use itertools::Itertools;
 
 use crate::{
-  error::{JangError, JangResult},
-  interpreter::{bytecode::instruction::JitCompiledFunction, parse_as::ParseAs},
+  interpreter::{
+    bytecode::instruction::JitCompiledFunction,
+    error::{InterpreterError, InterpreterResult},
+    parse_as::ParseAs,
+  },
   parser::token::literal::{Literal, NumericLiteral},
 };
 
@@ -26,9 +29,9 @@ enum NumericValuePair {
 }
 
 impl<'a> TryFrom<&Literal> for Value<'a> {
-  type Error = JangError;
+  type Error = InterpreterError;
 
-  fn try_from(value: &Literal) -> JangResult<Self> {
+  fn try_from(value: &Literal) -> InterpreterResult<Self> {
     match value {
       Literal::Numeric(NumericLiteral::Integral(v)) => Ok(Self::Int32(v.parse_as()?)),
       Literal::Numeric(NumericLiteral::Float(v)) => Ok(Self::Float32(v.parse_as()?)),
@@ -37,7 +40,7 @@ impl<'a> TryFrom<&Literal> for Value<'a> {
 }
 
 impl<'a> Value<'a> {
-  pub fn from_literal(literal: &Literal) -> JangResult<Self> {
+  pub fn from_literal(literal: &Literal) -> InterpreterResult<Self> {
     literal.try_into()
   }
 
@@ -61,91 +64,88 @@ impl<'a> Value<'a> {
     }
   }
 
-  fn to_numeric_pair(&self, other: &Self) -> JangResult<NumericValuePair> {
+  fn to_numeric_pair(&self, other: &Self) -> InterpreterResult<NumericValuePair> {
     match (self, other) {
       (Self::Int32(a), Self::Int32(b)) => Ok(NumericValuePair::Int32(*a, *b)),
       (Self::Float32(a), Self::Float32(b)) => Ok(NumericValuePair::Float32(*a, *b)),
-      (Self::Int32(_), _) | (Self::Float32(_), _) => Err(JangError::interpret_error(format!(
+      (Self::Int32(_), _) | (Self::Float32(_), _) => Err(InterpreterError::value_err(format!(
         "type mismatch: {:?} != {:?}",
         self.debug_type_name(),
         other.debug_type_name()
       ))),
-      (Self::JitCompiledFunctionRef(_), _) => Err(JangError::interpret_error(format!(
+      (Self::JitCompiledFunctionRef(_), _) => Err(InterpreterError::value_err(format!(
         "non-numeric value: {}",
         self.debug_type_name()
       ))),
     }
   }
 
-  pub fn multiply(&self, other: &Self) -> JangResult<Self> {
+  pub fn multiply(&self, other: &Self) -> InterpreterResult<Self> {
     match self
       .to_numeric_pair(other)
-      .map_err(|e| e.prefix_msg("multiply: "))?
+      .map_err(|e| e.prefix("multiply: "))?
     {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a * b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a * b)),
     }
   }
 
-  pub fn add(&self, other: &Self) -> JangResult<Self> {
-    match self
-      .to_numeric_pair(other)
-      .map_err(|e| e.prefix_msg("add: "))?
-    {
+  pub fn add(&self, other: &Self) -> InterpreterResult<Self> {
+    match self.to_numeric_pair(other).map_err(|e| e.prefix("add: "))? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a + b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a + b)),
     }
   }
 
-  pub fn subtract(&self, other: &Self) -> JangResult<Self> {
+  pub fn subtract(&self, other: &Self) -> InterpreterResult<Self> {
     match self
       .to_numeric_pair(other)
-      .map_err(|e| e.prefix_msg("subtract: "))?
+      .map_err(|e| e.prefix("subtract: "))?
     {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a - b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a - b)),
     }
   }
 
-  pub fn divide(&self, divisor: &Self) -> JangResult<Self> {
+  pub fn divide(&self, divisor: &Self) -> InterpreterResult<Self> {
     match self
       .to_numeric_pair(divisor)
-      .map_err(|e| e.prefix_msg("divide: "))?
+      .map_err(|e| e.prefix("divide: "))?
     {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a.checked_div(b).ok_or_else(|| {
-        JangError::interpret_error(format!("division by zero: {:?} / {:?}", self, divisor))
+        InterpreterError::value_err(format!("division by zero: {:?} / {:?}", self, divisor))
       })?)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a.div(b))),
     }
   }
 
-  pub fn modulo(&self, divisor: &Self) -> JangResult<Self> {
+  pub fn modulo(&self, divisor: &Self) -> InterpreterResult<Self> {
     match self
       .to_numeric_pair(divisor)
-      .map_err(|e| e.prefix_msg("modulo: "))?
+      .map_err(|e| e.prefix("modulo: "))?
     {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a.checked_rem(b).ok_or_else(|| {
-        JangError::interpret_error(format!("modulo by zero: {:?} / {:?}", self, divisor))
+        InterpreterError::value_err(format!("modulo by zero: {:?} / {:?}", self, divisor))
       })?)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a.rem(b))),
     }
   }
 
-  pub fn is_truthy(&self) -> JangResult<bool> {
+  pub fn is_truthy(&self) -> InterpreterResult<bool> {
     match self {
       Value::Int32(v) => Ok(*v != 0),
       Value::Float32(v) => Ok(*v != 0.),
-      v => Err(JangError::interpret_error(format!(
+      value => Err(InterpreterError::value_err(format!(
         "unexpected value in truthy check: {:?}",
-        v
+        value
       ))),
     }
   }
 
-  pub fn as_jit_function(&self) -> JangResult<&'a JitCompiledFunction<'a>> {
+  pub fn as_jit_function(&self) -> InterpreterResult<&'a JitCompiledFunction<'a>> {
     match self {
       Value::JitCompiledFunctionRef(jit_compiled_function) => Ok(*jit_compiled_function),
-      value => Err(JangError::interpret_error(format!(
+      value => Err(InterpreterError::value_err(format!(
         "expected value to be a JIT-compiled function: {:?}",
         value
       ))),

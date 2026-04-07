@@ -1,9 +1,9 @@
 use std::{fmt::Debug, str::FromStr};
 
-use crate::error::{JangError, JangResult};
+use crate::interpreter::error::{InterpreterError, InterpreterResult};
 
 pub trait ParseAs<T> {
-  fn parse_as(self) -> JangResult<T>;
+  fn parse_as(self) -> InterpreterResult<T>;
 }
 
 impl<T, E> ParseAs<T> for &str
@@ -11,9 +11,9 @@ where
   E: Debug,
   T: FromStr<Err = E>,
 {
-  fn parse_as(self) -> JangResult<T> {
+  fn parse_as(self) -> InterpreterResult<T> {
     self
       .parse()
-      .map_err(|err: <T as FromStr>::Err| JangError::interpret_error(format!("{:?}", err)))
+      .map_err(|err: <T as FromStr>::Err| InterpreterError::value_err(format!("{:?}", err)))
   }
 }

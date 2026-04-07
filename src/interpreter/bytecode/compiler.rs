@@ -1,13 +1,15 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-  error::{JangError, JangResult},
-  interpreter::bytecode::{
-    instruction::{
-      BlockId, ConditionalJumpTargets, JitCallInstructionBuilder, JitCompiledFunction,
-      JitInstruction, JitInstructionBlock, JitTerminalInstruction,
+  interpreter::{
+    bytecode::{
+      instruction::{
+        BlockId, ConditionalJumpTargets, JitCallInstructionBuilder, JitCompiledFunction,
+        JitInstruction, JitInstructionBlock, JitTerminalInstruction,
+      },
+      local_table::LocalId,
     },
-    local_table::LocalId,
+    error::{InterpreterError, InterpreterResult},
   },
   parser::{
     ast::{
@@ -129,30 +131,31 @@ impl<'a> JitFunctionBuilder<'a> {
     id
   }
 
-  fn finish_block(mut self, finished: TerminatedBlock<'a>) -> JangResult<Self> {
+  fn finish_block(mut self, finished: TerminatedBlock<'a>) -> InterpreterResult<Self> {
     let slot = self
       .blocks
       .get_mut(finished.id.as_index())
-      .ok_or_else(|| JangError::interpret_error("internal jit failure: could not find block"))?;
+      .ok_or_else(|| InterpreterError::jit_err("internal jit failure: could not find block"))?;
     if slot.is_some() {
-      return Err(JangError::interpret_error(
-        "internal jit failure: block terminated more than once",
-      ));
+      return Err(
+        InterpreterError::jit_err("internal jit failure: block terminated more than once").into(),
+      );
     }
     *slot = Some(finished.block);
     Ok(self)
   }
 
-  fn into_blocks(self) -> JangResult<Vec<JitInstructionBlock<'a>>> {
+  fn into_blocks(self) -> InterpreterResult<Vec<JitInstructionBlock<'a>>> {
     self
       .blocks
       .into_iter()
       .enumerate()
       .map(|(index, block)| {
         block.ok_or_else(|| {
-          JangError::interpret_error(format!(
+          InterpreterError::jit_err(format!(
             "internal jit failure: block {index} was never terminated"
           ))
+          .into()
         })
       })
       .collect()
@@ -218,7 +221,7 @@ impl<'a> OpenCursor<'a> {
     }
   }
 
-  fn terminate(self, terminal: JitTerminalInstruction) -> JangResult<ClosedCursor<'a>> {
+  fn terminate(self, terminal: JitTerminalInstruction) -> InterpreterResult<ClosedCursor<'a>> {
     Ok(ClosedCursor {
       fn_builder: self
         .fn_builder
@@ -245,7 +248,7 @@ impl<'a> OpenCursor<'a> {
     self.emit_instr(JitInstruction::LoadLiteral(literal))
   }
 
-  fn compile_statement(self, statement: &'a Statement) -> JangResult<Cursor<'a>> {
+  fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a>> {
     match statement {
       Statement::Let(let_statement) => Ok(
         self
@@ -264,12 +267,14 @@ impl<'a> OpenCursor<'a> {
       }
       Statement::IfStatement(if_statement) => Ok(self.compile_if_statement(if_statement)?.into()),
       Statement::Block(block) => self.compile_lexical_block(block),
-      Statement::LoopStatement(_) => Err(JangError::interpret_error("not yet implemented: loop")),
-      Statement::Break => Err(JangError::interpret_error("not yet implemented: break")),
+      Statement::LoopStatement(_) => {
+        Err(InterpreterError::unimplemented("not yet implemented: loop").into())
+      }
+      Statement::Break => Err(InterpreterError::unimplemented("not yet implemented: break").into()),
     }
   }
 
-  fn compile_lexical_block(self, block: &'a Block) -> JangResult<Cursor<'a>> {
+  fn compile_lexical_block(self, block: &'a Block) -> InterpreterResult<Cursor<'a>> {
     let outer_scope = self.lexical_scope.clone();
     let inner_scope = self.lexical_scope.push_block();
     Ok(
@@ -284,7 +289,10 @@ impl<'a> OpenCursor<'a> {
     )
   }
 
-  fn compile_if_statement(mut self, if_statement: &'a IfStatement) -> JangResult<OpenCursor<'a>> {
+  fn compile_if_statement(
+    mut self,
+    if_statement: &'a IfStatement,
+  ) -> InterpreterResult<OpenCursor<'a>> {
     let if_block_id = self.allocate_block();
     let else_block_id = self.allocate_block();
     let join_block_id = self.allocate_block();
@@ -308,19 +316,19 @@ impl<'a> OpenCursor<'a> {
     )
   }
 
-  fn compile_expr(self, expr: &'a Expression) -> JangResult<Self> {
+  fn compile_expr(self, expr: &'a Expression) -> InterpreterResult<Self> {
     match expr {
       Expression::Literal(literal) => Ok(self.emit_literal_load(literal)),
       Expression::Ident(ident) => Ok(self.emit_local_load(ident)),
       Expression::BinaryExpression(expr) => self.compile_binary_expression(expr),
       Expression::CallExpression(expr) => self.compile_call_expression(expr),
-      Expression::DotExpression(_) => Err(JangError::interpret_error(
-        "dot expression not yet supported",
-      )),
+      Expression::DotExpression(_) => {
+        Err(InterpreterError::unimplemented("dot expression not yet supported").into())
+      }
     }
   }
 
-  fn compile_else_block(self, else_clause: &'a ElseClause) -> JangResult<Cursor<'a>> {
+  fn compile_else_block(self, else_clause: &'a ElseClause) -> InterpreterResult<Cursor<'a>> {
     match else_clause {
       ElseClause::None => Ok(self.into()),
       ElseClause::Else(block) => self.compile_lexical_block(block),
@@ -328,7 +336,7 @@ impl<'a> OpenCursor<'a> {
     }
   }
 
-  fn compile_binary_expression(self, expr: &'a BinaryExpression) -> JangResult<Self> {
+  fn compile_binary_expression(self, expr: &'a BinaryExpression) -> InterpreterResult<Self> {
     Ok(
       self
         .compile_expr(expr.rhs())?
@@ -337,7 +345,7 @@ impl<'a> OpenCursor<'a> {
     )
   }
 
-  fn compile_call_expression(self, call_expression: &'a CallExpression) -> JangResult<Self> {
+  fn compile_call_expression(self, call_expression: &'a CallExpression) -> InterpreterResult<Self> {
     Ok(
       call_expression
         .argument_list()
@@ -380,24 +388,27 @@ impl<'a> Cursor<'a> {
     }
   }
 
-  fn finish_with_fallthrough_to(self, block_id: BlockId) -> JangResult<ClosedCursor<'a>> {
+  fn finish_with_fallthrough_to(self, block_id: BlockId) -> InterpreterResult<ClosedCursor<'a>> {
     match self {
       Cursor::Open(cursor) => cursor.terminate(JitTerminalInstruction::Jump(block_id)),
       Cursor::Closed(cursor) => Ok(cursor),
     }
   }
 
-  fn compile_statement(self, statement: &'a Statement) -> JangResult<Cursor<'a>> {
+  fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a>> {
     match self {
       Cursor::Open(cur) => cur.compile_statement(statement),
-      Cursor::Closed(_) => Err(JangError::interpret_error(format!(
-        "jit compilation failed: unreachable statement: {:?}",
-        statement
-      ))),
+      Cursor::Closed(_) => Err(
+        InterpreterError::jit_err(format!(
+          "jit compilation failed: unreachable statement: {:?}",
+          statement
+        ))
+        .into(),
+      ),
     }
   }
 
-  fn compile_fn_decl(fn_decl: &'a FunctionDecl) -> JangResult<JitCompiledFunction<'a>> {
+  fn compile_fn_decl(fn_decl: &'a FunctionDecl) -> InterpreterResult<JitCompiledFunction<'a>> {
     let cur = fn_decl
       .parameters()
       .iter()
@@ -420,6 +431,8 @@ impl<'a> Cursor<'a> {
   }
 }
 
-pub fn compile_to_bytecode<'a>(fn_decl: &'a FunctionDecl) -> JangResult<JitCompiledFunction<'a>> {
+pub fn compile_to_bytecode<'a>(
+  fn_decl: &'a FunctionDecl,
+) -> InterpreterResult<JitCompiledFunction<'a>> {
   Cursor::compile_fn_decl(fn_decl)
 }
