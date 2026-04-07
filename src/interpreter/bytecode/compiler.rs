@@ -439,8 +439,8 @@ mod tests {
       .ok_or_else(|| InterpreterError::generic_err("no function decls in AST").into())
   }
 
-  #[test]
-  fn empty_function() -> googletest::Result<()> {
+  #[gtest]
+  fn empty_function() {
     let decl = parse_fn_decl(
       r#"
               fn f() { }
@@ -449,7 +449,7 @@ mod tests {
     )
     .unwrap();
 
-    verify_that!(
+    expect_that!(
       compile_to_bytecode(&decl),
       ok(entry_block(
         instruction_block(is_empty(), ret_terminator(),)
@@ -457,8 +457,8 @@ mod tests {
     )
   }
 
-  #[test]
-  fn binary_operators() -> googletest::Result<()> {
+  #[gtest]
+  fn binary_operators() {
     let decl = parse_fn_decl(
       r#"
               fn f() -> i32 {
@@ -469,7 +469,7 @@ mod tests {
     )
     .unwrap();
 
-    verify_that!(
+    expect_that!(
       compile_to_bytecode(&decl),
       ok(entry_block(instruction_block(
         elements_are![
@@ -484,8 +484,8 @@ mod tests {
     )
   }
 
-  #[test]
-  fn if_statement() -> googletest::Result<()> {
+  #[gtest]
+  fn if_statement() {
     let decl = parse_fn_decl(
       r#"
               fn f() -> i32 {
@@ -505,7 +505,7 @@ mod tests {
     let else_block_id = block_id(2);
     let join_block_id = block_id(3);
 
-    verify_that!(
+    expect_that!(
       compile_to_bytecode(&decl),
       ok(all![
         has_instruction_block(
@@ -537,8 +537,8 @@ mod tests {
     )
   }
 
-  #[test]
-  fn lexical_scoping() -> googletest::Result<()> {
+  #[gtest]
+  fn lexical_scoping() {
     let decl = parse_fn_decl(
       r#"
               fn f() -> i32 {
@@ -556,7 +556,7 @@ mod tests {
     )
     .unwrap();
 
-    verify_that!(
+    expect_that!(
       compile_to_bytecode(&decl),
       ok(entry_block(instruction_block(
         elements_are![
@@ -573,8 +573,8 @@ mod tests {
     )
   }
 
-  #[test]
-  fn function_call_no_args() -> googletest::Result<()> {
+  #[gtest]
+  fn function_call_no_args() {
     let decl = parse_fn_decl(
       r#"
               fn f() {
@@ -585,7 +585,7 @@ mod tests {
     )
     .unwrap();
 
-    verify_that!(
+    expect_that!(
       compile_to_bytecode(&decl),
       ok(entry_block(instruction_block(
         elements_are![
@@ -597,8 +597,8 @@ mod tests {
     )
   }
 
-  #[test]
-  fn store_and_load_local() -> googletest::Result<()> {
+  #[gtest]
+  fn store_and_load_local() {
     let decl = parse_fn_decl(
       r#"
               fn f() -> i32 {
@@ -610,7 +610,7 @@ mod tests {
     )
     .unwrap();
 
-    verify_that!(
+    expect_that!(
       compile_to_bytecode(&decl),
       ok(entry_block(instruction_block(
         elements_are![
@@ -625,8 +625,8 @@ mod tests {
     )
   }
 
-  #[test]
-  fn function_call_multiple_args() -> googletest::Result<()> {
+  #[gtest]
+  fn call_with_multiple_args() {
     let decl = parse_fn_decl(
       r#"
               fn f() {
@@ -637,7 +637,7 @@ mod tests {
     )
     .unwrap();
 
-    verify_that!(
+    expect_that!(
       compile_to_bytecode(&decl),
       ok(entry_block(instruction_block(
         elements_are![
@@ -652,8 +652,38 @@ mod tests {
     )
   }
 
-  #[test]
-  fn function_with_args() -> googletest::Result<()> {
+  #[gtest]
+  fn call_argument_eval_order() {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() {
+                func(1 + 2, 3 + 4)
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_literal_instruction(integral("1")),
+          load_literal_instruction(integral("2")),
+          binary_op_instruction(pat!(BinaryOp::Add)),
+          load_literal_instruction(integral("3")),
+          load_literal_instruction(integral("4")),
+          binary_op_instruction(pat!(BinaryOp::Add)),
+          load_global_instruction(ident("func")),
+          call_instruction(call_with_arity(eq(&2)))
+        ],
+        ret_terminator()
+      )))
+    )
+  }
+
+  #[gtest]
+  fn fn_decl_with_parameters() {
     let decl = parse_fn_decl(
       r#"
               fn f(a: i32, b: i32, c: i32) {
@@ -664,7 +694,7 @@ mod tests {
     )
     .unwrap();
 
-    verify_that!(
+    expect_that!(
       compile_to_bytecode(&decl),
       ok(entry_block(instruction_block(
         elements_are![
@@ -679,6 +709,34 @@ mod tests {
           load_local_instruction(eq(&local_id(0))),
           binary_op_instruction(pat!(BinaryOp::Add)),
           binary_op_instruction(pat!(BinaryOp::Add)),
+        ],
+        ret_with_value_terminator()
+      )))
+    )
+  }
+
+  #[gtest]
+  fn values_as_functions() {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() {
+                let x = global_fn
+                ret x(1)
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_global_instruction(ident("global_fn")),
+          store_local_instruction(eq(&local_id(0))),
+          load_literal_instruction(integral("1")),
+          load_local_instruction(eq(&local_id(0))),
+          call_instruction(call_with_arity(eq(&1))),
         ],
         ret_with_value_terminator()
       )))
