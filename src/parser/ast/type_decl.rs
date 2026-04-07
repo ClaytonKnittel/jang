@@ -29,8 +29,7 @@ pub struct TypeDecl {
 }
 
 impl TypeDecl {
-  pub fn new(name: Ident, decl: impl Into<TypeDeclVariant>) -> Self {
-    let decl = decl.into();
+  pub fn new(name: Ident, decl: TypeDeclVariant) -> Self {
     Self { name, decl }
   }
 }

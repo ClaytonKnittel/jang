@@ -6,6 +6,7 @@ use crate::parser::{
     block::{Block, BlockBuilder},
     call_expression::CallExpression,
     dot_expression::DotExpression,
+    enum_type_decl::{EnumTypeDecl, EnumTypeDeclBuilder, EnumVariant, EnumVariantType},
     expression::Expression,
     expression_list::{ExpressionList, ExpressionListBuilder},
     function_decl::{
@@ -18,7 +19,7 @@ use crate::parser::{
     ret_statement::RetStatement,
     statement::Statement,
     structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
-    type_decl::TypeDecl,
+    type_decl::{TypeDecl, TypeDeclVariant},
     type_expr::TypeExpression,
   },
   token::{
@@ -47,14 +48,19 @@ pub_grammar!(
   };
 
   <type_decl>: TypeDecl =>
-    Keyword(Keyword::Type) <ident> <eq> <open_bracket>
-      <structured_type_decl>
-    <close_bracket>
+    Keyword(Keyword::Type) <ident> <eq> <type_decl_variant>
   {
-    TypeDecl::new(#ident, #structured_type_decl)
+    TypeDecl::new(#ident, #type_decl_variant)
   };
 
-  <structured_type_decl>: StructuredTypeDecl => <structured_type_decl_builder>;
+  <type_decl_variant>: TypeDeclVariant => <structured_type_decl>;
+  <type_decl_variant>: TypeDeclVariant => <enum_type_decl>;
+
+  <structured_type_decl>: StructuredTypeDecl =>
+    <open_bracket> <structured_type_decl_builder> <close_bracket>
+  {
+    #structured_type_decl_builder.build().unwrap()
+  };
 
   <structured_type_decl_builder>: StructuredTypeDeclBuilder => ! {
     StructuredTypeDeclBuilder::default()
@@ -68,6 +74,23 @@ pub_grammar!(
 
   <structured_type_field>: StructuredTypeField => <ident> <colon> <type_expr> {
     StructuredTypeField::new(#ident, #type_expr)
+  };
+
+  <enum_type_decl>: EnumTypeDecl => <enum_type_decl_builder>;
+
+  <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_variant> {
+    EnumTypeDeclBuilder::default().add_variants(#enum_type_decl_variant)
+  };
+
+  <enum_type_decl_variant>: EnumVariant => <bar> <ident> <enum_variant_type> {
+    EnumVariant::new(#ident, #enum_variant_type)
+  };
+
+  <enum_variant_type>: EnumVariantType => <ident> {
+    EnumVariantType::TypeRef(#ident)
+  };
+  <enum_variant_type>: EnumVariantType => <structured_type_decl> {
+    EnumVariantType::Structured(#structured_type_decl)
   };
 
   <function_decl>: FunctionDecl =>
@@ -221,6 +244,7 @@ pub_grammar!(
   <colon> => Operator(Operator { op: Op::Colon });
   <comma> => Operator(Operator { op: Op::Comma });
   <dot> => Operator(Operator { op: Op::Dot });
+  <bar> => Operator(Operator { op: Op::Bar });
   <right_arrow> =>
       Operator(Operator { op: Op::Dash })
       Joint

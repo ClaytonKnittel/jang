@@ -25,6 +25,12 @@ pub struct EnumVariant {
   ty: EnumVariantType,
 }
 
+impl EnumVariant {
+  pub fn new(name: Ident, ty: EnumVariantType) -> Self {
+    Self { name, ty }
+  }
+}
+
 impl Display for EnumVariant {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "| {}: {}", self.name, self.ty)
