@@ -401,7 +401,6 @@ impl<'a> Cursor<'a> {
     Ok(JitCompiledFunction::new(
       cur.fn_builder.entrypoint,
       cur.fn_builder.into_blocks()?,
-      fn_decl,
     ))
   }
 }

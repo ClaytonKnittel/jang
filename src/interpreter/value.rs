@@ -3,8 +3,6 @@ use std::{
   ops::{Div, Rem},
 };
 
-use itertools::Itertools;
-
 use crate::{
   interpreter::{
     bytecode::instruction::JitCompiledFunction,
@@ -48,19 +46,7 @@ impl<'a> Value<'a> {
     match self {
       Self::Int32(_) => "i32".into(),
       Self::Float32(_) => "f32".into(),
-      Self::JitCompiledFunctionRef(f) => {
-        format!(
-          "fn({}){}",
-          f.decl()
-            .parameters()
-            .iter()
-            .map(|p| format!("{}", p.ty()))
-            .join(", "),
-          f.decl()
-            .return_type()
-            .map_or_else(|| "".into(), |t| format!("->{}", t))
-        )
-      }
+      Self::JitCompiledFunctionRef(_) => "<compiled-bytecode>".into(),
     }
   }
 

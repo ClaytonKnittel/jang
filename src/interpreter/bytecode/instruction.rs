@@ -6,7 +6,7 @@ use crate::{
     local_table::LocalId,
   },
   parser::{
-    ast::{binary_expression::BinaryOp, function_decl::FunctionDecl},
+    ast::binary_expression::BinaryOp,
     token::{ident::Ident, literal::Literal},
   },
 };
@@ -115,20 +115,11 @@ impl<'a> JitInstructionBlock<'a> {
 pub struct JitCompiledFunction<'a> {
   entrypoint: BlockId,
   blocks: BlockList<JitInstructionBlock<'a>>,
-  fn_decl: &'a FunctionDecl,
 }
 
 impl<'a> JitCompiledFunction<'a> {
-  pub fn new(
-    entrypoint: BlockId,
-    blocks: BlockList<JitInstructionBlock<'a>>,
-    fn_decl: &'a FunctionDecl,
-  ) -> Self {
-    Self {
-      entrypoint,
-      blocks,
-      fn_decl,
-    }
+  pub fn new(entrypoint: BlockId, blocks: BlockList<JitInstructionBlock<'a>>) -> Self {
+    Self { entrypoint, blocks }
   }
 
   pub fn entrypoint(&self) -> BlockId {
@@ -137,10 +128,6 @@ impl<'a> JitCompiledFunction<'a> {
 
   pub fn block(&self, block_id: BlockId) -> &JitInstructionBlock<'a> {
     self.blocks.block(block_id)
-  }
-
-  pub fn decl(&self) -> &'a FunctionDecl {
-    self.fn_decl
   }
 }
 
