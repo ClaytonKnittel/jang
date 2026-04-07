@@ -13,8 +13,12 @@ use crate::{
 
 #[derive(Debug)]
 pub enum JitInstruction<'a> {
-  // Binary operator. Pops lhs off the stack, pops rhs off the stack,
+  // Binary operator. Pops rhs off the stack, pops lhs off the stack,
   // combines the two, and pushes the result on the stack.
+  //
+  // For example, for 1 + 2, the stack would look like:
+  //   top -> 2
+  //          1
   BinaryOp(BinaryOp),
 
   // Push a literal value onto the stack.
@@ -30,7 +34,13 @@ pub enum JitInstruction<'a> {
   StoreLocal(LocalId),
 
   // Pops a function value off the stack,
-  // and jumps to instructions for the desired function.
+  // pops `arity` arguments off the stack (in reverse order),
+  // and calls the desired function.
+  //
+  // For example, for f(1, 2), the stack would look like:
+  //   top -> f
+  //          2
+  //          1
   Call(JitCallInstruction),
 }
 
@@ -135,4 +145,144 @@ impl<'a> JitCompiledFunction<'a> {
 }
 
 #[cfg(test)]
-pub mod matchers {}
+pub mod matchers {
+  use super::{
+    ConditionalJumpTargets, JitCallInstruction, JitCompiledFunction, JitInstruction,
+    JitInstructionBlock, JitTerminalInstruction,
+  };
+  use crate::{
+    interpreter::bytecode::{instruction_block_list::BlockId, local_table::LocalId},
+    parser::{
+      ast::binary_expression::BinaryOp,
+      token::{ident::Ident, literal::Literal},
+    },
+  };
+  use googletest::prelude::*;
+
+  pub fn binary_op_instruction<'a>(
+    op_matcher: impl Matcher<&'a BinaryOp>,
+  ) -> impl Matcher<&'a JitInstruction<'a>> {
+    pat!(JitInstruction::BinaryOp(op_matcher))
+  }
+
+  pub fn load_literal_instruction<'a>(
+    literal_matcher: impl Matcher<&'a Literal>,
+  ) -> impl Matcher<&'a JitInstruction<'a>> {
+    pat!(JitInstruction::LoadLiteral(result_of!(
+      |lit: &&'a Literal| *lit,
+      literal_matcher
+    )))
+  }
+
+  pub fn load_global_instruction<'a>(
+    ident_matcher: impl Matcher<&'a Ident>,
+  ) -> impl Matcher<&'a JitInstruction<'a>> {
+    pat!(JitInstruction::LoadGlobal(result_of!(
+      |ident: &&'a Ident| *ident,
+      ident_matcher
+    )))
+  }
+
+  pub fn load_local_instruction<'a>(
+    local_id_matcher: impl Matcher<&'a LocalId>,
+  ) -> impl Matcher<&'a JitInstruction<'a>> {
+    pat!(JitInstruction::LoadLocal(local_id_matcher))
+  }
+
+  pub fn store_local_instruction<'a>(
+    local_id_matcher: impl Matcher<&'a LocalId>,
+  ) -> impl Matcher<&'a JitInstruction<'a>> {
+    pat!(JitInstruction::StoreLocal(local_id_matcher))
+  }
+
+  pub fn call_instruction<'a>(
+    call_matcher: impl Matcher<&'a JitCallInstruction>,
+  ) -> impl Matcher<&'a JitInstruction<'a>> {
+    pat!(JitInstruction::Call(call_matcher))
+  }
+
+  pub fn call_with_arity<'a>(
+    arity_matcher: impl Matcher<&'a u32>,
+  ) -> impl Matcher<&'a JitCallInstruction> {
+    pat!(JitCallInstruction {
+      arity: arity_matcher
+    })
+  }
+
+  pub fn conditional_jump_targets<'a>(
+    true_target_matcher: impl Matcher<&'a BlockId>,
+    false_target_matcher: impl Matcher<&'a BlockId>,
+  ) -> impl Matcher<&'a ConditionalJumpTargets> {
+    pat!(ConditionalJumpTargets {
+      true_target: true_target_matcher,
+      false_target: false_target_matcher,
+    })
+  }
+
+  pub fn if_branch_target<'a>(
+    matcher: impl Matcher<&'a BlockId>,
+  ) -> impl Matcher<&'a ConditionalJumpTargets> {
+    pat!(ConditionalJumpTargets {
+      true_target: matcher,
+      ..
+    })
+  }
+
+  pub fn else_branch_target<'a>(
+    matcher: impl Matcher<&'a BlockId>,
+  ) -> impl Matcher<&'a ConditionalJumpTargets> {
+    pat!(ConditionalJumpTargets {
+      false_target: matcher,
+      ..
+    })
+  }
+
+  pub fn jump_terminator<'a>(
+    target_matcher: impl Matcher<&'a BlockId>,
+  ) -> impl Matcher<&'a JitTerminalInstruction> {
+    pat!(JitTerminalInstruction::Jump(target_matcher))
+  }
+
+  pub fn conditional_jump_terminator<'a>(
+    targets_matcher: impl Matcher<&'a ConditionalJumpTargets>,
+  ) -> impl Matcher<&'a JitTerminalInstruction> {
+    pat!(JitTerminalInstruction::ConditionalJump(targets_matcher))
+  }
+
+  pub fn ret_terminator<'a>() -> impl Matcher<&'a JitTerminalInstruction> {
+    pat!(JitTerminalInstruction::Ret)
+  }
+
+  pub fn ret_with_value_terminator<'a>() -> impl Matcher<&'a JitTerminalInstruction> {
+    pat!(JitTerminalInstruction::RetWithValue)
+  }
+
+  pub fn instruction_block<'a>(
+    instructions_matcher: impl Matcher<&'a Vec<JitInstruction<'a>>>,
+    terminator_matcher: impl Matcher<&'a JitTerminalInstruction>,
+  ) -> impl Matcher<&'a JitInstructionBlock<'a>> {
+    pat!(JitInstructionBlock {
+      instructions: instructions_matcher,
+      terminator: terminator_matcher,
+    })
+  }
+
+  pub fn has_instruction_block<'a>(
+    block_id: BlockId,
+    block_matcher: impl Matcher<&'a JitInstructionBlock<'a>>,
+  ) -> impl Matcher<&'a JitCompiledFunction<'a>> {
+    result_of!(
+      move |f: &'a JitCompiledFunction<'a>| f.blocks.block(block_id),
+      block_matcher
+    )
+  }
+
+  pub fn entry_block<'a>(
+    block_matcher: impl Matcher<&'a JitInstructionBlock<'a>>,
+  ) -> impl Matcher<&'a JitCompiledFunction<'a>> {
+    all!(result_of!(
+      |f: &'a JitCompiledFunction<'a>| f.blocks.block(f.entrypoint),
+      block_matcher
+    ))
+  }
+}

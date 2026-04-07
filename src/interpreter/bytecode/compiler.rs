@@ -317,8 +317,8 @@ impl<'a> OpenCursor<'a> {
   fn compile_binary_expression(self, expr: &'a BinaryExpression) -> InterpreterResult<Self> {
     Ok(
       self
-        .compile_expr(expr.rhs())?
         .compile_expr(expr.lhs())?
+        .compile_expr(expr.rhs())?
         .emit_instr(JitInstruction::BinaryOp(expr.op())),
     )
   }
@@ -328,7 +328,6 @@ impl<'a> OpenCursor<'a> {
       call_expression
         .argument_list()
         .iter()
-        .rev()
         .try_fold(self, |cursor, expr| cursor.compile_expr(expr))?
         .compile_expr(call_expression.target())?
         .emit_instr(JitInstruction::Call(
@@ -387,6 +386,7 @@ impl<'a> Cursor<'a> {
     let cur = fn_decl
       .parameters()
       .iter()
+      .rev()
       .fold(OpenCursor::new(), |cursor, param| {
         cursor.bind_local(param.name())
       })
@@ -410,4 +410,278 @@ pub fn compile_to_bytecode<'a>(
   fn_decl: &'a FunctionDecl,
 ) -> InterpreterResult<JitCompiledFunction<'a>> {
   Cursor::compile_fn_decl(fn_decl)
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::{
+    error::JangResult,
+    interpreter::{
+      bytecode::{
+        compiler::compile_to_bytecode, instruction::matchers::*,
+        instruction_block_list::testing::block_id, local_table::testing::local_id,
+      },
+      error::InterpreterError,
+    },
+    parser::{
+      ast::{binary_expression::BinaryOp, function_decl::FunctionDecl},
+      grammar::testing::lex_and_parse_jang_file,
+      token::{ident::matchers::ident, literal::matchers::integral},
+    },
+  };
+  use googletest::prelude::*;
+
+  fn parse_fn_decl(text: impl IntoIterator<Item = char>) -> JangResult<FunctionDecl> {
+    lex_and_parse_jang_file(text)?
+      .function_decls()
+      .first()
+      .cloned()
+      .ok_or_else(|| InterpreterError::generic_err("no function decls in AST").into())
+  }
+
+  #[test]
+  fn empty_function() -> googletest::Result<()> {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() { }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    verify_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(
+        instruction_block(is_empty(), ret_terminator(),)
+      ))
+    )
+  }
+
+  #[test]
+  fn binary_operators() -> googletest::Result<()> {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() -> i32 {
+                ret 2 * (3 + 4)
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    verify_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_literal_instruction(integral("2")),
+          load_literal_instruction(integral("3")),
+          load_literal_instruction(integral("4")),
+          binary_op_instruction(pat!(BinaryOp::Add)),
+          binary_op_instruction(pat!(BinaryOp::Mul)),
+        ],
+        ret_with_value_terminator()
+      )))
+    )
+  }
+
+  #[test]
+  fn if_statement() -> googletest::Result<()> {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() -> i32 {
+                if 0 {
+                  ret 1
+                } else {
+                }
+                ret 2
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    let entry_block_id = block_id(0);
+    let if_block_id = block_id(1);
+    let else_block_id = block_id(2);
+    let join_block_id = block_id(3);
+
+    verify_that!(
+      compile_to_bytecode(&decl),
+      ok(all![
+        has_instruction_block(
+          entry_block_id,
+          instruction_block(
+            elements_are![load_literal_instruction(integral("0"))],
+            conditional_jump_terminator(all![
+              if_branch_target(eq(&if_block_id)),
+              else_branch_target(eq(&else_block_id))
+            ])
+          ),
+        ),
+        has_instruction_block(
+          if_block_id,
+          instruction_block(
+            elements_are![load_literal_instruction(integral("1"))],
+            ret_with_value_terminator()
+          )
+        ),
+        has_instruction_block(
+          else_block_id,
+          instruction_block(is_empty(), jump_terminator(eq(&join_block_id)))
+        ),
+        has_instruction_block(
+          join_block_id,
+          instruction_block(anything(), ret_with_value_terminator())
+        )
+      ])
+    )
+  }
+
+  #[test]
+  fn lexical_scoping() -> googletest::Result<()> {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() -> i32 {
+                let x = 1
+                {
+                  let x = 2
+                  {
+                    let x = 3
+                  }
+                  ret x
+                }
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    verify_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_literal_instruction(integral("1")),
+          store_local_instruction(eq(&local_id(0))),
+          load_literal_instruction(integral("2")),
+          store_local_instruction(eq(&local_id(1))),
+          load_literal_instruction(integral("3")),
+          store_local_instruction(eq(&local_id(2))),
+          load_local_instruction(eq(&local_id(1))),
+        ],
+        ret_with_value_terminator()
+      )))
+    )
+  }
+
+  #[test]
+  fn function_call_no_args() -> googletest::Result<()> {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() {
+                func()
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    verify_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_global_instruction(ident("func")),
+          call_instruction(call_with_arity(eq(&0)))
+        ],
+        ret_terminator()
+      )))
+    )
+  }
+
+  #[test]
+  fn store_and_load_local() -> googletest::Result<()> {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() -> i32 {
+                let x = 1 + 2
+                ret x
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    verify_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_literal_instruction(integral("1")),
+          load_literal_instruction(integral("2")),
+          binary_op_instruction(pat!(BinaryOp::Add)),
+          store_local_instruction(eq(&local_id(0))),
+          load_local_instruction(eq(&local_id(0))),
+        ],
+        ret_with_value_terminator()
+      )))
+    )
+  }
+
+  #[test]
+  fn function_call_multiple_args() -> googletest::Result<()> {
+    let decl = parse_fn_decl(
+      r#"
+              fn f() {
+                func(1, 2, 3)
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    verify_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_literal_instruction(integral("1")),
+          load_literal_instruction(integral("2")),
+          load_literal_instruction(integral("3")),
+          load_global_instruction(ident("func")),
+          call_instruction(call_with_arity(eq(&3)))
+        ],
+        ret_terminator()
+      )))
+    )
+  }
+
+  #[test]
+  fn function_with_args() -> googletest::Result<()> {
+    let decl = parse_fn_decl(
+      r#"
+              fn f(a: i32, b: i32, c: i32) {
+                ret a + (b + c)
+              }
+             "#
+      .chars(),
+    )
+    .unwrap();
+
+    verify_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          // Load arguments.
+          store_local_instruction(eq(&local_id(0))),
+          store_local_instruction(eq(&local_id(1))),
+          store_local_instruction(eq(&local_id(2))),
+          // load a
+          load_local_instruction(eq(&local_id(2))),
+          // b + c
+          load_local_instruction(eq(&local_id(1))),
+          load_local_instruction(eq(&local_id(0))),
+          binary_op_instruction(pat!(BinaryOp::Add)),
+          binary_op_instruction(pat!(BinaryOp::Add)),
+        ],
+        ret_with_value_terminator()
+      )))
+    )
+  }
 }

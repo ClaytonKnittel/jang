@@ -55,3 +55,12 @@ impl<T> BlockListBuilder<T> {
     })
   }
 }
+
+#[cfg(test)]
+pub mod testing {
+  use crate::interpreter::bytecode::instruction_block_list::BlockId;
+
+  pub fn block_id(index: usize) -> BlockId {
+    BlockId(index)
+  }
+}

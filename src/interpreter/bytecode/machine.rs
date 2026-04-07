@@ -16,8 +16,7 @@ struct MachineStack<'a> {
 }
 
 impl<'a> MachineStack<'a> {
-  fn from_args(mut args: Vec<Value<'a>>) -> Self {
-    args.reverse();
+  fn from_args(args: Vec<Value<'a>>) -> Self {
     Self { items: args }
   }
 
@@ -51,8 +50,8 @@ pub fn evaluate_function<'a>(
     for instr in block.instructions() {
       match instr {
         JitInstruction::BinaryOp(binary_op) => {
-          let lhs = stack.pop_value()?;
           let rhs = stack.pop_value()?;
+          let lhs = stack.pop_value()?;
           stack.push_value(match binary_op {
             BinaryOp::Add => lhs.add(&rhs)?,
             BinaryOp::Sub => lhs.subtract(&rhs)?,
@@ -75,10 +74,13 @@ pub fn evaluate_function<'a>(
         }
         JitInstruction::Call(call_instr) => {
           let target_fn = stack.pop_value()?.as_jit_function()?;
+
           let mut args = Vec::new();
           for _ in 0..call_instr.arity() {
             args.push(stack.pop_value()?);
           }
+          args.reverse();
+
           let value = evaluate_function(target_fn, args, context)?;
           if let Some(value) = value {
             stack.push_value(value);
