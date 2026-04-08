@@ -8,6 +8,7 @@ use crate::parser::{ast::structured_type_decl::StructuredTypeDecl, token::ident:
 pub enum EnumVariantType {
   TypeRef(Ident),
   Structured(StructuredTypeDecl),
+  Empty,
 }
 
 impl Display for EnumVariantType {
@@ -15,6 +16,7 @@ impl Display for EnumVariantType {
     match self {
       Self::TypeRef(name) => write!(f, "{name}"),
       Self::Structured(structured) => write!(f, "{structured}"),
+      Self::Empty => Ok(()),
     }
   }
 }
@@ -83,7 +85,14 @@ pub(crate) mod matchers {
     )))
   }
 
-  pub fn enum_variant<'a>(
+  pub fn enum_variant<'a>(name: impl Matcher<&'a Ident>) -> impl Matcher<&'a EnumVariant> {
+    pat!(EnumVariant {
+      name: name,
+      ty: pat!(EnumVariantType::Empty)
+    })
+  }
+
+  pub fn enum_variant_with<'a>(
     name: impl Matcher<&'a Ident>,
     type_matcher: impl Matcher<&'a EnumVariantType>,
   ) -> impl Matcher<&'a EnumVariant> {

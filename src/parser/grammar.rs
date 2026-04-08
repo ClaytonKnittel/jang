@@ -93,6 +93,9 @@ pub_grammar!(
     EnumVariant::new(#ident, #enum_variant_type)
   };
 
+  <enum_variant_type>: EnumVariantType => ! {
+    EnumVariantType::Empty
+  };
   <enum_variant_type>: EnumVariantType => <ident> {
     EnumVariantType::TypeRef(#ident)
   };
@@ -276,7 +279,9 @@ mod tests {
           call_expr_args, call_expr_target, call_expression, call_statement,
         },
         dot_expression::matchers::{dot_expr_base, dot_expr_member},
-        enum_type_decl::matchers::{enum_ref_type, enum_structured_type, enum_variant},
+        enum_type_decl::matchers::{
+          enum_ref_type, enum_structured_type, enum_variant, enum_variant_with,
+        },
         expression::{
           Expression,
           matchers::{ident_expression as id_exp, literal_expression as lit_exp},
@@ -443,6 +448,26 @@ mod tests {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         type E =
+          | V1
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(enum_type(
+        ident("E"),
+        elements_are![enum_variant(ident("V1"))]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn enum_decl_single_variant_with_data() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        type E =
           | V1 i32
         "#
       .chars(),
@@ -453,7 +478,7 @@ mod tests {
       ast,
       jang_file_with_type(enum_type(
         ident("E"),
-        elements_are![enum_variant(ident("V1"), enum_ref_type(ident("i32")))]
+        elements_are![enum_variant_with(ident("V1"), enum_ref_type(ident("i32")))]
       ))
     );
   }
@@ -473,7 +498,7 @@ mod tests {
       ast,
       jang_file_with_type(enum_type(
         ident("E"),
-        elements_are![enum_variant(
+        elements_are![enum_variant_with(
           ident("V1"),
           enum_structured_type(elements_are![type_field(
             ident("field1"),
@@ -489,7 +514,7 @@ mod tests {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
         type E =
-          | V1 i32
+          | V1
           | V2 {
               f1: i64
               f2: String
@@ -505,15 +530,15 @@ mod tests {
       jang_file_with_type(enum_type(
         ident("E"),
         elements_are![
-          enum_variant(ident("V1"), enum_ref_type(ident("i32"))),
-          enum_variant(
+          enum_variant(ident("V1")),
+          enum_variant_with(
             ident("V2"),
             enum_structured_type(elements_are![
               type_field(ident("f1"), type_expr_name(ident("i64"))),
               type_field(ident("f2"), type_expr_name(ident("String"))),
             ])
           ),
-          enum_variant(ident("V3"), enum_ref_type(ident("String"))),
+          enum_variant_with(ident("V3"), enum_ref_type(ident("String"))),
         ]
       ))
     );
