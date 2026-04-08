@@ -32,6 +32,8 @@ pub enum Op {
   Slash,
   /// '%'
   Percent,
+  /// '|'
+  Bar,
   /// '!'
   Bang,
 }
@@ -54,6 +56,7 @@ impl Op {
       '*' => Some(Self::Star),
       '/' => Some(Self::Slash),
       '%' => Some(Self::Percent),
+      '|' => Some(Self::Bar),
       '!' => Some(Self::Bang),
       _ => None,
     }
@@ -76,6 +79,7 @@ impl Op {
       Self::Star => '*',
       Self::Slash => '/',
       Self::Percent => '%',
+      Self::Bar => '|',
       Self::Bang => '!',
     }
   }
@@ -100,7 +104,8 @@ impl Op {
       | Self::Plus
       | Self::Star
       | Self::Slash
-      | Self::Percent => false,
+      | Self::Percent
+      | Self::Bar => false,
     }
   }
 }

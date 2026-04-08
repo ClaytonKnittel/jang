@@ -113,7 +113,7 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
       }
       Some(
         first_char @ ('=' | ',' | '(' | ')' | '{' | '}' | '-' | '<' | '>' | ':' | '+' | '*' | '/'
-        | '%' | '!'),
+        | '%' | '|' | '!'),
       ) => Ok(Some(self.parse_operator(first_char))),
       Some(ch) => Err(JangError::parse_error(
         format!("Unexpected symbol '{ch}'"),
@@ -376,7 +376,7 @@ mod tests {
 
   #[gtest]
   fn test_other_operators() {
-    let text = "= , ( ) { } - < > ! : . + * / %";
+    let text = "= , ( ) { } - < > ! : . + * / % |";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
     expect_that!(
@@ -398,6 +398,7 @@ mod tests {
         operator!(Star),
         operator!(Slash),
         operator!(Percent),
+        operator!(Bar),
       ])
     );
   }
@@ -407,6 +408,6 @@ mod tests {
     let text = "#";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(tokens, err(pat![JangError::ParseError(anything())]));
+    expect_that!(tokens, err(pat![JangError::Parse(anything())]));
   }
 }

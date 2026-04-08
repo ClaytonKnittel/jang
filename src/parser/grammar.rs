@@ -1,37 +1,43 @@
 use parser_generator::pub_grammar;
 
-use crate::parser::{
-  ast::{
-    binary_expression::{BinaryExpression, BinaryOp},
-    block::{Block, BlockBuilder},
-    call_expression::CallExpression,
-    dot_expression::DotExpression,
-    expression::Expression,
-    expression_list::{ExpressionList, ExpressionListBuilder},
-    function_decl::{
-      FunctionDecl, FunctionParameter, FunctionParameters, FunctionParametersBuilder,
+use crate::{
+  error::JangError,
+  parser::{
+    ast::{
+      binary_expression::{BinaryExpression, BinaryOp},
+      block::{Block, BlockBuilder},
+      call_expression::CallExpression,
+      dot_expression::DotExpression,
+      enum_type_decl::{EnumTypeDecl, EnumTypeDeclBuilder, EnumVariant, EnumVariantType},
+      expression::Expression,
+      expression_list::{ExpressionList, ExpressionListBuilder},
+      function_decl::{
+        FunctionDecl, FunctionParameter, FunctionParameters, FunctionParametersBuilder,
+      },
+      if_statement::IfStatement,
+      jang_file::{JangFile, JangFileBuilder},
+      let_statement::LetStatement,
+      loop_statement::LoopStatement,
+      ret_statement::RetStatement,
+      statement::Statement,
+      structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
+      type_decl::{TypeDecl, TypeDeclVariant},
+      type_expr::TypeExpression,
     },
-    if_statement::IfStatement,
-    jang_file::{JangFile, JangFileBuilder},
-    let_statement::LetStatement,
-    loop_statement::LoopStatement,
-    ret_statement::RetStatement,
-    statement::Statement,
-    type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField, TypeDecl},
-    type_expr::TypeExpression,
-  },
-  token::{
-    JangToken,
-    ident::Ident,
-    keyword::Keyword,
-    literal::Literal,
-    operator::{Op, Operator},
+    token::{
+      JangToken,
+      ident::Ident,
+      keyword::Keyword,
+      literal::Literal,
+      operator::{Op, Operator},
+    },
   },
 };
 
 pub_grammar!(
   name: JangGrammar;
   enum_terminal: JangToken;
+  error_type: JangError;
 
   <root>: JangFile => <jang_file>;
 
@@ -46,14 +52,19 @@ pub_grammar!(
   };
 
   <type_decl>: TypeDecl =>
-    Keyword(Keyword::Type) <ident> <eq> <open_bracket>
-      <structured_type_decl>
-    <close_bracket>
+    Keyword(Keyword::Type) <ident> <eq> <type_decl_variant>
   {
-    TypeDecl::new(#ident, #structured_type_decl)
+    TypeDecl::new(#ident, #type_decl_variant)
   };
 
-  <structured_type_decl>: StructuredTypeDecl => <structured_type_decl_builder>;
+  <type_decl_variant>: TypeDeclVariant => <structured_type_decl>;
+  <type_decl_variant>: TypeDeclVariant => <enum_type_decl>;
+
+  <structured_type_decl>: StructuredTypeDecl =>
+    <open_bracket> <structured_type_decl_builder> <close_bracket>
+  {
+    #structured_type_decl_builder.build()?
+  };
 
   <structured_type_decl_builder>: StructuredTypeDeclBuilder => ! {
     StructuredTypeDeclBuilder::default()
@@ -67,6 +78,29 @@ pub_grammar!(
 
   <structured_type_field>: StructuredTypeField => <ident> <colon> <type_expr> {
     StructuredTypeField::new(#ident, #type_expr)
+  };
+
+  <enum_type_decl>: EnumTypeDecl => <enum_type_decl_builder>;
+
+  <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_variant> {
+    EnumTypeDeclBuilder::default().add_variants(#enum_type_decl_variant)
+  };
+  <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_builder> <enum_type_decl_variant> {
+    #enum_type_decl_builder.add_variants(#enum_type_decl_variant)
+  };
+
+  <enum_type_decl_variant>: EnumVariant => <bar> <ident> <enum_variant_type> {
+    EnumVariant::new(#ident, #enum_variant_type)
+  };
+
+  <enum_variant_type>: EnumVariantType => ! {
+    EnumVariantType::Empty
+  };
+  <enum_variant_type>: EnumVariantType => <ident> {
+    EnumVariantType::TypeRef(#ident)
+  };
+  <enum_variant_type>: EnumVariantType => <structured_type_decl> {
+    EnumVariantType::Structured(#structured_type_decl)
   };
 
   <function_decl>: FunctionDecl =>
@@ -177,12 +211,12 @@ pub_grammar!(
     CallExpression::new(#call_or_dot_expr, #call_args)
   };
 
-  <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list };
+  <call_args>: ExpressionList => <open_paren> <expr_list_builder> <close_paren> {
+    #expr_list_builder.build()?
+  };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
   <leaf_expr>: Expression => <ident>;
-
-  <expr_list>: ExpressionList => <expr_list_builder>;
 
   <expr_list_builder>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
   <expr_list_builder>: ExpressionListBuilder => <non_empty_expr_list>;
@@ -194,10 +228,8 @@ pub_grammar!(
     #non_empty_expr_list.add_expressions(#expr)
   };
 
-  <function_params>: FunctionParameters => <function_params_builder>;
-
-  <function_params_builder>: FunctionParametersBuilder => <open_paren> <parameter_list> <close_paren> {
-    #parameter_list
+  <function_params>: FunctionParameters => <open_paren> <parameter_list> <close_paren> {
+    #parameter_list.build()?
   };
 
   <parameter_list>: FunctionParametersBuilder => ! { FunctionParametersBuilder::default() };
@@ -239,6 +271,7 @@ pub_grammar!(
   <colon> => Operator(Operator { op: Op::Colon });
   <comma> => Operator(Operator { op: Op::Comma });
   <dot> => Operator(Operator { op: Op::Dot });
+  <bar> => Operator(Operator { op: Op::Bar });
   <right_arrow> =>
       Operator(Operator { op: Op::Dash })
       Joint
@@ -263,6 +296,9 @@ mod tests {
           call_expr_args, call_expr_target, call_expression, call_statement,
         },
         dot_expression::matchers::{dot_expr_base, dot_expr_member},
+        enum_type_decl::matchers::{
+          enum_ref_type, enum_structured_type, enum_variant, enum_variant_with,
+        },
         expression::{
           Expression,
           matchers::{ident_expression as id_exp, literal_expression as lit_exp},
@@ -279,7 +315,8 @@ mod tests {
         loop_statement::matchers::loop_statement,
         ret_statement::matchers::ret_statement as ret_stmt,
         statement::{Statement, matchers::break_statement},
-        type_decl::matchers::{structured_type, type_field},
+        structured_type_decl::matchers::type_field,
+        type_decl::matchers::{enum_type, structured_type},
         type_expr::matchers::type_expr_name,
       },
       grammar::JangGrammar,
@@ -419,6 +456,107 @@ mod tests {
           type_field(ident("a"), type_expr_name(ident("i32"))),
           type_field(ident("b"), type_expr_name(ident("String"))),
           type_field(ident("c"), type_expr_name(ident("MyCustomType"))),
+        ]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn enum_decl_single_variant() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        type E =
+          | V1
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(enum_type(
+        ident("E"),
+        elements_are![enum_variant(ident("V1"))]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn enum_decl_single_variant_with_data() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        type E =
+          | V1 i32
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(enum_type(
+        ident("E"),
+        elements_are![enum_variant_with(ident("V1"), enum_ref_type(ident("i32")))]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn enum_decl_structured_variant() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        type E =
+          | V1 { field1: i32 }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(enum_type(
+        ident("E"),
+        elements_are![enum_variant_with(
+          ident("V1"),
+          enum_structured_type(elements_are![type_field(
+            ident("field1"),
+            type_expr_name(ident("i32"))
+          )])
+        )]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn enum_decl_many_variants() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        type E =
+          | V1
+          | V2 {
+              f1: i64
+              f2: String
+            }
+          | V3 String
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(enum_type(
+        ident("E"),
+        elements_are![
+          enum_variant(ident("V1")),
+          enum_variant_with(
+            ident("V2"),
+            enum_structured_type(elements_are![
+              type_field(ident("f1"), type_expr_name(ident("i64"))),
+              type_field(ident("f2"), type_expr_name(ident("String"))),
+            ])
+          ),
+          enum_variant_with(ident("V3"), enum_ref_type(ident("String"))),
         ]
       ))
     );
