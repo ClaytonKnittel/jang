@@ -33,7 +33,7 @@ impl EnumVariant {
 
 impl Display for EnumVariant {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "| {}: {}", self.name, self.ty)
+    write!(f, "{} {}", self.name, self.ty)
   }
 }
 
