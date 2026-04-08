@@ -203,12 +203,12 @@ pub_grammar!(
     CallExpression::new(#call_or_dot_expr, #call_args)
   };
 
-  <call_args>: ExpressionList => <open_paren> <expr_list> <close_paren> { #expr_list };
+  <call_args>: ExpressionList => <open_paren> <expr_list_builder> <close_paren> {
+    #expr_list_builder.build()?
+  };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
   <leaf_expr>: Expression => <ident>;
-
-  <expr_list>: ExpressionList => <expr_list_builder>;
 
   <expr_list_builder>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
   <expr_list_builder>: ExpressionListBuilder => <non_empty_expr_list>;
@@ -220,10 +220,8 @@ pub_grammar!(
     #non_empty_expr_list.add_expressions(#expr)
   };
 
-  <function_params>: FunctionParameters => <function_params_builder>;
-
-  <function_params_builder>: FunctionParametersBuilder => <open_paren> <parameter_list> <close_paren> {
-    #parameter_list
+  <function_params>: FunctionParameters => <open_paren> <parameter_list> <close_paren> {
+    #parameter_list.build()?
   };
 
   <parameter_list>: FunctionParametersBuilder => ! { FunctionParametersBuilder::default() };
