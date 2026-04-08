@@ -137,11 +137,11 @@ pub_grammar!(
   };
 
   <expr>: Expression => <comparison_expr>;
-  <expr>: Expression => <add_expr>;
 
   <comparison_expr>: Expression => <add_expr> <comparator> <add_expr> {
     BinaryExpression::new(#0, #2, #comparator).into()
   };
+  <comparison_expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
     BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Add).into()
