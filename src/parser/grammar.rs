@@ -306,15 +306,7 @@ mod tests {
       .chars(),
     ))?;
 
-    let statement = ast
-      .function_decls()
-      .first()
-      .expect("parse_single_exp expects a function")
-      .body()
-      .statements()
-      .first()
-      .expect("parse_single_exp expects a statement");
-
+    let statement = &ast.function_decls()[0].body().statements()[0];
     match statement {
       Statement::Let(stmt) => Ok(stmt.expr().clone()),
       _ => {
