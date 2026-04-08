@@ -4,7 +4,8 @@ use std::{
   fmt::{Debug, Display},
 };
 
-use parser_generator::error::ParserError;
+use cknittel_util::builder::error::BuilderError;
+use parser_generator::{ParserUserError, error::ParserError};
 
 use crate::source_location::SourceLocation;
 
@@ -40,10 +41,11 @@ impl Debug for ParseError {
   }
 }
 
-#[derive(Clone)]
+#[derive(Clone, ParserUserError)]
 pub enum JangError {
   ParseError(ParseError),
   GrammarError(ParserError<Infallible>),
+  BuilderError(BuilderError),
 }
 
 impl JangError {
@@ -55,18 +57,21 @@ impl JangError {
 impl From<ParserError<JangError>> for JangError {
   fn from(value: ParserError<JangError>) -> Self {
     match value {
-      ParserError::InputStreamError(err) => err,
+      ParserError::UserError(err) => err,
       ParserError::ParseError { message } => {
         JangError::GrammarError(ParserError::ParseError { message })
-      }
-      ParserError::ForeignError { message } => {
-        JangError::GrammarError(ParserError::ForeignError { message })
       }
       #[cfg(debug_assertions)]
       ParserError::OverlappingTokenMatchers { token } => {
         JangError::GrammarError(ParserError::OverlappingTokenMatchers { token })
       }
     }
+  }
+}
+
+impl From<BuilderError> for JangError {
+  fn from(value: BuilderError) -> Self {
+    JangError::BuilderError(value)
   }
 }
 
@@ -77,6 +82,7 @@ impl Display for JangError {
     match self {
       Self::ParseError(err) => write!(f, "{err}"),
       Self::GrammarError(err) => write!(f, "Grammar error: {err}"),
+      Self::BuilderError(err) => write!(f, "Builder error: {err}"),
     }
   }
 }

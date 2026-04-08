@@ -1,39 +1,43 @@
 use parser_generator::pub_grammar;
 
-use crate::parser::{
-  ast::{
-    binary_expression::{BinaryExpression, BinaryOp},
-    block::{Block, BlockBuilder},
-    call_expression::CallExpression,
-    dot_expression::DotExpression,
-    enum_type_decl::{EnumTypeDecl, EnumTypeDeclBuilder, EnumVariant, EnumVariantType},
-    expression::Expression,
-    expression_list::{ExpressionList, ExpressionListBuilder},
-    function_decl::{
-      FunctionDecl, FunctionParameter, FunctionParameters, FunctionParametersBuilder,
+use crate::{
+  error::JangError,
+  parser::{
+    ast::{
+      binary_expression::{BinaryExpression, BinaryOp},
+      block::{Block, BlockBuilder},
+      call_expression::CallExpression,
+      dot_expression::DotExpression,
+      enum_type_decl::{EnumTypeDecl, EnumTypeDeclBuilder, EnumVariant, EnumVariantType},
+      expression::Expression,
+      expression_list::{ExpressionList, ExpressionListBuilder},
+      function_decl::{
+        FunctionDecl, FunctionParameter, FunctionParameters, FunctionParametersBuilder,
+      },
+      if_statement::IfStatement,
+      jang_file::{JangFile, JangFileBuilder},
+      let_statement::LetStatement,
+      loop_statement::LoopStatement,
+      ret_statement::RetStatement,
+      statement::Statement,
+      structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
+      type_decl::{TypeDecl, TypeDeclVariant},
+      type_expr::TypeExpression,
     },
-    if_statement::IfStatement,
-    jang_file::{JangFile, JangFileBuilder},
-    let_statement::LetStatement,
-    loop_statement::LoopStatement,
-    ret_statement::RetStatement,
-    statement::Statement,
-    structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
-    type_decl::{TypeDecl, TypeDeclVariant},
-    type_expr::TypeExpression,
-  },
-  token::{
-    JangToken,
-    ident::Ident,
-    keyword::Keyword,
-    literal::Literal,
-    operator::{Op, Operator},
+    token::{
+      JangToken,
+      ident::Ident,
+      keyword::Keyword,
+      literal::Literal,
+      operator::{Op, Operator},
+    },
   },
 };
 
 pub_grammar!(
   name: JangGrammar;
   enum_terminal: JangToken;
+  error_type: JangError;
 
   <root>: JangFile => <jang_file>;
 
@@ -59,7 +63,7 @@ pub_grammar!(
   <structured_type_decl>: StructuredTypeDecl =>
     <open_bracket> <structured_type_decl_builder> <close_bracket>
   {
-    #structured_type_decl_builder.build().unwrap()
+    #structured_type_decl_builder.build()?
   };
 
   <structured_type_decl_builder>: StructuredTypeDeclBuilder => ! {
@@ -80,6 +84,9 @@ pub_grammar!(
 
   <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_variant> {
     EnumTypeDeclBuilder::default().add_variants(#enum_type_decl_variant)
+  };
+  <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_builder> <enum_type_decl_variant> {
+    #enum_type_decl_builder.add_variants(#enum_type_decl_variant)
   };
 
   <enum_type_decl_variant>: EnumVariant => <bar> <ident> <enum_variant_type> {
