@@ -292,7 +292,7 @@ mod tests {
   fn roundtrip_enum_type() -> Result<()> {
     let code = r#"
       type E = 
-      | V1 i32
+      | V1 
       | V2 {
         field1: i32
         field2: String
