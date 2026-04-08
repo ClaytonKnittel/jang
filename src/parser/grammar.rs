@@ -236,43 +236,46 @@ mod tests {
   use googletest::prelude::*;
   use parser_generator::parser::Parser;
 
-  use crate::parser::{
-    ast::{
-      binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
-      block::matchers::{block, block_statement},
-      call_expression::matchers::{
-        call_expr_args, call_expr_target, call_expression, call_statement,
+  use crate::{
+    error::JangResult,
+    parser::{
+      ast::{
+        binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
+        block::matchers::{block, block_statement},
+        call_expression::matchers::{
+          call_expr_args, call_expr_target, call_expression, call_statement,
+        },
+        dot_expression::matchers::{dot_expr_base, dot_expr_member},
+        expression::{
+          Expression,
+          matchers::{ident_expression as id_exp, literal_expression as lit_exp},
+        },
+        function_decl::matchers::{
+          fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
+          fn_return_type_none,
+        },
+        if_statement::matchers::{
+          if_else_clause, if_else_if_statement, if_else_statement, if_statement,
+        },
+        jang_file::matchers::{jang_file_functions, jang_file_with_fn, jang_file_with_type},
+        let_statement::matchers::let_statement as let_stmt,
+        loop_statement::matchers::loop_statement,
+        ret_statement::matchers::ret_statement as ret_stmt,
+        statement::{Statement, matchers::break_statement},
+        type_decl::matchers::{structured_type, type_field},
+        type_expr::matchers::type_expr_name,
       },
-      dot_expression::matchers::{dot_expr_base, dot_expr_member},
-      expression::{
-        Expression,
-        matchers::{ident_expression as id_exp, literal_expression as lit_exp},
-      },
-      function_decl::matchers::{
-        fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
-        fn_return_type_none,
-      },
-      if_statement::matchers::{
-        if_else_clause, if_else_if_statement, if_else_statement, if_statement,
-      },
-      jang_file::matchers::{jang_file_functions, jang_file_with_fn, jang_file_with_type},
-      let_statement::matchers::let_statement as let_stmt,
-      loop_statement::matchers::loop_statement,
-      ret_statement::matchers::ret_statement as ret_stmt,
-      statement::{Statement, matchers::break_statement},
-      type_decl::matchers::{structured_type, type_field},
-      type_expr::matchers::type_expr_name,
+      grammar::JangGrammar,
+      lexer::lex_stream,
+      token::{ident::matchers::ident, literal::matchers::integral},
     },
-    grammar::JangGrammar,
-    lexer::lex_stream,
-    token::{ident::matchers::ident, literal::matchers::integral},
   };
 
   fn failed_to_parse<'a, T: Debug, E: Error>() -> impl Matcher<&'a std::result::Result<T, E>> {
     err(displays_as(contains_substring("Failed to parse")))
   }
 
-  fn parse_single_exp(expression: &str) -> Result<Expression> {
+  fn parse_single_exp(expression: &str) -> JangResult<Expression> {
     let ast = JangGrammar::parse_fallible(lex_stream(
       format!(
         r#"
@@ -283,23 +286,24 @@ mod tests {
         expression
       )
       .chars(),
-    ))
-    .or_fail()?;
+    ))?;
 
     let statement = ast
       .function_decls()
       .first()
-      .or_fail()?
+      .expect("parse_single_exp expects a function")
       .body()
       .statements()
       .first()
-      .or_fail()?;
+      .expect("parse_single_exp expects a statement");
 
     match statement {
       Statement::Let(stmt) => Ok(stmt.expr().clone()),
       _ => {
-        fail!("expected let statement, got: {}", statement)?;
-        unreachable!()
+        panic!(
+          "parse_single_exp expects a let statement, got: {}",
+          statement
+        )
       }
     }
   }
