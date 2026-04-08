@@ -32,6 +32,8 @@ pub enum Op {
   Slash,
   /// '%'
   Percent,
+  /// '!'
+  Bang,
 }
 
 impl Op {
@@ -52,6 +54,7 @@ impl Op {
       '*' => Some(Self::Star),
       '/' => Some(Self::Slash),
       '%' => Some(Self::Percent),
+      '!' => Some(Self::Bang),
       _ => None,
     }
   }
@@ -73,6 +76,7 @@ impl Op {
       Self::Star => '*',
       Self::Slash => '/',
       Self::Percent => '%',
+      Self::Bang => '!',
     }
   }
 
@@ -83,13 +87,14 @@ impl Op {
     match self {
       Self::Dash => other_op == '>',
       Self::CloseParen => other_op == '(',
-      Self::Equal
-      | Self::Comma
+      Self::Bang => other_op == '=',
+      Self::LessThan => other_op == '=',
+      Self::GreaterThan => other_op == '=',
+      Self::Equal => other_op == '=',
+      Self::Comma
       | Self::OpenParen
       | Self::OpenBracket
       | Self::CloseBracket
-      | Self::LessThan
-      | Self::GreaterThan
       | Self::Colon
       | Self::Dot
       | Self::Plus
