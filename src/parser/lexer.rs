@@ -355,6 +355,6 @@ mod tests {
     let text = "#";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(tokens, err(pat![JangError::ParseError(anything())]));
+    expect_that!(tokens, err(pat![JangError::Parse(anything())]));
   }
 }

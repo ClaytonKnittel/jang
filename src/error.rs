@@ -43,14 +43,14 @@ impl Debug for ParseError {
 
 #[derive(Clone, ParserUserError)]
 pub enum JangError {
-  ParseError(ParseError),
-  GrammarError(ParserError<Infallible>),
-  BuilderError(BuilderError),
+  Parse(ParseError),
+  Grammar(ParserError<Infallible>),
+  Builder(BuilderError),
 }
 
 impl JangError {
   pub fn parse_error(message: impl Into<String>, source_location: SourceLocation) -> Self {
-    Self::ParseError(ParseError::new(message, source_location))
+    Self::Parse(ParseError::new(message, source_location))
   }
 }
 
@@ -59,11 +59,11 @@ impl From<ParserError<JangError>> for JangError {
     match value {
       ParserError::UserError(err) => err,
       ParserError::ParseError { message } => {
-        JangError::GrammarError(ParserError::ParseError { message })
+        JangError::Grammar(ParserError::ParseError { message })
       }
       #[cfg(debug_assertions)]
       ParserError::OverlappingTokenMatchers { token } => {
-        JangError::GrammarError(ParserError::OverlappingTokenMatchers { token })
+        JangError::Grammar(ParserError::OverlappingTokenMatchers { token })
       }
     }
   }
@@ -71,7 +71,7 @@ impl From<ParserError<JangError>> for JangError {
 
 impl From<BuilderError> for JangError {
   fn from(value: BuilderError) -> Self {
-    JangError::BuilderError(value)
+    JangError::Builder(value)
   }
 }
 
@@ -80,9 +80,9 @@ impl Error for JangError {}
 impl Display for JangError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      Self::ParseError(err) => write!(f, "{err}"),
-      Self::GrammarError(err) => write!(f, "Grammar error: {err}"),
-      Self::BuilderError(err) => write!(f, "Builder error: {err}"),
+      Self::Parse(err) => write!(f, "{err}"),
+      Self::Grammar(err) => write!(f, "Grammar error: {err}"),
+      Self::Builder(err) => write!(f, "Builder error: {err}"),
     }
   }
 }
