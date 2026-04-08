@@ -276,6 +276,7 @@ mod tests {
           call_expr_args, call_expr_target, call_expression, call_statement,
         },
         dot_expression::matchers::{dot_expr_base, dot_expr_member},
+        enum_type_decl::matchers::{enum_ref_type, enum_structured_type, enum_variant},
         expression::{
           Expression,
           matchers::{ident_expression as id_exp, literal_expression as lit_exp},
@@ -293,33 +294,12 @@ mod tests {
         ret_statement::matchers::ret_statement as ret_stmt,
         statement::{Statement, matchers::break_statement},
         structured_type_decl::matchers::type_field,
-        type_decl::matchers::structured_type,
+        type_decl::matchers::{enum_type, structured_type},
         type_expr::matchers::type_expr_name,
       },
-<<<<<<< HEAD
       grammar::JangGrammar,
       lexer::lex_stream,
       token::{ident::matchers::ident, literal::matchers::integral},
-=======
-      dot_expression::matchers::{dot_expr_base, dot_expr_member},
-      enum_type_decl::matchers::{enum_ref_type, enum_structured_type, enum_variant},
-      expression::matchers::{ident_expression as id_exp, literal_expression as lit_exp},
-      function_decl::matchers::{
-        fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
-        fn_return_type_none,
-      },
-      if_statement::matchers::{
-        if_else_clause, if_else_if_statement, if_else_statement, if_statement,
-      },
-      jang_file::matchers::{jang_file_functions, jang_file_with_fn, jang_file_with_type},
-      let_statement::matchers::let_statement as let_stmt,
-      loop_statement::matchers::loop_statement,
-      ret_statement::matchers::ret_statement as ret_stmt,
-      statement::matchers::break_statement,
-      structured_type_decl::matchers::type_field,
-      type_decl::matchers::{enum_type, structured_type},
-      type_expr::matchers::type_expr_name,
->>>>>>> 3c4ceb5 (Tests)
     },
   };
 
