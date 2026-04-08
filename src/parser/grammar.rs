@@ -288,11 +288,7 @@ mod tests {
       .chars(),
     ))?;
 
-    let statement = ast
-      .function_decls()[0]
-      .body()
-      .statements()[0];
-
+    let statement = &ast.function_decls()[0].body().statements()[0];
     match statement {
       Statement::Let(stmt) => Ok(stmt.expr().clone()),
       _ => {
