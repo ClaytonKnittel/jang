@@ -1233,6 +1233,16 @@ mod tests {
   }
 
   #[gtest]
+  fn logical_and_rejects_non_joint_tokens() {
+    expect_that!(parse_single_exp("a & & b"), failed_to_parse());
+  }
+
+  #[gtest]
+  fn logical_or_rejects_non_joint_tokens() {
+    expect_that!(parse_single_exp("a | | b"), failed_to_parse());
+  }
+
+  #[gtest]
   fn logical_and_higher_precedence_than_arithmetic() {
     expect_that!(
       parse_single_exp("a < b && b < c").unwrap(),
