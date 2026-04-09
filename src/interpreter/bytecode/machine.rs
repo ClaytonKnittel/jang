@@ -291,7 +291,7 @@ mod tests {
     }
   }
 
-  fn evaluate_unary_fn<'a>(jit_fn: &'a JitCompiledFunction<'a>) -> InterpreterResult<Value<'a>> {
+  fn evaluate_no_arg_fn<'a>(jit_fn: &'a JitCompiledFunction<'a>) -> InterpreterResult<Value<'a>> {
     evaluate_function(jit_fn, Vec::new(), &EmptyContext)
   }
 
@@ -301,14 +301,14 @@ mod tests {
       vec![JitInstruction::LoadUnit],
       JitTerminalInstruction::Return,
     )]);
-    expect_that!(evaluate_unary_fn(&code), ok(unit_value()))
+    expect_that!(evaluate_no_arg_fn(&code), ok(unit_value()))
   }
 
   #[gtest]
   fn ret_with_value_on_empty_stack_errors() {
     let code = function_bytecode(vec![block(vec![], JitTerminalInstruction::Return)]);
     expect_that!(
-      evaluate_unary_fn(&code),
+      evaluate_no_arg_fn(&code),
       err(displays_as(contains_substring("bad stack: empty")))
     )
   }
@@ -320,7 +320,7 @@ mod tests {
       JitTerminalInstruction::Return,
     )]);
     expect_that!(
-      evaluate_unary_fn(&code),
+      evaluate_no_arg_fn(&code),
       err(displays_as(contains_substring("bad local read")))
     )
   }
@@ -337,7 +337,7 @@ mod tests {
       JitTerminalInstruction::Return,
     )]);
 
-    expect_that!(evaluate_unary_fn(&code), ok(i32_value(eq(&1))),)
+    expect_that!(evaluate_no_arg_fn(&code), ok(i32_value(eq(&1))),)
   }
 
   #[gtest]
@@ -349,7 +349,7 @@ mod tests {
     )]);
 
     expect_that!(
-      evaluate_unary_fn(&code),
+      evaluate_no_arg_fn(&code),
       err(displays_as(contains_substring(
         "not found in empty context"
       ))),
@@ -369,7 +369,7 @@ mod tests {
       JitTerminalInstruction::Return,
     )]);
 
-    expect_that!(evaluate_unary_fn(&code), ok(i32_value(eq(&1))),)
+    expect_that!(evaluate_no_arg_fn(&code), ok(i32_value(eq(&1))),)
   }
 
   #[gtest]
