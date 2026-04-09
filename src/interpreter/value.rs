@@ -60,15 +60,6 @@ impl<'a> Value<'a> {
     }
   }
 
-  pub fn debug_type_name(&self) -> String {
-    match self {
-      Self::Int32(_) => "i32".into(),
-      Self::Float32(_) => "f32".into(),
-      Self::JitCompiledFunctionRef(_) => "<compiled-bytecode>".into(),
-      Self::Unit => "unit".into(),
-    }
-  }
-
   fn to_numeric_pair(&self, other: &Self, op: &'static str) -> InterpreterResult<NumericValuePair> {
     match (self, other) {
       (Value::Int32(a), Value::Int32(b)) => Ok(NumericValuePair::Int32(*a, *b)),
