@@ -7,7 +7,7 @@ use std::{
 use cknittel_util::builder::error::BuilderError;
 use parser_generator::{ParserUserError, error::ParserError};
 
-use crate::source_location::SourceLocation;
+use crate::{interpreter::error::InterpreterError, source_location::SourceLocation};
 
 #[derive(Clone)]
 pub struct ParseError {
@@ -46,6 +46,7 @@ pub enum JangError {
   Parse(ParseError),
   Grammar(ParserError<Infallible>),
   Builder(BuilderError),
+  Interpret(InterpreterError),
 }
 
 impl JangError {
@@ -75,6 +76,12 @@ impl From<BuilderError> for JangError {
   }
 }
 
+impl From<InterpreterError> for JangError {
+  fn from(err: InterpreterError) -> Self {
+    JangError::Interpret(err)
+  }
+}
+
 impl Error for JangError {}
 
 impl Display for JangError {
@@ -83,6 +90,7 @@ impl Display for JangError {
       Self::Parse(err) => write!(f, "{err}"),
       Self::Grammar(err) => write!(f, "Grammar error: {err}"),
       Self::Builder(err) => write!(f, "Builder error: {err}"),
+      Self::Interpret(err) => write!(f, "Interpret error: {err}"),
     }
   }
 }

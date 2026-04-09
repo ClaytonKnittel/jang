@@ -1,4 +1,4 @@
 pub mod ast;
 pub mod grammar;
 pub mod lexer;
-mod token;
+pub(crate) mod token;

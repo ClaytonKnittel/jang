@@ -299,6 +299,20 @@ pub_grammar!(
 );
 
 #[cfg(test)]
+pub mod testing {
+  use parser_generator::parser::Parser;
+
+  use crate::{
+    error::JangResult,
+    parser::{ast::jang_file::JangFile, grammar::JangGrammar, lexer::lex_stream},
+  };
+
+  pub fn lex_and_parse_jang_file(text: impl IntoIterator<Item = char>) -> JangResult<JangFile> {
+    Ok(JangGrammar::parse_fallible(lex_stream(text))?)
+  }
+}
+
+#[cfg(test)]
 mod tests {
   use googletest::prelude::*;
   use parser_generator::parser::Parser;
