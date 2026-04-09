@@ -200,6 +200,18 @@ mod tests {
   }
 
   #[gtest]
+  fn roundtrip_negation_expr() -> Result<()> {
+    let code = r#"
+      fn function_name() -> i32 {
+        let x = !a.b()
+        let y = !(a + b)
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
   fn roundtrip_block_scope() -> Result<()> {
     let code = r#"
       fn function_name() -> i32 {
