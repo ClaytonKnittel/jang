@@ -15,11 +15,11 @@ use crate::{
 };
 
 #[derive(Default)]
-struct MachineStack<'a> {
+struct ValueStack<'a> {
   items: Vec<Value<'a>>,
 }
 
-impl<'a> MachineStack<'a> {
+impl<'a> ValueStack<'a> {
   fn from_args(args: Vec<Value<'a>>) -> Self {
     Self { items: args }
   }
@@ -72,13 +72,6 @@ impl<'a> JitInstructionBlockCursor<'a> {
   }
 }
 
-struct JitCallFrame<'a> {
-  jit_fn: &'a JitCompiledFunction<'a>,
-  locals: LocalTable<Value<'a>>,
-  stack: MachineStack<'a>,
-  block_cursor: JitInstructionBlockCursor<'a>,
-}
-
 // Actions that affect which call frames are on the stack.
 enum FrameAction<'a> {
   // Does nothing.
@@ -94,6 +87,13 @@ enum FrameAction<'a> {
   Return(Value<'a>),
 }
 
+struct JitCallFrame<'a> {
+  jit_fn: &'a JitCompiledFunction<'a>,
+  locals: LocalTable<Value<'a>>,
+  stack: ValueStack<'a>,
+  block_cursor: JitInstructionBlockCursor<'a>,
+}
+
 // A single call frame.
 impl<'a> JitCallFrame<'a> {
   fn from_call(
@@ -107,7 +107,7 @@ impl<'a> JitCallFrame<'a> {
     Ok(Self {
       jit_fn,
       locals: LocalTable::<Value<'a>>::new(),
-      stack: MachineStack::from_args(args),
+      stack: ValueStack::from_args(args),
       block_cursor: JitInstructionBlockCursor::start_of(entrypoint),
     })
   }
@@ -120,7 +120,7 @@ impl<'a> JitCallFrame<'a> {
     let block = self
       .jit_fn
       .block(id)
-      .ok_or_else(|| InterpreterError::jit_err("target block must exist"))?;
+      .ok_or_else(|| InterpreterError::internal_err("target block does not exist"))?;
     self.block_cursor = JitInstructionBlockCursor::start_of(block);
     Ok(())
   }
