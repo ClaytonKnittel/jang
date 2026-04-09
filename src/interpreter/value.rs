@@ -60,7 +60,11 @@ impl<'a> Value<'a> {
     }
   }
 
-  fn to_numeric_pair(&self, other: &Self, op: &'static str) -> InterpreterResult<NumericValuePair> {
+  fn expect_numeric_pair(
+    &self,
+    other: &Self,
+    op: &'static str,
+  ) -> InterpreterResult<NumericValuePair> {
     match (self, other) {
       (Value::Int32(a), Value::Int32(b)) => Ok(NumericValuePair::Int32(*a, *b)),
       (Value::Float32(a), Value::Float32(b)) => Ok(NumericValuePair::Float32(*a, *b)),
@@ -71,29 +75,30 @@ impl<'a> Value<'a> {
       ))),
     }
   }
+
   pub fn multiply(&self, other: &Self) -> InterpreterResult<Self> {
-    match self.to_numeric_pair(other, "multiply")? {
+    match self.expect_numeric_pair(other, "multiply")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a * b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a * b)),
     }
   }
 
   pub fn add(&self, other: &Self) -> InterpreterResult<Self> {
-    match self.to_numeric_pair(other, "add")? {
+    match self.expect_numeric_pair(other, "add")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a + b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a + b)),
     }
   }
 
   pub fn subtract(&self, other: &Self) -> InterpreterResult<Self> {
-    match self.to_numeric_pair(other, "subtract")? {
+    match self.expect_numeric_pair(other, "subtract")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a - b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a - b)),
     }
   }
 
   pub fn divide(&self, divisor: &Self) -> InterpreterResult<Self> {
-    match self.to_numeric_pair(divisor, "divide")? {
+    match self.expect_numeric_pair(divisor, "divide")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a.checked_div(b).ok_or_else(|| {
         InterpreterError::value_err(format!("division by zero: {:?} / {:?}", self, divisor))
       })?)),
@@ -102,7 +107,7 @@ impl<'a> Value<'a> {
   }
 
   pub fn modulo(&self, divisor: &Self) -> InterpreterResult<Self> {
-    match self.to_numeric_pair(divisor, "modulo")? {
+    match self.expect_numeric_pair(divisor, "modulo")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a.checked_rem(b).ok_or_else(|| {
         InterpreterError::value_err(format!("modulo by zero: {:?} / {:?}", self, divisor))
       })?)),
