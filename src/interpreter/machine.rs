@@ -315,6 +315,29 @@ mod tests {
   }
 
   #[gtest]
+  fn deeply_recursive_function() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn rec(n: i32) -> i32 {
+          if n {
+            ret rec(n - 1) + 1
+          } else {
+            ret 0
+          }
+        }
+
+        fn main() -> i32 {
+          ret rec(500)
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&500))
+    );
+  }
+
+  #[gtest]
   fn errors_if_main_does_not_return_a_value() {
     expect_that!(
       interpret_program(
