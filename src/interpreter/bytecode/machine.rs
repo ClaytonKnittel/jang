@@ -175,14 +175,23 @@ impl<'a> JitCallFrame<'a> {
   fn execute_binary_operation(&mut self, op: &BinaryOp) -> InterpreterResult<()> {
     let rhs = self.stack.pop_value()?;
     let lhs = self.stack.pop_value()?;
+
+    #[allow(unreachable_patterns)] // Allows changes to AST w/o requiring support here.
     let value = match op {
       BinaryOp::Add => lhs.add(&rhs)?,
       BinaryOp::Sub => lhs.subtract(&rhs)?,
       BinaryOp::Mul => lhs.multiply(&rhs)?,
       BinaryOp::Div => lhs.divide(&rhs)?,
       BinaryOp::Mod => lhs.modulo(&rhs)?,
+      BinaryOp::Equal => lhs.equal(&rhs)?,
+      BinaryOp::GreaterThan => lhs.greater_than(&rhs)?,
+      BinaryOp::GreaterThanEqual => lhs.greater_than_equal(&rhs)?,
+      BinaryOp::LessThan => lhs.less_than(&rhs)?,
+      BinaryOp::LessThanEqual => lhs.less_than_equal(&rhs)?,
+      BinaryOp::NotEqual => lhs.equal(&rhs)?.logical_not()?,
       op => return Err(InterpreterError::unimplemented(format!("{op}"))),
     };
+
     self.stack.push_value(value);
     Ok(())
   }
@@ -192,7 +201,7 @@ impl<'a> JitCallFrame<'a> {
     targets: &ConditionalJumpTargets,
   ) -> InterpreterResult<()> {
     let condition = self.stack.pop_value()?;
-    let target = if condition.is_truthy()? {
+    let target = if condition.expect_bool()? {
       targets.true_target()
     } else {
       targets.false_target()

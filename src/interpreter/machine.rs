@@ -216,7 +216,7 @@ mod tests {
       interpret_program(
         r#"
         fn main() -> i32 {
-          if 1 {
+          if 1 == 1 {
             ret 1
           }
           ret 2
@@ -234,7 +234,7 @@ mod tests {
       interpret_program(
         r#"
         fn main() -> i32 {
-          if 0 {
+          if 1 != 1 {
             ret 1
           } else {
             ret 2
@@ -254,9 +254,9 @@ mod tests {
       interpret_program(
         r#"
         fn main() -> i32 {
-          if 0 {
+          if 1 != 1 {
             ret 1
-          } else if 1 {
+          } else if 1 == 1 {
             ret 2
           } else {
             ret 3
@@ -276,9 +276,9 @@ mod tests {
       interpret_program(
         r#"
         fn main() -> i32 {
-          if 0 {
+          if 1 != 1 {
             ret 1
-          } else if 0 {
+          } else if 1 != 1 {
             ret 2
           } else {
             ret 3
@@ -298,8 +298,7 @@ mod tests {
       interpret_program(
         r#"
         fn fib(n: i32) -> i32 {
-          if n - 1 {} else { ret 1 }
-          if n {} else { ret 1 }
+          if n < 2 { ret 1 }
 
           ret fib(n - 1) + fib(n - 2)
         }
@@ -320,9 +319,13 @@ mod tests {
       interpret_program(
         r#"
         fn solve(n: i32) -> i32 {
-          if n {} else { ret 0 }
-          if n % 3 {} else { ret n + solve(n - 1) }
-          if n % 5 {} else { ret n + solve(n - 1) }
+          if n == 0 { ret 0 }
+          if n % 3 == 0 {
+            ret n + solve(n - 1)
+          }
+          if n % 5 == 0 {
+            ret n + solve(n - 1)
+          }
           ret solve(n - 1)
         }
 
@@ -358,7 +361,7 @@ mod tests {
           let x = 1
           {
             let x = 2
-            if 1 { ret x }
+            if 0 == 0 { ret x }
           }
           ret x
         }
@@ -378,7 +381,7 @@ mod tests {
           let x = 0
           let y = 5
           {
-            let x = 2
+            let x = 1 == 1
             { {
                 if x { ret y }
             } }
