@@ -90,26 +90,6 @@ impl<'a> Value<'a> {
     }
   }
 
-  fn expect_bool_pair(&self, other: &Self, op: &str) -> InterpreterResult<(bool, bool)> {
-    match (self, other) {
-      (Value::Bool(a), Value::Bool(b)) => Ok((*a, *b)),
-      _ => Err(InterpreterError::value_err(format!(
-        "{op}: expected bool, got {} ({self:?})",
-        self.ty(),
-      ))),
-    }
-  }
-
-  pub fn logical_and(&self, other: &Self) -> InterpreterResult<Self> {
-    let (a, b) = self.expect_bool_pair(other, "logical and")?;
-    Ok(Value::Bool(a && b))
-  }
-
-  pub fn logical_or(&self, other: &Self) -> InterpreterResult<Self> {
-    let (a, b) = self.expect_bool_pair(other, "logical or")?;
-    Ok(Value::Bool(a || b))
-  }
-
   pub fn logical_not(&self) -> InterpreterResult<Self> {
     Ok(Value::Bool(!self.expect_bool()?))
   }
@@ -313,30 +293,6 @@ mod tests {
     expect_that!(
       Value::Bool(true).equal(&Value::Int32(1)),
       err(interpreter_value_error(contains_substring("equality")))
-    );
-  }
-
-  #[gtest]
-  fn logical_and() {
-    expect_that!(
-      Value::Bool(true).logical_and(&Value::Bool(false)),
-      ok(bool_value(&false))
-    );
-  }
-
-  #[gtest]
-  fn logical_or() {
-    expect_that!(
-      Value::Bool(true).logical_or(&Value::Bool(false)),
-      ok(bool_value(&true))
-    );
-  }
-
-  #[gtest]
-  fn logical_and_with_invalid_type() {
-    expect_that!(
-      Value::Int32(123).logical_and(&Value::Bool(false)),
-      err(interpreter_value_error(contains_substring("logical and")))
     );
   }
 
