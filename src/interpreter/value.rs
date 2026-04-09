@@ -1,5 +1,5 @@
 use std::{
-  fmt::{Debug, Display},
+  fmt::Debug,
   ops::{Div, Rem},
 };
 
@@ -18,14 +18,6 @@ pub enum Value<'a> {
   Int32(i32),
   Float32(f32),
   JitCompiledFunctionRef(&'a JitCompiledFunction<'a>),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ValueKind {
-  Unit,
-  Int32,
-  Float32,
-  Function,
 }
 
 /// A pair of two identically-typed numeric values.
@@ -51,12 +43,12 @@ impl<'a> Value<'a> {
     literal.try_into()
   }
 
-  pub fn ty(&self) -> ValueKind {
+  pub fn debug_type_name(&self) -> &'static str {
     match self {
-      Self::Unit => ValueKind::Unit,
-      Self::Int32(_) => ValueKind::Int32,
-      Self::Float32(_) => ValueKind::Float32,
-      Self::JitCompiledFunctionRef(_) => ValueKind::Function,
+      Self::Unit => "unit",
+      Self::Int32(_) => "i32",
+      Self::Float32(_) => "f32",
+      Self::JitCompiledFunctionRef(_) => "<compiled-bytecode>",
     }
   }
 
@@ -70,8 +62,8 @@ impl<'a> Value<'a> {
       (Value::Float32(a), Value::Float32(b)) => Ok(NumericValuePair::Float32(*a, *b)),
       (lhs, rhs) => Err(InterpreterError::value_err(format!(
         "{op}: expected matching numeric operands, got {} and {}",
-        lhs.ty(),
-        rhs.ty(),
+        lhs.debug_type_name(),
+        rhs.debug_type_name(),
       ))),
     }
   }
@@ -133,21 +125,6 @@ impl<'a> Value<'a> {
         value
       ))),
     }
-  }
-}
-
-impl Display for ValueKind {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "{}",
-      match self {
-        ValueKind::Unit => "unit",
-        ValueKind::Int32 => "i32",
-        ValueKind::Float32 => "f32",
-        ValueKind::Function => "<compiled-bytecode>",
-      }
-    )
   }
 }
 

@@ -42,7 +42,6 @@ impl Debug for ParseError {
 }
 
 #[derive(Clone, ParserUserError)]
-#[allow(clippy::enum_variant_names)]
 pub enum JangError {
   Parse(ParseError),
   Grammar(ParserError<Infallible>),
