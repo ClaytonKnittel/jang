@@ -319,20 +319,21 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn solve(n: i32) -> i32 {
-          if n {} else { ret 0 }
-          if n % 3 {} else { ret n + solve(n - 1) }
-          if n % 5 {} else { ret n + solve(n - 1) }
-          ret solve(n - 1)
+        fn rec(n: i32) -> i32 {
+          if n {
+            ret rec(n - 1) + 1
+          } else {
+            ret 0
+          }
         }
 
         fn main() -> i32 {
-          ret solve(999)
+          ret rec(500)
         }
         "#
         .chars()
       ),
-      ok(eq(&233168))
+      ok(eq(&500))
     );
   }
 

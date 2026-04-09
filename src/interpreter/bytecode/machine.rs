@@ -268,7 +268,6 @@ pub fn evaluate_function<'a>(
   context: &'a impl JitFunctionContext<'a>,
 ) -> InterpreterResult<Value<'a>> {
   let mut machine = Machine::new(jit_fn, args)?;
-
   loop {
     match machine.step(context)? {
       MachineStatus::Running => {}
