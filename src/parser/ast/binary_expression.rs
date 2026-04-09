@@ -15,6 +15,8 @@ pub enum BinaryOp {
   LessThan,
   LessThanEqual,
   NotEqual,
+  LogicalAnd,
+  LogicalOr,
 }
 
 impl Display for BinaryOp {
@@ -34,6 +36,8 @@ impl Display for BinaryOp {
         Self::LessThan => "<",
         Self::LessThanEqual => "<=",
         Self::NotEqual => "!=",
+        Self::LogicalAnd => "&&",
+        Self::LogicalOr => "||",
       }
     )
   }
