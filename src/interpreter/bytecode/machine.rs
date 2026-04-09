@@ -60,6 +60,7 @@ pub fn evaluate_function<'a>(
             BinaryOp::Mul => lhs.multiply(&rhs)?,
             BinaryOp::Div => lhs.divide(&rhs)?,
             BinaryOp::Mod => lhs.modulo(&rhs)?,
+            _ => todo!(),
           });
         }
         JitInstruction::LoadLiteral(literal) => {
