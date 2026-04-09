@@ -23,6 +23,7 @@ use crate::{
       structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
       type_decl::{TypeDecl, TypeDeclVariant},
       type_expr::TypeExpression,
+      unary_experssion::{UnaryExpression, UnaryOp},
     },
     token::{
       JangToken,
@@ -170,9 +171,19 @@ pub_grammar!(
     LoopStatement::new(#block_scope)
   };
 
-  <expr>: Expression => <comparison_expr>;
+  <expr>: Expression => <logical_or_expr>;
 
-  <comparison_expr>: Expression => <add_expr> <comparator> <add_expr> {
+  <logical_or_expr>: Expression => <logical_or_expr> <logical_or> <logical_and_expr> {
+    BinaryExpression::new(#logical_or_expr, #logical_and_expr, BinaryOp::LogicalOr).into()
+  };
+  <logical_or_expr>: Expression => <logical_and_expr>;
+
+  <logical_and_expr>: Expression => <logical_and_expr> <logical_and> <comparison_expr> {
+    BinaryExpression::new(#logical_and_expr, #comparison_expr, BinaryOp::LogicalAnd).into()
+  };
+  <logical_and_expr>: Expression => <comparison_expr>;
+
+  <comparison_expr>: Expression => <comparison_expr> <comparator> <add_expr> {
     BinaryExpression::new(#0, #2, #comparator).into()
   };
   <comparison_expr>: Expression => <add_expr>;
@@ -197,6 +208,9 @@ pub_grammar!(
   <mul_expr>: Expression => <unary_expr>;
 
   // Unary expressions:
+  <unary_expr>: Expression => <bang> <unary_expr> {
+    UnaryExpression::new(#unary_expr, UnaryOp::LogicalNot).into()
+  };
   <unary_expr>: Expression => <call_or_dot_expr>;
   <unary_expr>: Expression => <literal>;
 
@@ -272,6 +286,9 @@ pub_grammar!(
   <comma> => Operator(Operator { op: Op::Comma });
   <dot> => Operator(Operator { op: Op::Dot });
   <bar> => Operator(Operator { op: Op::Bar });
+  <ampersand> => Operator(Operator { op: Op::Ampersand });
+  <logical_and> => <ampersand> Joint <ampersand>;
+  <logical_or> => <bar> Joint <bar>;
   <right_arrow> =>
       Operator(Operator { op: Op::Dash })
       Joint
@@ -332,6 +349,7 @@ mod tests {
         structured_type_decl::matchers::type_field,
         type_decl::matchers::{enum_type, structured_type},
         type_expr::matchers::type_expr_name,
+        unary_experssion::matchers::logical_not_exp,
       },
       grammar::JangGrammar,
       lexer::lex_stream,
@@ -1147,13 +1165,140 @@ mod tests {
   }
 
   #[gtest]
+  fn chained_comparison_left_associative() {
+    expect_that!(
+      parse_single_exp("1 < 2 < 3").unwrap(),
+      bin_exp(
+        bin_exp(
+          lit_exp(integral("1")),
+          &BinaryOp::LessThan,
+          lit_exp(integral("2"))
+        ),
+        &BinaryOp::LessThan,
+        lit_exp(integral("3"))
+      )
+    );
+  }
+
+  #[gtest]
   fn comparison_equal_does_not_parse() {
     expect_that!(parse_single_exp("1 = 2"), err(anything()));
   }
 
   #[gtest]
-  fn chained_comparison_not_allowed() {
-    expect_that!(parse_single_exp("1 < 3 > 2"), err(anything()));
+  fn logical_not_expression() {
+    expect_that!(
+      parse_single_exp("!a").unwrap(),
+      logical_not_exp(id_exp(ident("a"))),
+    );
+  }
+
+  #[gtest]
+  fn logical_not_lower_precedence_that_dot_expr() {
+    expect_that!(
+      parse_single_exp("!a.b").unwrap(),
+      logical_not_exp(all![
+        dot_expr_base(id_exp(ident("a"))),
+        dot_expr_member(ident("b")),
+      ]),
+    );
+  }
+
+  #[gtest]
+  fn logical_not_lower_precedence_that_dot_call() {
+    expect_that!(
+      parse_single_exp("!a.b()").unwrap(),
+      logical_not_exp(call_expression(call_expr_target(all![
+        dot_expr_base(id_exp(ident("a"))),
+        dot_expr_member(ident("b")),
+      ])))
+    );
+  }
+
+  #[gtest]
+  fn logical_not_expression_higher_precendence_than_and() {
+    expect_that!(
+      parse_single_exp("!a && b").unwrap(),
+      bin_exp(
+        logical_not_exp(id_exp(ident("a"))),
+        &BinaryOp::LogicalAnd,
+        id_exp(ident("b")),
+      ),
+    );
+  }
+
+  #[gtest]
+  fn nested_logical_not_expression() {
+    expect_that!(
+      parse_single_exp("!!a").unwrap(),
+      logical_not_exp(logical_not_exp(id_exp(ident("a")))),
+    );
+  }
+
+  #[gtest]
+  fn logical_and_left_associativity() {
+    expect_that!(
+      parse_single_exp("a && b && c").unwrap(),
+      bin_exp(
+        bin_exp(
+          id_exp(ident("a")),
+          &BinaryOp::LogicalAnd,
+          id_exp(ident("b")),
+        ),
+        &BinaryOp::LogicalAnd,
+        id_exp(ident("c"))
+      ),
+    );
+  }
+
+  #[gtest]
+  fn logical_or_left_associativity() {
+    expect_that!(
+      parse_single_exp("a || b || c").unwrap(),
+      bin_exp(
+        bin_exp(id_exp(ident("a")), &BinaryOp::LogicalOr, id_exp(ident("b"))),
+        &BinaryOp::LogicalOr,
+        id_exp(ident("c"))
+      ),
+    );
+  }
+
+  #[gtest]
+  fn logical_and_higher_precendence_than_or() {
+    expect_that!(
+      parse_single_exp("a || b && c").unwrap(),
+      bin_exp(
+        id_exp(ident("a")),
+        &BinaryOp::LogicalOr,
+        bin_exp(
+          id_exp(ident("b")),
+          &BinaryOp::LogicalAnd,
+          id_exp(ident("c")),
+        ),
+      ),
+    );
+  }
+
+  #[gtest]
+  fn logical_and_rejects_non_joint_tokens() {
+    expect_that!(parse_single_exp("a & & b"), failed_to_parse());
+  }
+
+  #[gtest]
+  fn logical_or_rejects_non_joint_tokens() {
+    expect_that!(parse_single_exp("a | | b"), failed_to_parse());
+  }
+
+  #[gtest]
+  fn logical_and_higher_precedence_than_arithmetic() {
+    expect_that!(
+      parse_single_exp("a < b && b < c").unwrap(),
+      bin_exp(
+        bin_exp(id_exp(ident("a")), &BinaryOp::LessThan, id_exp(ident("b")),),
+        &BinaryOp::LogicalAnd,
+        bin_exp(id_exp(ident("b")), &BinaryOp::LessThan, id_exp(ident("c")),),
+      ),
+    );
   }
 
   #[gtest]
