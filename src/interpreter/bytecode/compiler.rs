@@ -250,9 +250,9 @@ impl<'a> OpenCursor<'a> {
       Expression::Ident(ident) => Ok(self.emit_local_load(ident)),
       Expression::BinaryExpression(expr) => self.compile_binary_expression(expr),
       Expression::CallExpression(expr) => self.compile_call_expression(expr),
-      Expression::DotExpression(_) => Err(InterpreterError::unimplemented(
-        "dot expression not yet supported",
-      )),
+      expr => Err(InterpreterError::unimplemented(format!(
+        "evaluation of expression not yet implemented: {expr}"
+      ))),
     }
   }
 
