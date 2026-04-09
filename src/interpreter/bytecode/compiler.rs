@@ -1,3 +1,5 @@
+use cknittel_util::from_variants::FromVariants;
+
 use crate::{
   interpreter::{
     bytecode::{
@@ -97,21 +99,10 @@ struct ClosedCursor<'a> {
   lexical_scope: JitCompilerLexicalScope<'a>,
 }
 
+#[derive(FromVariants)]
 enum Cursor<'a> {
   Open(OpenCursor<'a>),
   Closed(ClosedCursor<'a>),
-}
-
-impl<'a> From<OpenCursor<'a>> for Cursor<'a> {
-  fn from(val: OpenCursor<'a>) -> Self {
-    Cursor::Open(val)
-  }
-}
-
-impl<'a> From<ClosedCursor<'a>> for Cursor<'a> {
-  fn from(val: ClosedCursor<'a>) -> Self {
-    Cursor::Closed(val)
-  }
 }
 
 impl<'a> OpenCursor<'a> {
