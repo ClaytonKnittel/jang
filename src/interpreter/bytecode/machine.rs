@@ -210,68 +210,29 @@ impl<'a> JitCallFrame<'a> {
   }
 }
 
-struct Machine<'a> {
-  parent_frames: Vec<JitCallFrame<'a>>,
-  frame: JitCallFrame<'a>,
-}
-
-enum MachineStatus<'a> {
-  Running,
-  Finished(Value<'a>),
-}
-
-impl<'a> Machine<'a> {
-  fn new(jit_fn: &'a JitCompiledFunction<'a>, args: Vec<Value<'a>>) -> InterpreterResult<Self> {
-    Ok(Self {
-      parent_frames: Vec::new(),
-      frame: JitCallFrame::from_call(jit_fn, args)?,
-    })
-  }
-
-  fn push_frame(
-    &mut self,
-    target_fn: &'a JitCompiledFunction<'a>,
-    args: Vec<Value<'a>>,
-  ) -> InterpreterResult<()> {
-    let frame = std::mem::replace(&mut self.frame, JitCallFrame::from_call(target_fn, args)?);
-    self.parent_frames.push(frame);
-    Ok(())
-  }
-
-  // Executes a single instruction.
-  fn step(
-    &mut self,
-    context: &'a impl JitFunctionContext<'a>,
-  ) -> InterpreterResult<MachineStatus<'a>> {
-    match self.frame.step(context)? {
-      FrameAction::Continue => Ok(MachineStatus::Running),
-      FrameAction::Call { target_fn, args } => {
-        self.push_frame(target_fn, args)?;
-        Ok(MachineStatus::Running)
-      }
-      FrameAction::Return(value) => {
-        if let Some(parent) = self.parent_frames.pop() {
-          self.frame = parent;
-          self.frame.stack.push_value(value);
-          Ok(MachineStatus::Running)
-        } else {
-          Ok(MachineStatus::Finished(value))
-        }
-      }
-    }
-  }
-}
-
 pub fn evaluate_function<'a>(
   jit_fn: &'a JitCompiledFunction<'a>,
   args: Vec<Value<'a>>,
   context: &'a impl JitFunctionContext<'a>,
 ) -> InterpreterResult<Value<'a>> {
-  let mut machine = Machine::new(jit_fn, args)?;
+  let mut parent_frames = vec![];
+  let mut current_frame = JitCallFrame::from_call(jit_fn, args)?;
+
   loop {
-    match machine.step(context)? {
-      MachineStatus::Running => {}
-      MachineStatus::Finished(value) => return Ok(value),
+    match current_frame.step(context)? {
+      FrameAction::Continue => {}
+      FrameAction::Call { target_fn, args } => {
+        parent_frames.push(current_frame);
+        current_frame = JitCallFrame::from_call(target_fn, args)?;
+      }
+      FrameAction::Return(value) => {
+        if let Some(parent) = parent_frames.pop() {
+          current_frame = parent;
+          current_frame.stack.push_value(value);
+        } else {
+          return Ok(value);
+        }
+      }
     }
   }
 }
