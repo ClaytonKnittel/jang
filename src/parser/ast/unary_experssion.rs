@@ -46,14 +46,7 @@ impl UnaryExpression {
 
 impl Display for UnaryExpression {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self.expr() {
-      Expression::Literal(_)
-      | Expression::Ident(_)
-      | Expression::UnaryExpression(_)
-      | Expression::CallExpression(_)
-      | Expression::DotExpression(_) => write!(f, "{}{}", self.op, self.expr),
-      _ => write!(f, "{}({})", self.op, self.expr),
-    }
+    write!(f, "{}{}", self.op, self.expr)
   }
 }
 

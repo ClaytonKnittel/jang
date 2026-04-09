@@ -1169,6 +1169,28 @@ mod tests {
   }
 
   #[gtest]
+  fn logical_not_lower_precedence_that_dot_expr() {
+    expect_that!(
+      parse_single_exp("!a.b").unwrap(),
+      logical_not_exp(all![
+        dot_expr_base(id_exp(ident("a"))),
+        dot_expr_member(ident("b")),
+      ]),
+    );
+  }
+
+  #[gtest]
+  fn logical_not_lower_precedence_that_dot_call() {
+    expect_that!(
+      parse_single_exp("!a.b()").unwrap(),
+      logical_not_exp(call_expression(call_expr_target(all![
+        dot_expr_base(id_exp(ident("a"))),
+        dot_expr_member(ident("b")),
+      ])))
+    );
+  }
+
+  #[gtest]
   fn logical_not_expression_higher_precendence_than_and() {
     expect_that!(
       parse_single_exp("!a && b").unwrap(),
