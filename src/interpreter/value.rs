@@ -1,5 +1,5 @@
 use std::{
-  fmt::{Debug, Display},
+  fmt::Debug,
   ops::{Div, Rem},
 };
 
@@ -14,20 +14,11 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub enum Value<'a> {
-  Bool(bool),
   Unit,
+  Bool(bool),
   Int32(i32),
   Float32(f32),
   JitCompiledFunctionRef(&'a JitCompiledFunction<'a>),
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ValueKind {
-  Bool,
-  Unit,
-  Int32,
-  Float32,
-  Function,
 }
 
 /// A pair of two identically-typed numeric values.
@@ -53,13 +44,13 @@ impl<'a> Value<'a> {
     literal.try_into()
   }
 
-  pub fn ty(&self) -> ValueKind {
+  pub fn debug_type_name(&self) -> &'static str {
     match self {
-      Self::Bool(_) => ValueKind::Bool,
-      Self::Unit => ValueKind::Unit,
-      Self::Int32(_) => ValueKind::Int32,
-      Self::Float32(_) => ValueKind::Float32,
-      Self::JitCompiledFunctionRef(_) => ValueKind::Function,
+      Self::Unit => "unit",
+      Self::Bool(_) => "bool",
+      Self::Int32(_) => "i32",
+      Self::Float32(_) => "f32",
+      Self::JitCompiledFunctionRef(_) => "<compiled-bytecode>",
     }
   }
 
@@ -73,8 +64,8 @@ impl<'a> Value<'a> {
       (Value::Float32(a), Value::Float32(b)) => Ok(NumericValuePair::Float32(*a, *b)),
       (lhs, rhs) => Err(InterpreterError::value_err(format!(
         "{op}: expected matching numeric operands, got {} and {}",
-        lhs.ty(),
-        rhs.ty(),
+        lhs.debug_type_name(),
+        rhs.debug_type_name(),
       ))),
     }
   }
@@ -84,7 +75,7 @@ impl<'a> Value<'a> {
       Value::Bool(v) => Ok(*v),
       _ => Err(InterpreterError::value_err(format!(
         "expected bool, got {} ({:?})",
-        self.ty(),
+        self.debug_type_name(),
         self
       ))),
     }
@@ -167,8 +158,8 @@ impl<'a> Value<'a> {
       (Self::Int32(a), Value::Int32(b)) => a == b,
       _ => Err(InterpreterError::value_err(format!(
         "operands not supported for equality, got {} and {}",
-        self.ty(),
-        rhs.ty()
+        self.debug_type_name(),
+        rhs.debug_type_name()
       )))?,
     }))
   }
@@ -181,22 +172,6 @@ impl<'a> Value<'a> {
         value
       ))),
     }
-  }
-}
-
-impl Display for ValueKind {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "{}",
-      match self {
-        ValueKind::Bool => "bool",
-        ValueKind::Unit => "unit",
-        ValueKind::Int32 => "i32",
-        ValueKind::Float32 => "f32",
-        ValueKind::Function => "<compiled-bytecode>",
-      }
-    )
   }
 }
 
