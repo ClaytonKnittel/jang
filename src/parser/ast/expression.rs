@@ -5,7 +5,7 @@ use cknittel_util::from_variants::FromVariants;
 use crate::parser::{
   ast::{
     binary_expression::BinaryExpression, call_expression::CallExpression,
-    dot_expression::DotExpression,
+    dot_expression::DotExpression, unary_experssion::UnaryExpression,
   },
   token::{ident::Ident, literal::Literal},
 };
@@ -15,6 +15,7 @@ pub enum Expression {
   Literal(Literal),
   Ident(Ident),
   BinaryExpression(BinaryExpression),
+  UnaryExpression(UnaryExpression),
   CallExpression(CallExpression),
   DotExpression(DotExpression),
 }
@@ -25,6 +26,7 @@ impl Display for Expression {
       Self::Literal(literal) => write!(f, "{literal}"),
       Self::Ident(ident) => write!(f, "{ident}"),
       Self::BinaryExpression(binary_expr) => write!(f, "({binary_expr})"),
+      Self::UnaryExpression(unary_expr) => write!(f, "{unary_expr}"),
       Self::CallExpression(call_expr) => write!(f, "{call_expr}"),
       Self::DotExpression(dot_expr) => write!(f, "{dot_expr}"),
     }
