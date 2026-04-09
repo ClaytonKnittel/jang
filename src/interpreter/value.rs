@@ -1,5 +1,5 @@
 use std::{
-  fmt::Debug,
+  fmt::{Debug, Display},
   ops::{Div, Rem},
 };
 
@@ -18,6 +18,14 @@ pub enum Value<'a> {
   Int32(i32),
   Float32(f32),
   JitCompiledFunctionRef(&'a JitCompiledFunction<'a>),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValueKind {
+  Unit,
+  Int32,
+  Float32,
+  Function,
 }
 
 /// A pair of two identically-typed numeric values.
@@ -43,6 +51,15 @@ impl<'a> Value<'a> {
     literal.try_into()
   }
 
+  pub fn ty(&self) -> ValueKind {
+    match self {
+      Self::Unit => ValueKind::Unit,
+      Self::Int32(_) => ValueKind::Int32,
+      Self::Float32(_) => ValueKind::Float32,
+      Self::JitCompiledFunctionRef(_) => ValueKind::Function,
+    }
+  }
+
   pub fn debug_type_name(&self) -> String {
     match self {
       Self::Int32(_) => "i32".into(),
@@ -52,55 +69,40 @@ impl<'a> Value<'a> {
     }
   }
 
-  fn to_numeric_pair(&self, other: &Self) -> InterpreterResult<NumericValuePair> {
+  fn to_numeric_pair(&self, other: &Self, op: &'static str) -> InterpreterResult<NumericValuePair> {
     match (self, other) {
-      (Self::Int32(a), Self::Int32(b)) => Ok(NumericValuePair::Int32(*a, *b)),
-      (Self::Float32(a), Self::Float32(b)) => Ok(NumericValuePair::Float32(*a, *b)),
-      (Self::Int32(_), _) | (Self::Float32(_), _) => Err(InterpreterError::value_err(format!(
-        "type mismatch: {:?} != {:?}",
-        self.debug_type_name(),
-        other.debug_type_name()
+      (Value::Int32(a), Value::Int32(b)) => Ok(NumericValuePair::Int32(*a, *b)),
+      (Value::Float32(a), Value::Float32(b)) => Ok(NumericValuePair::Float32(*a, *b)),
+      (lhs, rhs) => Err(InterpreterError::value_err(format!(
+        "{op}: expected matching numeric operands, got {} and {}",
+        lhs.ty(),
+        rhs.ty(),
       ))),
-      (Self::JitCompiledFunctionRef(_), _) => Err(InterpreterError::value_err(format!(
-        "non-numeric value: {}",
-        self.debug_type_name()
-      ))),
-      (Self::Unit, _) => Err(InterpreterError::value_err("unit value, expected numeric")),
     }
   }
-
   pub fn multiply(&self, other: &Self) -> InterpreterResult<Self> {
-    match self
-      .to_numeric_pair(other)
-      .map_err(|e| e.prefix("multiply: "))?
-    {
+    match self.to_numeric_pair(other, "multiply")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a * b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a * b)),
     }
   }
 
   pub fn add(&self, other: &Self) -> InterpreterResult<Self> {
-    match self.to_numeric_pair(other).map_err(|e| e.prefix("add: "))? {
+    match self.to_numeric_pair(other, "add")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a + b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a + b)),
     }
   }
 
   pub fn subtract(&self, other: &Self) -> InterpreterResult<Self> {
-    match self
-      .to_numeric_pair(other)
-      .map_err(|e| e.prefix("subtract: "))?
-    {
+    match self.to_numeric_pair(other, "subtract")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a - b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a - b)),
     }
   }
 
   pub fn divide(&self, divisor: &Self) -> InterpreterResult<Self> {
-    match self
-      .to_numeric_pair(divisor)
-      .map_err(|e| e.prefix("divide: "))?
-    {
+    match self.to_numeric_pair(divisor, "divide")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a.checked_div(b).ok_or_else(|| {
         InterpreterError::value_err(format!("division by zero: {:?} / {:?}", self, divisor))
       })?)),
@@ -109,10 +111,7 @@ impl<'a> Value<'a> {
   }
 
   pub fn modulo(&self, divisor: &Self) -> InterpreterResult<Self> {
-    match self
-      .to_numeric_pair(divisor)
-      .map_err(|e| e.prefix("modulo: "))?
-    {
+    match self.to_numeric_pair(divisor, "modulo")? {
       NumericValuePair::Int32(a, b) => Ok(Value::Int32(a.checked_rem(b).ok_or_else(|| {
         InterpreterError::value_err(format!("modulo by zero: {:?} / {:?}", self, divisor))
       })?)),
@@ -138,6 +137,21 @@ impl<'a> Value<'a> {
         value
       ))),
     }
+  }
+}
+
+impl Display for ValueKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{}",
+      match self {
+        ValueKind::Unit => "unit",
+        ValueKind::Int32 => "i32",
+        ValueKind::Float32 => "f32",
+        ValueKind::Function => "<compiled-bytecode>",
+      }
+    )
   }
 }
 

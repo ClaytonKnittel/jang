@@ -29,16 +29,6 @@ impl InterpreterError {
   pub fn value_err(message: impl Into<String>) -> Self {
     Self::Value(message.into())
   }
-
-  pub fn prefix(self, message: impl Into<String>) -> Self {
-    match self {
-      InterpreterError::Generic(s) => InterpreterError::Generic(message.into() + &s),
-      InterpreterError::Internal(s) => InterpreterError::Internal(message.into() + &s),
-      InterpreterError::JitCompile(s) => InterpreterError::JitCompile(message.into() + &s),
-      InterpreterError::Unimplemented(s) => InterpreterError::Unimplemented(message.into() + &s),
-      InterpreterError::Value(s) => InterpreterError::Value(message.into() + &s),
-    }
-  }
 }
 
 impl Display for InterpreterError {
@@ -56,3 +46,16 @@ impl Display for InterpreterError {
 }
 
 pub type InterpreterResult<T = ()> = Result<T, InterpreterError>;
+
+#[cfg(test)]
+pub(crate) mod matchers {
+  use googletest::prelude::*;
+
+  use crate::interpreter::error::InterpreterError;
+
+  pub fn interpreter_value_error<'a>(
+    message_matcher: impl Matcher<&'a String>,
+  ) -> impl Matcher<&'a InterpreterError> {
+    pat!(InterpreterError::Value(message_matcher))
+  }
+}

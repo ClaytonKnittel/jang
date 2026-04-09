@@ -76,14 +76,17 @@ mod tests {
   use googletest::{expect_that, gtest, prelude::*};
 
   use crate::{
-    error::JangResult, interpreter::machine::Interpreter,
+    interpreter::{
+      error::{InterpreterResult, matchers::interpreter_value_error},
+      machine::Interpreter,
+    },
     parser::grammar::testing::lex_and_parse_jang_file,
   };
 
-  fn interpret_program(text: impl IntoIterator<Item = char>) -> JangResult<i32> {
+  fn interpret_program(text: impl IntoIterator<Item = char>) -> InterpreterResult<i32> {
     let ast = lex_and_parse_jang_file(text).unwrap();
     let interp = Interpreter::new(&ast).unwrap();
-    interp.run_main().map_err(|err| err.into())
+    interp.run_main()
   }
 
   #[gtest]
@@ -461,7 +464,7 @@ mod tests {
         "#
         .chars()
       ),
-      err(displays_as(contains_substring("type mismatch")))
+      err(interpreter_value_error(contains_substring("add")))
     );
   }
 }
