@@ -172,7 +172,7 @@ pub_grammar!(
 
   <expr>: Expression => <comparison_expr>;
 
-  <comparison_expr>: Expression => <add_expr> <comparator> <add_expr> {
+  <comparison_expr>: Expression => <comparison_expr> <comparator> <add_expr> {
     BinaryExpression::new(#0, #2, #comparator).into()
   };
   <comparison_expr>: Expression => <add_expr>;
@@ -1133,13 +1133,24 @@ mod tests {
   }
 
   #[gtest]
-  fn comparison_equal_does_not_parse() {
-    expect_that!(parse_single_exp("1 = 2"), err(anything()));
+  fn chained_comparison_left_associative() {
+    expect_that!(
+      parse_single_exp("1 < 2 < 3").unwrap(),
+      bin_exp(
+        bin_exp(
+          lit_exp(integral("1")),
+          &BinaryOp::LessThan,
+          lit_exp(integral("2"))
+        ),
+        &BinaryOp::LessThan,
+        lit_exp(integral("3"))
+      )
+    );
   }
 
   #[gtest]
-  fn chained_comparison_not_allowed() {
-    expect_that!(parse_single_exp("1 < 3 > 2"), err(anything()));
+  fn comparison_equal_does_not_parse() {
+    expect_that!(parse_single_exp("1 = 2"), err(anything()));
   }
 
   #[gtest]
