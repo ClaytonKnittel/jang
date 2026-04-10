@@ -3,13 +3,13 @@ use std::fmt::Display;
 use cknittel_util::from_variants::FromVariants;
 
 use crate::parser::ast::{
-  block::Block, call_expression::CallExpression, if_statement::IfStatement,
-  let_statement::LetStatement, loop_statement::LoopStatement, ret_statement::RetStatement,
+  assignment_statement::AssignmentStatement, block::Block, call_expression::CallExpression,
+  if_statement::IfStatement, loop_statement::LoopStatement, ret_statement::RetStatement,
 };
 
 #[derive(Clone, Debug, FromVariants)]
 pub enum Statement {
-  Let(LetStatement),
+  Assign(AssignmentStatement),
   Ret(RetStatement),
   CallStatement(CallExpression),
   IfStatement(IfStatement),
@@ -21,7 +21,7 @@ pub enum Statement {
 impl Display for Statement {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      Self::Let(let_stmt) => write!(f, "{let_stmt}"),
+      Self::Assign(let_stmt) => write!(f, "{let_stmt}"),
       Self::Ret(ret_stmt) => write!(f, "{ret_stmt}"),
       Self::CallStatement(call_stmt) => write!(f, "{call_stmt}"),
       Self::IfStatement(if_stmt) => write!(f, "{if_stmt}"),

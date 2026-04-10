@@ -181,7 +181,7 @@ impl<'a> OpenCursor<'a> {
 
   fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a>> {
     match statement {
-      Statement::Let(let_statement) => Ok(
+      Statement::Assign(let_statement) => Ok(
         self
           .compile_expr(let_statement.expr())?
           .emit_local_store(let_statement.var())
