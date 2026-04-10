@@ -486,6 +486,29 @@ mod tests {
     );
   }
 
+  #[gtest]
+  fn reassign_in_if_statement() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn test(x: i32) -> i32 {
+          mut ret_val = 3
+          if x == 2 {
+            ret_val = 100
+          }
+          ret ret_val
+        }
+
+        fn main() -> i32 {
+          ret test(1) + test(2)
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&103))
+    );
+  }
+
   #[cfg(test)]
   mod examples {
     use crate::interpreter::interpreter::tests::interpret_program;
