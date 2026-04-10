@@ -388,6 +388,11 @@ mod tests {
   }
 
   #[gtest]
+  fn grammar_size() {
+    expect_eq!(JangGrammar::TABLE_SIZE, 334);
+  }
+
+  #[gtest]
   fn parse_minimal_function() {
     let ast = JangGrammar::parse_fallible(lex_stream(
       r#"
