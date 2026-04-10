@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
   interpreter::{
-    bytecode::local_table::LocalId,
+    bytecode::runtime::local_table::LocalId,
     error::{InterpreterError, InterpreterResult},
   },
   parser::token::ident::Ident,

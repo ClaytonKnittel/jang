@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use crate::{
   interpreter::{
     bytecode::{
-      compiler::compile_to_bytecode,
-      instruction::JitCompiledFunction,
-      machine::{self, JitFunctionContext},
+      compiler::{compile_to_bytecode, instruction::JitCompiledFunction},
+      runtime::machine::{self, JitFunctionContext},
     },
     error::{InterpreterError, InterpreterResult},
     value::Value,

@@ -2,7 +2,7 @@ use cknittel_util::from_variants::FromVariants;
 
 use crate::{
   interpreter::{
-    bytecode::{
+    bytecode::compiler::{
       instruction::{
         ConditionalJumpTargets, JitCallInstruction, JitCompiledFunction, JitInstruction,
         JitInstructionBlock, JitTerminalInstruction,
@@ -401,8 +401,11 @@ mod tests {
     error::JangResult,
     interpreter::{
       bytecode::{
-        compiler::compile_to_bytecode, instruction::matchers::*,
-        instruction_block_list::testing::block_id, local_table::testing::local_id,
+        compiler::{
+          compiler::compile_to_bytecode, instruction::matchers::*,
+          instruction_block_list::testing::block_id,
+        },
+        runtime::local_table::testing::local_id,
       },
       error::InterpreterError,
     },

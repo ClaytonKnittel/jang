@@ -45,7 +45,7 @@ impl<T> LocalTable<T> {
 
 #[cfg(test)]
 pub mod testing {
-  use crate::interpreter::bytecode::local_table::LocalId;
+  use crate::interpreter::bytecode::runtime::local_table::LocalId;
 
   pub fn local_id(index: usize) -> LocalId {
     LocalId(index)

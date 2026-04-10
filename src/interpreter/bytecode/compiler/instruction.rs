@@ -1,7 +1,7 @@
 use crate::{
   interpreter::bytecode::{
-    instruction_block_list::{BlockId, BlockList},
-    local_table::LocalId,
+    compiler::instruction_block_list::{BlockId, BlockList},
+    runtime::local_table::LocalId,
   },
   parser::{
     ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
@@ -153,7 +153,9 @@ pub mod matchers {
     JitInstructionBlock, JitTerminalInstruction,
   };
   use crate::{
-    interpreter::bytecode::{instruction_block_list::BlockId, local_table::LocalId},
+    interpreter::bytecode::{
+      compiler::instruction_block_list::BlockId, runtime::local_table::LocalId,
+    },
     parser::{
       ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
       token::{ident::Ident, literal::Literal},
@@ -303,7 +305,7 @@ pub mod matchers {
 
 #[cfg(test)]
 pub mod testing {
-  use crate::interpreter::bytecode::{
+  use crate::interpreter::bytecode::compiler::{
     instruction::{
       JitCompiledFunction, JitInstruction, JitInstructionBlock, JitTerminalInstruction,
     },
