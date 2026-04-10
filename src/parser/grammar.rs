@@ -308,7 +308,6 @@ pub_grammar!(
   <ident>: Ident => Ident(..);
 );
 
-#[cfg(test)]
 pub mod testing {
   use parser_generator::parser::Parser;
 
