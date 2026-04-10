@@ -626,5 +626,45 @@ mod tests {
         ok(eq(&4613732))
       );
     }
+
+    #[gtest]
+    fn project_euler_problem5() {
+      expect_that!(
+        interpret_program(
+          r#"
+          fn gcd(a: i32, b: i32) -> i32 {
+            if b == 0 {
+              ret a
+            } else if a < b {
+              ret gcd(b, a)
+            } else {
+              let d = a / b
+              let c = d * b
+              ret gcd(b, a - c)
+            }
+          }
+
+          fn solve(n: i32) -> i32 {
+            mut l = 1
+            mut i = 2
+            loop {
+              l = i / gcd(l, i) * l
+              i = i + 1
+              if i > n {
+                break
+              }
+            }
+            ret l
+          }
+
+          fn main() -> i32 {
+            ret solve(20)
+          }
+          "#
+          .chars()
+        ),
+        ok(eq(&232792560))
+      );
+    }
   }
 }
