@@ -6,19 +6,13 @@ pub struct LoopContext {
 }
 
 impl LoopContext {
-  pub fn new(break_target: BlockId) -> Self {
+  pub fn exchange(&mut self, break_target: BlockId) -> Self {
     Self {
-      break_target: Some(break_target),
+      break_target: self.break_target.replace(break_target),
     }
   }
 
   pub fn break_target(&self) -> Option<BlockId> {
     self.break_target
-  }
-
-  pub fn exchange(&mut self, break_target: BlockId) -> Self {
-    Self {
-      break_target: self.break_target.replace(break_target),
-    }
   }
 }
