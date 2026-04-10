@@ -36,4 +36,12 @@ jobs:
       - name: Fuzz for 10s
         working-directory: jang/fuzz
         run: |
-          cargo fuzz run parser -- -max_total_time=10
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FUZZ_TIME=10
+          else
+            FUZZ_TIME=180
+          fi
+
+          echo "Running fuzz for $FUZZ_TIME seconds"
+
+          cargo fuzz run parser -- -max_total_time=$FUZZ_TIME
