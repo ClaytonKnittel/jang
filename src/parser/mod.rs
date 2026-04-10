@@ -7,7 +7,7 @@ use parser_generator::{error::ParserError, parser::Parser};
 pub mod ast;
 pub mod grammar;
 pub mod lexer;
-mod token;
+pub(crate) mod token;
 
 pub fn parse_jang(stream: impl IntoIterator<Item = char>) -> JangResult<JangFile> {
   JangGrammar::parse_fallible(lex_stream(stream)).map_err(|err| match err {

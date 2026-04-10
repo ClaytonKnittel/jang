@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NumericLiteral {
   Integral(String),
@@ -15,6 +17,14 @@ impl NumericLiteral {
   }
 }
 
+impl Display for NumericLiteral {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Integral(val) | Self::Float(val) => write!(f, "{val}"),
+    }
+  }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Literal {
   Numeric(NumericLiteral),
@@ -23,6 +33,14 @@ pub enum Literal {
 impl From<NumericLiteral> for Literal {
   fn from(value: NumericLiteral) -> Self {
     Self::Numeric(value)
+  }
+}
+
+impl Display for Literal {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Numeric(numeric_literal) => write!(f, "{numeric_literal}"),
+    }
   }
 }
 

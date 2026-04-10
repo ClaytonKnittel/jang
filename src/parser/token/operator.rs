@@ -32,6 +32,12 @@ pub enum Op {
   Slash,
   /// '%'
   Percent,
+  /// '|'
+  Bar,
+  /// '!'
+  Bang,
+  /// '&'
+  Ampersand,
 }
 
 impl Op {
@@ -52,6 +58,9 @@ impl Op {
       '*' => Some(Self::Star),
       '/' => Some(Self::Slash),
       '%' => Some(Self::Percent),
+      '|' => Some(Self::Bar),
+      '!' => Some(Self::Bang),
+      '&' => Some(Self::Ampersand),
       _ => None,
     }
   }
@@ -73,6 +82,9 @@ impl Op {
       Self::Star => '*',
       Self::Slash => '/',
       Self::Percent => '%',
+      Self::Bar => '|',
+      Self::Bang => '!',
+      Self::Ampersand => '&',
     }
   }
 
@@ -83,13 +95,16 @@ impl Op {
     match self {
       Self::Dash => other_op == '>',
       Self::CloseParen => other_op == '(',
-      Self::Equal
-      | Self::Comma
+      Self::Bang => other_op == '=',
+      Self::LessThan => other_op == '=',
+      Self::GreaterThan => other_op == '=',
+      Self::Equal => other_op == '=',
+      Self::Ampersand => other_op == '&',
+      Self::Bar => other_op == '|',
+      Self::Comma
       | Self::OpenParen
       | Self::OpenBracket
       | Self::CloseBracket
-      | Self::LessThan
-      | Self::GreaterThan
       | Self::Colon
       | Self::Dot
       | Self::Plus
@@ -129,7 +144,7 @@ pub(crate) mod matchers {
   };
   use googletest::prelude::*;
 
-  pub fn operator_matcher<'a>(op: &'a Op) -> impl Matcher<&'a JangToken> {
+  pub fn operator_matcher(op: &Op) -> impl Matcher<&JangToken> {
     pat!(JangToken::Operator(pat!(Operator { op: op })))
   }
 

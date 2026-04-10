@@ -1,21 +1,25 @@
+use std::fmt::Display;
+
+use cknittel_util::builder::Builder;
+
 use crate::parser::{
-  ast::{block::Block, type_expr::Type},
+  ast::{block::Block, type_expr::TypeExpression},
   token::ident::Ident,
 };
 
 #[derive(Clone, Debug)]
 pub struct FunctionDecl {
   name: Ident,
-  parameters: Vec<FunctionParameter>,
-  return_type: Option<Type>,
+  parameters: FunctionParameters,
+  return_type: Option<TypeExpression>,
   body: Block,
 }
 
 impl FunctionDecl {
   pub fn new(
     name: Ident,
-    parameters: Vec<FunctionParameter>,
-    return_type: Option<Type>,
+    parameters: FunctionParameters,
+    return_type: Option<TypeExpression>,
     body: Block,
   ) -> Self {
     Self {
@@ -31,10 +35,10 @@ impl FunctionDecl {
   }
 
   pub fn parameters(&self) -> &[FunctionParameter] {
-    &self.parameters
+    self.parameters.parameters()
   }
 
-  pub fn return_type(&self) -> Option<&Type> {
+  pub fn return_type(&self) -> Option<&TypeExpression> {
     self.return_type.as_ref()
   }
 
@@ -43,14 +47,52 @@ impl FunctionDecl {
   }
 }
 
+impl Display for FunctionDecl {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match &self.return_type {
+      Some(ty) => write!(f, "fn {}({}) -> {} ", self.name, self.parameters, ty)?,
+      None => write!(f, "fn {}({}) ", self.name, self.parameters)?,
+    }
+    writeln!(f, "{}", self.body)
+  }
+}
+
+#[derive(Clone, Debug, Builder)]
+pub struct FunctionParameters {
+  #[vec]
+  parameters: Vec<FunctionParameter>,
+}
+
+impl FunctionParameters {
+  pub fn parameters(&self) -> &[FunctionParameter] {
+    &self.parameters
+  }
+}
+
+impl Display for FunctionParameters {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut first = true;
+    for parameter in &self.parameters {
+      if first {
+        first = false;
+      } else {
+        write!(f, ", ")?;
+      }
+
+      write!(f, "{parameter}")?;
+    }
+    Ok(())
+  }
+}
+
 #[derive(Clone, Debug)]
 pub struct FunctionParameter {
   name: Ident,
-  ty: Type,
+  ty: TypeExpression,
 }
 
 impl FunctionParameter {
-  pub fn new(name: Ident, ty: Type) -> Self {
+  pub fn new(name: Ident, ty: TypeExpression) -> Self {
     Self { name, ty }
   }
 
@@ -58,8 +100,14 @@ impl FunctionParameter {
     &self.name
   }
 
-  pub fn ty(&self) -> &Type {
+  pub fn ty(&self) -> &TypeExpression {
     &self.ty
+  }
+}
+
+impl Display for FunctionParameter {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}: {}", self.name, self.ty)
   }
 }
 
@@ -69,7 +117,7 @@ pub(crate) mod matchers {
     ast::{
       block::Block,
       function_decl::{FunctionDecl, FunctionParameter},
-      type_expr::Type,
+      type_expr::TypeExpression,
     },
     token::ident::Ident,
   };
@@ -83,7 +131,9 @@ pub(crate) mod matchers {
     property!(&FunctionDecl.return_type(), none())
   }
 
-  pub fn fn_return_type<'a>(matcher: impl Matcher<&'a Type>) -> impl Matcher<&'a FunctionDecl> {
+  pub fn fn_return_type<'a>(
+    matcher: impl Matcher<&'a TypeExpression>,
+  ) -> impl Matcher<&'a FunctionDecl> {
     property!(&FunctionDecl.return_type(), some(matcher))
   }
 
@@ -104,7 +154,7 @@ pub(crate) mod matchers {
   }
 
   pub fn fn_parameter_type<'a>(
-    matcher: impl Matcher<&'a Type>,
+    matcher: impl Matcher<&'a TypeExpression>,
   ) -> impl Matcher<&'a FunctionParameter> {
     property!(&FunctionParameter.ty(), matcher)
   }

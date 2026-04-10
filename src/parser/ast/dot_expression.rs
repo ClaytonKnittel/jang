@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::parser::{ast::expression::Expression, token::ident::Ident};
 
 #[derive(Clone, Debug)]
@@ -20,6 +22,12 @@ impl DotExpression {
 
   pub fn member(&self) -> &Ident {
     &self.member
+  }
+}
+
+impl Display for DotExpression {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}.{}", self.base, self.member)
   }
 }
 

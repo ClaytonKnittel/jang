@@ -8,7 +8,7 @@ use crate::{
     JangToken,
     ident::Ident,
     keyword::Keyword,
-    literal::NumericLiteral,
+    literal::{Literal, NumericLiteral},
     operator::{Op, Operator},
   },
   source_location::SourceLocation,
@@ -74,7 +74,7 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
 
   fn parse_numeric(&mut self, first_char: char) -> JangToken {
     let numeric = self.collect_while(first_char, is_numeric_char);
-    NumericLiteral::from_str(numeric).into()
+    Literal::from(NumericLiteral::from_str(numeric)).into()
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
@@ -113,7 +113,7 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
       }
       Some(
         first_char @ ('=' | ',' | '(' | ')' | '{' | '}' | '-' | '<' | '>' | ':' | '+' | '*' | '/'
-        | '%'),
+        | '%' | '|' | '!' | '&'),
       ) => Ok(Some(self.parse_operator(first_char))),
       Some(ch) => Err(JangError::parse_error(
         format!("Unexpected symbol '{ch}'"),
@@ -230,12 +230,22 @@ mod tests {
 
   #[gtest]
   fn test_all_keywords() {
-    let text = "fn let ret";
+    let text = "fn let ret if else loop break type mut";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
     expect_that!(
       tokens,
-      elements_are![keyword!(Function), keyword!(Let), keyword!(Ret)]
+      elements_are![
+        keyword!(Function),
+        keyword!(Let),
+        keyword!(Ret),
+        keyword!(If),
+        keyword!(Else),
+        keyword!(Loop),
+        keyword!(Break),
+        keyword!(Type),
+        keyword!(Mut),
+      ]
     );
   }
 
@@ -290,6 +300,84 @@ mod tests {
   }
 
   #[gtest]
+  fn test_joint_equal_to() {
+    let text = "==";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![operator!(Equal), joint(), operator!(Equal)])
+    );
+  }
+
+  #[gtest]
+  fn test_joint_not_equal() {
+    let text = "!=";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![operator!(Bang), joint(), operator!(Equal)])
+    );
+  }
+
+  #[gtest]
+  fn test_joint_greater_than_equal() {
+    let text = ">=";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![
+        operator!(GreaterThan),
+        joint(),
+        operator!(Equal)
+      ])
+    );
+  }
+
+  #[gtest]
+  fn test_joint_less_than_equal() {
+    let text = "<=";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![
+        operator!(LessThan),
+        joint(),
+        operator!(Equal)
+      ])
+    );
+  }
+
+  #[gtest]
+  fn test_joint_double_ampersand() {
+    let text = "&&";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![
+        operator!(Ampersand),
+        joint(),
+        operator!(Ampersand)
+      ])
+    );
+  }
+
+  #[gtest]
+  fn test_joint_double_bar() {
+    let text = "||";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(
+      tokens,
+      ok(elements_are![operator!(Bar), joint(), operator!(Bar)])
+    );
+  }
+
+  #[gtest]
   fn test_joint_close_open_paren() {
     let text = ")(";
 
@@ -315,7 +403,7 @@ mod tests {
 
   #[gtest]
   fn test_other_operators() {
-    let text = "= , ( ) { } - < > : . + * / %";
+    let text = "= , ( ) { } - < > ! : . + * / % | &";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
     expect_that!(
@@ -330,12 +418,15 @@ mod tests {
         operator!(Dash),
         operator!(LessThan),
         operator!(GreaterThan),
+        operator!(Bang),
         operator!(Colon),
         operator!(Dot),
         operator!(Plus),
         operator!(Star),
         operator!(Slash),
         operator!(Percent),
+        operator!(Bar),
+        operator!(Ampersand),
       ])
     );
   }
@@ -345,6 +436,6 @@ mod tests {
     let text = "#";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(tokens, err(pat![JangError::ParseError(anything())]));
+    expect_that!(tokens, err(pat![JangError::Parse(anything())]));
   }
 }

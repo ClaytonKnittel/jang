@@ -1,47 +1,35 @@
+use std::fmt::Display;
+
+use cknittel_util::from_variants::FromVariants;
+
 use crate::parser::{
   ast::{
     binary_expression::BinaryExpression, call_expression::CallExpression,
-    dot_expression::DotExpression,
+    dot_expression::DotExpression, unary_experssion::UnaryExpression,
   },
   token::{ident::Ident, literal::Literal},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, FromVariants)]
 pub enum Expression {
   Literal(Literal),
   Ident(Ident),
   BinaryExpression(BinaryExpression),
+  UnaryExpression(UnaryExpression),
   CallExpression(CallExpression),
   DotExpression(DotExpression),
 }
 
-impl From<Literal> for Expression {
-  fn from(value: Literal) -> Self {
-    Self::Literal(value)
-  }
-}
-
-impl From<Ident> for Expression {
-  fn from(value: Ident) -> Self {
-    Self::Ident(value)
-  }
-}
-
-impl From<BinaryExpression> for Expression {
-  fn from(value: BinaryExpression) -> Self {
-    Self::BinaryExpression(value)
-  }
-}
-
-impl From<CallExpression> for Expression {
-  fn from(value: CallExpression) -> Self {
-    Self::CallExpression(value)
-  }
-}
-
-impl From<DotExpression> for Expression {
-  fn from(value: DotExpression) -> Self {
-    Self::DotExpression(value)
+impl Display for Expression {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Literal(literal) => write!(f, "{literal}"),
+      Self::Ident(ident) => write!(f, "{ident}"),
+      Self::BinaryExpression(binary_expr) => write!(f, "({binary_expr})"),
+      Self::UnaryExpression(unary_expr) => write!(f, "{unary_expr}"),
+      Self::CallExpression(call_expr) => write!(f, "{call_expr}"),
+      Self::DotExpression(dot_expr) => write!(f, "{dot_expr}"),
+    }
   }
 }
 
