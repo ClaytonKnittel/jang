@@ -430,13 +430,7 @@ mod tests {
   #[gtest]
   fn function_call() {
     let sub_function = function_bytecode(vec![block(
-      vec![
-        JitInstruction::StoreLocal(local_id(0)),
-        JitInstruction::LoadLocal(local_id(0)),
-        JitInstruction::StoreLocal(local_id(1)),
-        JitInstruction::LoadLocal(local_id(1)),
-        JitInstruction::BinaryOp(BinaryOp::Sub),
-      ],
+      vec![JitInstruction::BinaryOp(BinaryOp::Sub)],
       JitTerminalInstruction::Return,
     )]);
     let sub_function_name = Ident::new("sub");

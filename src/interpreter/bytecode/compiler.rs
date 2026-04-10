@@ -203,13 +203,8 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_lexical_block(self, block: &'a Block) -> InterpreterResult<Cursor<'a>> {
-    block
-      .statements()
-      .iter()
-      .try_fold(
-        self.enter_lexical_scope().into(),
-        |cur: Cursor<'a>, stmt| cur.compile_statement(stmt),
-      )?
+    Cursor::from(self.enter_lexical_scope())
+      .compile_statements(block.statements())?
       .exit_lexical_scope()
   }
 
@@ -345,7 +340,7 @@ impl<'a> Cursor<'a> {
     }
   }
 
-  fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a>> {
+  fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Self> {
     match self {
       Cursor::Open(cur) => cur.compile_statement(statement),
       Cursor::Closed(_) => Err(InterpreterError::jit_err(format!(
@@ -353,6 +348,15 @@ impl<'a> Cursor<'a> {
         statement
       ))),
     }
+  }
+
+  fn compile_statements(
+    self,
+    statements: impl IntoIterator<Item = &'a Statement>,
+  ) -> InterpreterResult<Self> {
+    statements
+      .into_iter()
+      .try_fold(self, |cur, stmt| cur.compile_statement(stmt))
   }
 
   fn exit_lexical_scope(self) -> InterpreterResult<Self> {

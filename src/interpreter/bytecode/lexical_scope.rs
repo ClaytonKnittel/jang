@@ -9,11 +9,8 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct JitCompilerLexicalScope<'a>(Box<JitCompilerLexicalBlock<'a>>);
-
-#[derive(Debug, Default)]
-struct JitCompilerLexicalBlock<'a> {
-  parent: Option<JitCompilerLexicalScope<'a>>,
+pub struct JitCompilerLexicalScope<'a> {
+  parent: Option<Box<JitCompilerLexicalScope<'a>>>,
   next_local_id: LocalId,
   locals: HashMap<&'a Ident, LocalId>,
 }
@@ -21,36 +18,35 @@ struct JitCompilerLexicalBlock<'a> {
 impl<'a> JitCompilerLexicalScope<'a> {
   pub fn get_binding(&self, name: &Ident) -> Option<LocalId> {
     self
-      .0
       .locals
       .get(name)
       .copied()
-      .or_else(|| self.0.parent.as_ref()?.get_binding(name))
+      .or_else(|| self.parent.as_ref()?.get_binding(name))
   }
 
   pub fn bind(&mut self, name: &'a Ident) -> LocalId {
-    debug_assert!(!self.0.locals.contains_key(name));
+    debug_assert!(!self.locals.contains_key(name));
 
-    let local_id = self.0.next_local_id;
-    self.0.next_local_id = local_id.next();
-    self.0.locals.insert(name, local_id);
+    let local_id = self.next_local_id;
+    self.next_local_id = local_id.next();
+    self.locals.insert(name, local_id);
 
     local_id
   }
 
   pub fn enter_block(self) -> Self {
-    let next_local_id = self.0.next_local_id;
-    Self(Box::new(JitCompilerLexicalBlock {
-      parent: Some(self),
+    let next_local_id = self.next_local_id;
+    Self {
+      parent: Some(Box::new(self)),
       next_local_id,
       locals: HashMap::new(),
-    }))
+    }
   }
 
   pub fn exit_block(self) -> InterpreterResult<Self> {
     self
-      .0
       .parent
+      .map(|b| *b)
       .ok_or_else(|| InterpreterError::jit_err("tried to exit from top-level scope"))
   }
 }
