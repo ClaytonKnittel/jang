@@ -22,6 +22,7 @@ use crate::{
       if_statement::{ElseClause, IfStatement},
       ret_statement::RetStatement,
       statement::Statement,
+      unary_experssion::UnaryExpression,
     },
     token::{ident::Ident, literal::Literal},
   },
@@ -241,6 +242,7 @@ impl<'a> OpenCursor<'a> {
       Expression::Literal(literal) => Ok(self.emit_literal_load(literal)),
       Expression::Ident(ident) => Ok(self.emit_local_load(ident)),
       Expression::BinaryExpression(expr) => self.compile_binary_expression(expr),
+      Expression::UnaryExpression(expr) => self.compile_unary_expression(expr),
       Expression::CallExpression(expr) => self.compile_call_expression(expr),
       expr => Err(InterpreterError::unimplemented(format!(
         "evaluation of expression not yet implemented: {expr}"
@@ -262,6 +264,14 @@ impl<'a> OpenCursor<'a> {
         .compile_expr(expr.lhs())?
         .compile_expr(expr.rhs())?
         .emit_instr(JitInstruction::BinaryOp(expr.op())),
+    )
+  }
+
+  fn compile_unary_expression(self, expr: &'a UnaryExpression) -> InterpreterResult<Self> {
+    Ok(
+      self
+        .compile_expr(expr.expr())?
+        .emit_instr(JitInstruction::UnaryOp(expr.op())),
     )
   }
 
@@ -393,7 +403,7 @@ mod tests {
       error::InterpreterError,
     },
     parser::{
-      ast::{binary_expression::BinaryOp, function_decl::FunctionDecl},
+      ast::{binary_expression::BinaryOp, function_decl::FunctionDecl, unary_experssion::UnaryOp},
       grammar::testing::lex_and_parse_jang_file,
       token::{ident::matchers::ident, literal::matchers::integral},
     },
@@ -448,6 +458,32 @@ mod tests {
           load_literal_instruction(integral("4")),
           binary_op_instruction(pat!(BinaryOp::Add)),
           binary_op_instruction(pat!(BinaryOp::Mul)),
+        ],
+        ret_terminator()
+      )))
+    )
+  }
+
+  #[gtest]
+  fn unary_operator() {
+    let decl = parse_fn_decl(
+      r#"
+      fn f() -> bool {
+        ret !(2 == 3)
+      }
+      "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_literal_instruction(integral("2")),
+          load_literal_instruction(integral("3")),
+          binary_op_instruction(pat!(BinaryOp::Equal)),
+          unary_op_instruction(pat!(UnaryOp::LogicalNot)),
         ],
         ret_terminator()
       )))
