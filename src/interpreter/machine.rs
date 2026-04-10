@@ -320,16 +320,16 @@ mod tests {
         r#"
         fn rec(n: i32) -> i32 {
           if n == 0 { ret 0 }
-          ret 1 + rec(n - 1)
+          ret rec(n - 1) + 1
         }
 
         fn main() -> i32 {
-          ret rec(200)
+          ret rec(500)
         }
         "#
         .chars()
       ),
-      ok(eq(&200))
+      ok(eq(&500))
     );
   }
 
