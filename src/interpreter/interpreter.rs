@@ -509,6 +509,75 @@ mod tests {
     );
   }
 
+  #[gtest]
+  fn loop_break() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn test(x: i32) -> i32 {
+          mut y = x
+          mut acc = 1
+          loop {
+            if y == 0 {
+              break
+            } else {
+              y = y - 1
+            }
+            acc = acc * 2
+          }
+          ret acc
+        }
+
+        fn main() -> i32 {
+          ret test(5)
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&32))
+    );
+  }
+
+  #[gtest]
+  fn double_loop() {
+    expect_that!(
+      interpret_program(
+        r#"
+        fn test(width: i32, height: i32) -> i32 {
+          if width == 0 || height == 0 {
+            ret 0
+          }
+
+          mut row = 0
+          mut acc = 0
+          loop {
+            mut col = 0
+            loop {
+              acc = acc + 1
+              col = col + 1
+              if col == width {
+                break
+              }
+            }
+
+            row = row + 1
+            if row == height {
+              break
+            }
+          }
+          ret acc
+        }
+
+        fn main() -> i32 {
+          ret test(10, 13)
+        }
+        "#
+        .chars()
+      ),
+      ok(eq(&130))
+    );
+  }
+
   #[cfg(test)]
   mod examples {
     use crate::interpreter::interpreter::tests::interpret_program;
@@ -555,6 +624,46 @@ mod tests {
           .chars()
         ),
         ok(eq(&4613732))
+      );
+    }
+
+    #[gtest]
+    fn project_euler_problem5() {
+      expect_that!(
+        interpret_program(
+          r#"
+          fn gcd(a: i32, b: i32) -> i32 {
+            if b == 0 {
+              ret a
+            } else if a < b {
+              ret gcd(b, a)
+            } else {
+              let d = a / b
+              let c = d * b
+              ret gcd(b, a - c)
+            }
+          }
+
+          fn solve(n: i32) -> i32 {
+            mut l = 1
+            mut i = 2
+            loop {
+              l = i / gcd(l, i) * l
+              i = i + 1
+              if i > n {
+                break
+              }
+            }
+            ret l
+          }
+
+          fn main() -> i32 {
+            ret solve(20)
+          }
+          "#
+          .chars()
+        ),
+        ok(eq(&232792560))
       );
     }
   }

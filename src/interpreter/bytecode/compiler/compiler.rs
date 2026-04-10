@@ -9,6 +9,7 @@ use crate::{
       },
       instruction_block_list::{BlockId, BlockList, BlockListBuilder},
       lexical_scope::JitCompilerLexicalScope,
+      loop_context::LoopContext,
     },
     error::{InterpreterError, InterpreterResult},
   },
@@ -21,6 +22,7 @@ use crate::{
       expression::Expression,
       function_decl::FunctionDecl,
       if_statement::{ElseClause, IfStatement},
+      loop_statement::LoopStatement,
       ret_statement::RetStatement,
       statement::Statement,
       unary_experssion::UnaryExpression,
@@ -98,6 +100,7 @@ impl<'a> JitFunctionBuilder<'a> {
 struct OpenCursor<'a> {
   fn_builder: JitFunctionBuilder<'a>,
   lexical_scope: JitCompilerLexicalScope<'a>,
+  loop_context: LoopContext,
   block: JitInstructionBlockBuilder<'a>,
 }
 
@@ -105,6 +108,7 @@ struct OpenCursor<'a> {
 struct ClosedCursor<'a> {
   fn_builder: JitFunctionBuilder<'a>,
   lexical_scope: JitCompilerLexicalScope<'a>,
+  loop_context: LoopContext,
 }
 
 #[derive(FromVariants)]
@@ -121,6 +125,7 @@ impl<'a> OpenCursor<'a> {
       fn_builder,
       lexical_scope: JitCompilerLexicalScope::default(),
       block: JitInstructionBlockBuilder::new(entrypoint),
+      loop_context: LoopContext::default(),
     }
   }
 
@@ -161,6 +166,7 @@ impl<'a> OpenCursor<'a> {
         .fn_builder
         .finish_block(self.block.terminate_with_instr(terminal))?,
       lexical_scope: self.lexical_scope,
+      loop_context: self.loop_context,
     })
   }
 
@@ -215,12 +221,10 @@ impl<'a> OpenCursor<'a> {
       }
       Statement::IfStatement(if_statement) => Ok(self.compile_if_statement(if_statement)?.into()),
       Statement::Block(block) => self.compile_lexical_block(block),
-      Statement::LoopStatement(_) => {
-        Err(InterpreterError::unimplemented("not yet implemented: loop"))
+      Statement::LoopStatement(loop_statement) => {
+        Ok(self.compile_loop_statement(loop_statement)?.into())
       }
-      Statement::Break => Err(InterpreterError::unimplemented(
-        "not yet implemented: break",
-      )),
+      Statement::Break => Ok(self.compile_break_statement()?.into()),
     }
   }
 
@@ -268,6 +272,33 @@ impl<'a> OpenCursor<'a> {
         .finish_with_fallthrough_to(join_block_id)?
         .start_block(join_block_id),
     )
+  }
+
+  fn compile_loop_statement(
+    mut self,
+    loop_statement: &'a LoopStatement,
+  ) -> InterpreterResult<OpenCursor<'a>> {
+    let loop_block_id = self.allocate_block();
+    let join_block_id = self.allocate_block();
+    Ok(
+      self
+        .terminate(JitTerminalInstruction::Jump(loop_block_id))?
+        .enter_loop_context(join_block_id, |cursor| {
+          cursor
+            .start_block(loop_block_id)
+            .compile_lexical_block(loop_statement.body())?
+            .finish_with_fallthrough_to(loop_block_id)
+        })?
+        .start_block(join_block_id),
+    )
+  }
+
+  fn compile_break_statement(self) -> InterpreterResult<ClosedCursor<'a>> {
+    let break_target = self
+      .loop_context
+      .break_target()
+      .ok_or_else(|| InterpreterError::jit_err("Cannot break outside of a loop"))?;
+    self.terminate(JitTerminalInstruction::Jump(break_target))
   }
 
   fn compile_expr(self, expr: &'a Expression) -> InterpreterResult<Self> {
@@ -358,6 +389,7 @@ impl<'a> ClosedCursor<'a> {
     OpenCursor {
       fn_builder: self.fn_builder,
       lexical_scope: self.lexical_scope,
+      loop_context: self.loop_context,
       block: JitInstructionBlockBuilder::new(block_id),
     }
   }
@@ -367,6 +399,20 @@ impl<'a> ClosedCursor<'a> {
       lexical_scope: self.lexical_scope.exit_block()?,
       ..self
     })
+  }
+
+  fn enter_loop_context<F>(
+    mut self,
+    join_block_id: BlockId,
+    context_fn: F,
+  ) -> InterpreterResult<Self>
+  where
+    F: FnOnce(Self) -> InterpreterResult<Self>,
+  {
+    let prev_loop_context = self.loop_context.exchange(join_block_id);
+    let mut cursor = context_fn(self)?;
+    cursor.loop_context = prev_loop_context;
+    Ok(cursor)
   }
 }
 
@@ -579,6 +625,66 @@ mod tests {
         has_instruction_block(
           else_block_id,
           instruction_block(is_empty(), jump_terminator(eq(&join_block_id)))
+        ),
+        has_instruction_block(
+          join_block_id,
+          instruction_block(anything(), ret_terminator())
+        )
+      ])
+    )
+  }
+
+  #[gtest]
+  fn loop_statement() {
+    let decl = parse_fn_decl(
+      r#"
+      fn f() -> i32 {
+        loop {
+          if x {
+            break
+          }
+        }
+      }
+      "#
+      .chars(),
+    )
+    .unwrap();
+
+    let entry_block_id = block_id(0);
+    let loop_block_id = block_id(1);
+    let join_block_id = block_id(2);
+    let if_block_id = block_id(3);
+    let else_block_id = block_id(4);
+    let loop_end_block_id = block_id(5);
+
+    expect_that!(
+      compile_to_bytecode(&decl),
+      ok(all![
+        has_instruction_block(
+          entry_block_id,
+          instruction_block(is_empty(), jump_terminator(eq(&loop_block_id))),
+        ),
+        has_instruction_block(
+          loop_block_id,
+          instruction_block(
+            elements_are![load_global_instruction(ident("x"))],
+            conditional_jump_terminator(all![
+              if_branch_target(eq(&if_block_id)),
+              else_branch_target(eq(&else_block_id))
+            ])
+          )
+        ),
+        has_instruction_block(
+          if_block_id,
+          instruction_block(is_empty(), jump_terminator(eq(&join_block_id)))
+        ),
+        has_instruction_block(
+          else_block_id,
+          instruction_block(is_empty(), jump_terminator(eq(&loop_end_block_id)))
+        ),
+        has_instruction_block(
+          loop_end_block_id,
+          instruction_block(is_empty(), jump_terminator(eq(&loop_block_id)))
         ),
         has_instruction_block(
           join_block_id,
