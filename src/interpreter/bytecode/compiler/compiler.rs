@@ -165,13 +165,35 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn emit_local_store(mut self, name: &'a Ident) -> Self {
-    let local_id = self.lexical_scope.bind(name);
+    let local_id = self.lexical_scope.bind(name, Mutability::Immutable);
     self.emit_instr(JitInstruction::StoreLocal(local_id))
+  }
+
+  fn emit_local_mutable_store(mut self, name: &'a Ident) -> Self {
+    let local_id = self.lexical_scope.bind(name, Mutability::Mutable);
+    self.emit_instr(JitInstruction::StoreLocal(local_id))
+  }
+
+  fn emit_local_rebind(self, name: &'a Ident) -> InterpreterResult<Self> {
+    let info = self
+      .lexical_scope
+      .get_binding(name)
+      .ok_or_else(|| InterpreterError::jit_err(format!("Unknown variable {name}")))?;
+    if !matches!(info.mutability(), Mutability::Mutable) {
+      return Err(InterpreterError::jit_err(format!(
+        "Cannot rebind immutable variable {name}"
+      )));
+    }
+    let local_id = info.local_id();
+    Ok(self.emit_instr(JitInstruction::StoreLocal(local_id)))
   }
 
   fn emit_local_load(self, name: &'a Ident) -> Self {
     match self.lexical_scope.get_binding(name) {
-      Some(local_id) => self.emit_instr(JitInstruction::LoadLocal(local_id)),
+      Some(info) => {
+        let local_id = info.local_id();
+        self.emit_instr(JitInstruction::LoadLocal(local_id))
+      }
       None => self.emit_instr(JitInstruction::LoadGlobal(name)),
     }
   }
@@ -206,14 +228,15 @@ impl<'a> OpenCursor<'a> {
     self,
     statement: &'a AssignmentStatement,
   ) -> InterpreterResult<Self> {
+    let compiled_expr = self.compile_expr(statement.expr())?;
     match statement.kind() {
-      AssignmentKind::Declaration(Mutability::Immutable) => Ok(
-        self
-          .compile_expr(statement.expr())?
-          .emit_local_store(statement.var()),
-      ),
-      AssignmentKind::Declaration(Mutability::Mutable) => todo!(),
-      AssignmentKind::Rebind => todo!(),
+      AssignmentKind::Declaration(Mutability::Immutable) => {
+        Ok(compiled_expr.emit_local_store(statement.var()))
+      }
+      AssignmentKind::Declaration(Mutability::Mutable) => {
+        Ok(compiled_expr.emit_local_mutable_store(statement.var()))
+      }
+      AssignmentKind::Rebind => compiled_expr.emit_local_rebind(statement.var()),
     }
   }
 
@@ -652,6 +675,97 @@ mod tests {
         ret_terminator()
       )))
     )
+  }
+
+  #[gtest]
+  fn store_and_load_mutable_local() {
+    let decl = parse_fn_decl(
+      r#"
+      fn f() -> i32 {
+        mut x = 1 + 2
+        ret x
+      }
+      "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_literal_instruction(integral("1")),
+          load_literal_instruction(integral("2")),
+          binary_op_instruction(pat!(BinaryOp::Add)),
+          store_local_instruction(eq(&local_id(0))),
+          load_local_instruction(eq(&local_id(0))),
+        ],
+        ret_terminator()
+      )))
+    )
+  }
+
+  #[gtest]
+  fn rebind_mutable_local() {
+    let decl = parse_fn_decl(
+      r#"
+      fn f() -> i32 {
+        mut x = 1
+        x = 70
+        ret x
+      }
+      "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          load_literal_instruction(integral("1")),
+          store_local_instruction(eq(&local_id(0))),
+          load_literal_instruction(integral("70")),
+          store_local_instruction(eq(&local_id(0))),
+          load_local_instruction(eq(&local_id(0))),
+        ],
+        ret_terminator()
+      )))
+    )
+  }
+
+  #[gtest]
+  fn cannot_rebind_immutable_local() {
+    let decl = parse_fn_decl(
+      r#"
+      fn f() -> i32 {
+        let x = 1
+        x = 70
+        ret x
+      }
+      "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(compile_to_bytecode(&decl), err(anything()))
+  }
+
+  #[gtest]
+  fn cannot_rebind_unknown_local() {
+    let decl = parse_fn_decl(
+      r#"
+      fn f() -> i32 {
+        mut x = 1
+        y = 70
+        ret x
+      }
+      "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(compile_to_bytecode(&decl), err(anything()))
   }
 
   #[gtest]
