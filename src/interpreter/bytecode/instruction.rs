@@ -4,7 +4,7 @@ use crate::{
     local_table::LocalId,
   },
   parser::{
-    ast::binary_expression::BinaryOp,
+    ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
     token::{ident::Ident, literal::Literal},
   },
 };
@@ -18,6 +18,10 @@ pub enum JitInstruction<'a> {
   //   top -> 1 (rhs)
   //          2 (lhs)
   BinaryOp(BinaryOp),
+
+  // Unary operator. Pops a value off the stack, applies an operation,
+  // pushes the result on the stack.
+  UnaryOp(UnaryOp),
 
   // Push a literal value onto the stack.
   LoadLiteral(&'a Literal),
@@ -151,7 +155,7 @@ pub mod matchers {
   use crate::{
     interpreter::bytecode::{instruction_block_list::BlockId, local_table::LocalId},
     parser::{
-      ast::binary_expression::BinaryOp,
+      ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
       token::{ident::Ident, literal::Literal},
     },
   };
@@ -161,6 +165,12 @@ pub mod matchers {
     op_matcher: impl Matcher<&'a BinaryOp>,
   ) -> impl Matcher<&'a JitInstruction<'a>> {
     pat!(JitInstruction::BinaryOp(op_matcher))
+  }
+
+  pub fn unary_op_instruction<'a>(
+    op_matcher: impl Matcher<&'a UnaryOp>,
+  ) -> impl Matcher<&'a JitInstruction<'a>> {
+    pat!(JitInstruction::UnaryOp(op_matcher))
   }
 
   pub fn load_literal_instruction<'a>(
