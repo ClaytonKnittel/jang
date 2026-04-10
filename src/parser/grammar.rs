@@ -134,6 +134,7 @@ pub_grammar!(
   };
 
   <statement>: Statement => <let_binding>;
+  <statement>: Statement => <mut_binding>;
   <statement>: Statement => <ret_statement>;
   <statement>: Statement => <call_expr>;
   <statement>: Statement => <if_statement>;
@@ -145,6 +146,10 @@ pub_grammar!(
 
   <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
     LetStatement::new(#ident, #expr)
+  };
+
+  <mut_binding>: LetStatement => Keyword(Keyword::Mut) <ident> <eq> <expr> {
+    LetStatement::new_mut(#ident, #expr)
   };
 
   <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {

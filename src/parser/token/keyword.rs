@@ -10,6 +10,7 @@ pub enum Keyword {
   Loop,
   Break,
   Type,
+  Mut,
 }
 
 impl Keyword {
@@ -23,6 +24,7 @@ impl Keyword {
       "loop" => Some(Self::Loop),
       "break" => Some(Self::Break),
       "type" => Some(Self::Type),
+      "mut" => Some(Self::Mut),
       _ => None,
     }
   }
@@ -42,6 +44,7 @@ impl Display for Keyword {
         Self::Loop => "loop",
         Self::Break => "break",
         Self::Type => "type",
+        Self::Mut => "mut",
       }
     )
   }
