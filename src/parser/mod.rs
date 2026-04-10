@@ -11,7 +11,13 @@ pub(crate) mod token;
 
 pub fn parse_jang(stream: impl IntoIterator<Item = char>) -> JangResult<JangFile> {
   JangGrammar::parse_fallible(lex_stream(stream)).map_err(|err| match err {
-    ParserError::InputStreamError(err) => err,
-    _ => JangError::UnknownError(format!("{err:?}")),
+    ParserError::UserError(err) => err,
+    ParserError::ParseError { next_token } => {
+      JangError::Grammar(ParserError::ParseError { next_token })
+    }
+    #[cfg(debug_assertions)]
+    ParserError::OverlappingTokenMatchers { token } => {
+      JangError::Grammar(ParserError::OverlappingTokenMatchers { token })
+    }
   })
 }
