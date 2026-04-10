@@ -1,0 +1,47 @@
+name: Fuzz Parser
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Install Rust Nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+      - name: Check out jang
+        uses: actions/checkout@v4
+        with:
+          path: jang
+          submodules: recursive
+      - name: Initialize and Build
+        working-directory: jang/fuzz
+        run: |
+          cargo fuzz build
+      - name: Type check
+        working-directory: jang/fuzz
+        run: |
+          cargo fuzz check
+      - name: Clippy lint
+        working-directory: jang/fuzz
+        run: |
+          cargo clippy -- -D warnings
+      - name: Fuzz Parser
+        working-directory: jang/fuzz
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FUZZ_TIME=10
+          else
+            FUZZ_TIME=180
+          fi
+
+          echo "Running fuzz for $FUZZ_TIME seconds"
+
+          cargo fuzz run parser -- -max_total_time=$FUZZ_TIME
