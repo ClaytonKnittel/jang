@@ -12,6 +12,10 @@ jobs:
     runs-on: self-hosted
 
     steps:
+      - name: Install Rust Nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
       - name: Check out jang
         uses: actions/checkout@v4
         with:
