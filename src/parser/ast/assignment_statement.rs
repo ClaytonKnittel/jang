@@ -61,7 +61,15 @@ impl AssignmentStatement {
 
 impl Display for AssignmentStatement {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "let {} = {}", self.var, self.expr)
+    match self.kind() {
+      AssignmentKind::Declaration(Mutability::Mutable) => {
+        write!(f, "mut {} = {}", self.var, self.expr)
+      }
+      AssignmentKind::Declaration(Mutability::Immutable) => {
+        write!(f, "let {} = {}", self.var, self.expr)
+      }
+      AssignmentKind::Rebind => write!(f, "{} = {}", self.var, self.expr),
+    }
   }
 }
 
