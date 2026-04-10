@@ -33,7 +33,7 @@ jobs:
         working-directory: jang/fuzz
         run: |
           cargo clippy -- -D warnings
-      - name: Fuzz for 10s
+      - name: Fuzz Parser
         working-directory: jang/fuzz
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
