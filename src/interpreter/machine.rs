@@ -216,7 +216,7 @@ mod tests {
       interpret_program(
         r#"
         fn main() -> i32 {
-          if 1 {
+          if 1 == 1 {
             ret 1
           }
           ret 2
@@ -234,7 +234,7 @@ mod tests {
       interpret_program(
         r#"
         fn main() -> i32 {
-          if 0 {
+          if 1 != 1 {
             ret 1
           } else {
             ret 2
@@ -254,9 +254,9 @@ mod tests {
       interpret_program(
         r#"
         fn main() -> i32 {
-          if 0 {
+          if 1 != 1 {
             ret 1
-          } else if 1 {
+          } else if 1 == 1 {
             ret 2
           } else {
             ret 3
@@ -276,9 +276,9 @@ mod tests {
       interpret_program(
         r#"
         fn main() -> i32 {
-          if 0 {
+          if 1 != 1 {
             ret 1
-          } else if 0 {
+          } else if 1 != 1 {
             ret 2
           } else {
             ret 3
@@ -298,8 +298,7 @@ mod tests {
       interpret_program(
         r#"
         fn fib(n: i32) -> i32 {
-          if n - 1 {} else { ret 1 }
-          if n {} else { ret 1 }
+          if n < 2 { ret 1 }
 
           ret fib(n - 1) + fib(n - 2)
         }
@@ -320,11 +319,8 @@ mod tests {
       interpret_program(
         r#"
         fn rec(n: i32) -> i32 {
-          if n {
-            ret rec(n - 1) + 1
-          } else {
-            ret 0
-          }
+          if n == 0 { ret 0 }
+          ret rec(n - 1) + 1
         }
 
         fn main() -> i32 {
@@ -359,7 +355,7 @@ mod tests {
           let x = 1
           {
             let x = 2
-            if 1 { ret x }
+            if 0 == 0 { ret x }
           }
           ret x
         }
@@ -379,7 +375,7 @@ mod tests {
           let x = 0
           let y = 5
           {
-            let x = 2
+            let x = 1 == 1
             { {
                 if x { ret y }
             } }
@@ -489,5 +485,55 @@ mod tests {
       ),
       err(interpreter_value_error(contains_substring("add")))
     );
+  }
+
+  #[cfg(test)]
+  mod examples {
+    use crate::interpreter::machine::tests::interpret_program;
+    use googletest::prelude::*;
+
+    #[gtest]
+    fn project_euler_problem1() {
+      expect_that!(
+        interpret_program(
+          r#"
+          fn solve(n: i32, acc: i32) -> i32 {
+            if n == 1000 { ret acc }
+            if n % 3 == 0 { ret solve(n + 1, acc + n) }
+            if n % 5 == 0 { ret solve(n + 1, acc + n) }
+            ret solve(n + 1, acc)
+          }
+
+          fn main() -> i32 {
+            ret solve(0, 0)
+          }
+          "#
+          .chars()
+        ),
+        ok(eq(&233168))
+      );
+    }
+
+    #[gtest]
+    fn project_euler_problem2() {
+      expect_that!(
+        interpret_program(
+          r#"
+          fn solve(t0: i32, t1: i32, acc: i32) -> i32 {
+            if t0 > 4000000 { ret acc }
+            let t2 = t1 + t0
+            if t0 % 2 == 0 { ret solve(t1, t2, acc + t0) }
+            ret solve(t1, t2, acc)
+          }
+
+          fn main() -> i32 {
+            ret solve(0, 1, 0)
+          }
+          "#
+          .chars()
+        ),
+        ok(eq(&4613732))
+      );
+    }
   }
 }

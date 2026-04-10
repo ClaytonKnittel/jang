@@ -7,7 +7,9 @@ use std::{
 use cknittel_util::builder::error::BuilderError;
 use parser_generator::{ParserUserError, error::ParserError};
 
-use crate::{interpreter::error::InterpreterError, source_location::SourceLocation};
+use crate::{
+  interpreter::error::InterpreterError, parser::token::JangToken, source_location::SourceLocation,
+};
 
 #[derive(Clone)]
 pub struct ParseError {
@@ -44,7 +46,7 @@ impl Debug for ParseError {
 #[derive(Clone, ParserUserError)]
 pub enum JangError {
   Parse(ParseError),
-  Grammar(ParserError<Infallible>),
+  Grammar(ParserError<JangToken, Infallible>),
   Builder(BuilderError),
   Interpret(InterpreterError),
 }
@@ -55,12 +57,12 @@ impl JangError {
   }
 }
 
-impl From<ParserError<JangError>> for JangError {
-  fn from(value: ParserError<JangError>) -> Self {
+impl From<ParserError<JangToken, JangError>> for JangError {
+  fn from(value: ParserError<JangToken, JangError>) -> Self {
     match value {
       ParserError::UserError(err) => err,
-      ParserError::ParseError { message } => {
-        JangError::Grammar(ParserError::ParseError { message })
+      ParserError::ParseError { next_token } => {
+        JangError::Grammar(ParserError::ParseError { next_token })
       }
       #[cfg(debug_assertions)]
       ParserError::OverlappingTokenMatchers { token } => {

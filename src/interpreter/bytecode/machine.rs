@@ -11,7 +11,10 @@ use crate::{
     error::{InterpreterError, InterpreterResult},
     value::Value,
   },
-  parser::{ast::binary_expression::BinaryOp, token::ident::Ident},
+  parser::{
+    ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
+    token::ident::Ident,
+  },
 };
 
 #[derive(Default)]
@@ -120,7 +123,7 @@ impl<'a> JitCallFrame<'a> {
     let block = self
       .jit_fn
       .block(id)
-      .ok_or_else(|| InterpreterError::internal_err("target block does not exist"))?;
+      .ok_or_else(|| InterpreterError::jit_err("target block must exist"))?;
     self.block_cursor = JitInstructionBlockCursor::start_of(block);
     Ok(())
   }
@@ -134,6 +137,9 @@ impl<'a> JitCallFrame<'a> {
       CurrentInstruction::Instr(instr) => match instr {
         JitInstruction::BinaryOp(op) => {
           self.execute_binary_operation(op)?;
+        }
+        JitInstruction::UnaryOp(op) => {
+          self.execute_unary_operation(op)?;
         }
         JitInstruction::LoadLiteral(literal) => {
           self.stack.push_value(Value::from_literal(literal)?);
@@ -175,15 +181,35 @@ impl<'a> JitCallFrame<'a> {
   fn execute_binary_operation(&mut self, op: &BinaryOp) -> InterpreterResult<()> {
     let rhs = self.stack.pop_value()?;
     let lhs = self.stack.pop_value()?;
+
     let value = match op {
       BinaryOp::Add => lhs.add(&rhs)?,
       BinaryOp::Sub => lhs.subtract(&rhs)?,
       BinaryOp::Mul => lhs.multiply(&rhs)?,
       BinaryOp::Div => lhs.divide(&rhs)?,
       BinaryOp::Mod => lhs.modulo(&rhs)?,
-      op => return Err(InterpreterError::unimplemented(format!("{op}"))),
+      BinaryOp::Equal => lhs.equal(&rhs)?,
+      BinaryOp::GreaterThan => lhs.greater_than(&rhs)?,
+      BinaryOp::GreaterThanEqual => lhs.greater_than_equal(&rhs)?,
+      BinaryOp::LessThan => lhs.less_than(&rhs)?,
+      BinaryOp::LessThanEqual => lhs.less_than_equal(&rhs)?,
+      BinaryOp::NotEqual => lhs.equal(&rhs)?.logical_not()?,
+      BinaryOp::LogicalAnd => lhs.logical_and(&rhs)?,
+      BinaryOp::LogicalOr => lhs.logical_or(&rhs)?,
     };
+
     self.stack.push_value(value);
+    Ok(())
+  }
+
+  fn execute_unary_operation(&mut self, op: &UnaryOp) -> InterpreterResult<()> {
+    let value = self.stack.pop_value()?;
+
+    let result = match op {
+      UnaryOp::LogicalNot => value.logical_not()?,
+    };
+
+    self.stack.push_value(result);
     Ok(())
   }
 
@@ -192,7 +218,7 @@ impl<'a> JitCallFrame<'a> {
     targets: &ConditionalJumpTargets,
   ) -> InterpreterResult<()> {
     let condition = self.stack.pop_value()?;
-    let target = if condition.is_truthy()? {
+    let target = if condition.expect_bool()? {
       targets.true_target()
     } else {
       targets.false_target()
@@ -255,11 +281,11 @@ mod tests {
       error::{InterpreterError, InterpreterResult},
       value::{
         Value,
-        matchers::{i32_value, unit_value},
+        matchers::{bool_value, i32_value, unit_value},
       },
     },
     parser::{
-      ast::binary_expression::BinaryOp,
+      ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
       token::{
         ident::Ident,
         literal::{Literal, NumericLiteral},
@@ -370,6 +396,35 @@ mod tests {
     )]);
 
     expect_that!(evaluate_no_arg_fn(&code), ok(i32_value(eq(&1))),)
+  }
+
+  #[gtest]
+  fn comparison_returns_boolean() {
+    let two = Literal::Numeric(NumericLiteral::from_str("2"));
+    let one = Literal::Numeric(NumericLiteral::from_str("1"));
+    let code = function_bytecode(vec![block(
+      vec![
+        JitInstruction::LoadLiteral(&two),
+        JitInstruction::LoadLiteral(&one),
+        JitInstruction::BinaryOp(BinaryOp::Equal),
+      ],
+      JitTerminalInstruction::Return,
+    )]);
+
+    expect_that!(evaluate_no_arg_fn(&code), ok(bool_value(&false)),)
+  }
+
+  #[gtest]
+  fn unary_operator() {
+    let code = function_bytecode(vec![block(
+      vec![JitInstruction::UnaryOp(UnaryOp::LogicalNot)],
+      JitTerminalInstruction::Return,
+    )]);
+
+    expect_that!(
+      evaluate_function(&code, vec![Value::Bool(false)], &EmptyContext),
+      ok(bool_value(&true)),
+    )
   }
 
   #[gtest]
