@@ -14,6 +14,7 @@ use crate::{
   },
   parser::{
     ast::{
+      assignment_statement::{AssignmentKind, AssignmentStatement, Mutability},
       binary_expression::BinaryExpression,
       block::Block,
       call_expression::CallExpression,
@@ -181,10 +182,9 @@ impl<'a> OpenCursor<'a> {
 
   fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a>> {
     match statement {
-      Statement::Let(let_statement) => Ok(
+      Statement::Assign(assignment_statement) => Ok(
         self
-          .compile_expr(let_statement.expr())?
-          .emit_local_store(let_statement.var())
+          .compile_assignment_statement(assignment_statement)?
           .into(),
       ),
       Statement::Ret(ret_statement) => Ok(self.compile_ret_statement(ret_statement)?.into()),
@@ -199,6 +199,21 @@ impl<'a> OpenCursor<'a> {
       Statement::Break => Err(InterpreterError::unimplemented(
         "not yet implemented: break",
       )),
+    }
+  }
+
+  fn compile_assignment_statement(
+    self,
+    statement: &'a AssignmentStatement,
+  ) -> InterpreterResult<Self> {
+    match statement.kind() {
+      AssignmentKind::Declaration(Mutability::Immutable) => Ok(
+        self
+          .compile_expr(statement.expr())?
+          .emit_local_store(statement.var()),
+      ),
+      AssignmentKind::Declaration(Mutability::Mutable) => todo!(),
+      AssignmentKind::Rebind => todo!(),
     }
   }
 

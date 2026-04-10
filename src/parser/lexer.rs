@@ -230,7 +230,7 @@ mod tests {
 
   #[gtest]
   fn test_all_keywords() {
-    let text = "fn let ret if else loop break type";
+    let text = "fn let ret if else loop break type mut";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
     expect_that!(
@@ -244,6 +244,7 @@ mod tests {
         keyword!(Loop),
         keyword!(Break),
         keyword!(Type),
+        keyword!(Mut),
       ]
     );
   }

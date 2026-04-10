@@ -4,6 +4,7 @@ use crate::{
   error::JangError,
   parser::{
     ast::{
+      assignment_statement::AssignmentStatement,
       binary_expression::{BinaryExpression, BinaryOp},
       block::{Block, BlockBuilder},
       call_expression::CallExpression,
@@ -16,7 +17,6 @@ use crate::{
       },
       if_statement::IfStatement,
       jang_file::{JangFile, JangFileBuilder},
-      let_statement::LetStatement,
       loop_statement::LoopStatement,
       ret_statement::RetStatement,
       statement::Statement,
@@ -134,6 +134,8 @@ pub_grammar!(
   };
 
   <statement>: Statement => <let_binding>;
+  <statement>: Statement => <mut_binding>;
+  <statement>: Statement => <rebind>;
   <statement>: Statement => <ret_statement>;
   <statement>: Statement => <call_expr>;
   <statement>: Statement => <if_statement>;
@@ -143,8 +145,16 @@ pub_grammar!(
     Statement::Break
   };
 
-  <let_binding>: LetStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
-    LetStatement::new(#ident, #expr)
+  <let_binding>: AssignmentStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
+    AssignmentStatement::new_let(#ident, #expr)
+  };
+
+  <mut_binding>: AssignmentStatement => Keyword(Keyword::Mut) <ident> <eq> <expr> {
+    AssignmentStatement::new_mut(#ident, #expr)
+  };
+
+  <rebind>: AssignmentStatement => <ident> <eq> <expr> {
+    AssignmentStatement::new_rebind(#ident, #expr)
   };
 
   <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
@@ -321,6 +331,7 @@ mod tests {
     error::JangResult,
     parser::{
       ast::{
+        assignment_statement::matchers::{let_stmt, mut_stmt, rebind_stmt},
         binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
         block::matchers::{block, block_statement},
         call_expression::matchers::{
@@ -342,7 +353,6 @@ mod tests {
           if_else_clause, if_else_if_statement, if_else_statement, if_statement,
         },
         jang_file::matchers::{jang_file_functions, jang_file_with_fn, jang_file_with_type},
-        let_statement::matchers::let_statement as let_stmt,
         loop_statement::matchers::loop_statement,
         ret_statement::matchers::ret_statement as ret_stmt,
         statement::{Statement, matchers::break_statement},
@@ -377,7 +387,7 @@ mod tests {
 
     let statement = &ast.function_decls()[0].body().statements()[0];
     match statement {
-      Statement::Let(stmt) => Ok(stmt.expr().clone()),
+      Statement::Assign(stmt) => Ok(stmt.expr().clone()),
       _ => {
         panic!(
           "parse_single_exp expects a let statement, got: {}",
@@ -389,7 +399,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 334);
+    expect_eq!(JangGrammar::TABLE_SIZE, 343);
   }
 
   #[gtest]
@@ -654,6 +664,48 @@ mod tests {
     expect_that!(
       ast,
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        lit_exp(integral("123"))
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn mut_binding() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name(x: i32) {
+          mut x = 123
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![mut_stmt(
+        ident("x"),
+        lit_exp(integral("123"))
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn rebind_statment() {
+    let ast = JangGrammar::parse_fallible(lex_stream(
+      r#"
+        fn function_name(x: i32) {
+          x = 123
+        }
+        "#
+      .chars(),
+    ))
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![rebind_stmt(
         ident("x"),
         lit_exp(integral("123"))
       )])))
