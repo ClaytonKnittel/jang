@@ -1,0 +1,35 @@
+name: Fuzz Parser
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Check out jang
+        uses: actions/checkout@v4
+        with:
+          path: jang
+          submodules: recursive
+      - name: Initialize and Build
+        working-directory: jang/fuzz
+        run: |
+          cargo fuzz build
+      - name: Type check
+        working-directory: jang/fuzz
+        run: |
+          cargo fuzz check
+      - name: Clippy lint
+        working-directory: jang/fuzz
+        run: |
+          cargo clippy -- -D warnings
+      - name: Fuzz for 10s
+        working-directory: jang/fuzz
+        run: |
+          cargo fuzz run parser -- -max_total_time=10
