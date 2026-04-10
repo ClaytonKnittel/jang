@@ -16,7 +16,7 @@ impl<T> BlockList<T> {
   }
 }
 
-pub struct BlockListBuilder<T> {
+pub(in crate::interpreter::bytecode::compiler) struct BlockListBuilder<T> {
   next_id: BlockId,
   blocks: Vec<Option<T>>,
 }
@@ -58,7 +58,7 @@ impl<T> BlockListBuilder<T> {
 
 #[cfg(test)]
 pub mod testing {
-  use crate::interpreter::bytecode::instruction_block_list::{BlockId, BlockList};
+  use crate::interpreter::bytecode::compiler::instruction_block_list::{BlockId, BlockList};
 
   pub fn block_id(index: usize) -> BlockId {
     BlockId(index)

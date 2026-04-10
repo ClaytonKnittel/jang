@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use crate::{
   interpreter::{
     bytecode::{
-      compiler::compile_to_bytecode,
-      instruction::JitCompiledFunction,
-      machine::{self, JitFunctionContext},
+      compiler::{compile_to_bytecode, instruction::JitCompiledFunction},
+      runtime::machine::{self, JitFunctionContext},
     },
     error::{InterpreterError, InterpreterResult},
     value::Value,
@@ -78,7 +77,7 @@ mod tests {
   use crate::{
     interpreter::{
       error::{InterpreterResult, matchers::interpreter_value_error},
-      machine::Interpreter,
+      interpreter::Interpreter,
     },
     parser::grammar::testing::lex_and_parse_jang_file,
   };
@@ -489,7 +488,7 @@ mod tests {
 
   #[cfg(test)]
   mod examples {
-    use crate::interpreter::machine::tests::interpret_program;
+    use crate::interpreter::interpreter::tests::interpret_program;
     use googletest::prelude::*;
 
     #[gtest]

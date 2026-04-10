@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
   interpreter::{
-    bytecode::instruction::JitCompiledFunction,
+    bytecode::compiler::instruction::JitCompiledFunction,
     error::{InterpreterError, InterpreterResult},
     parse_as::ParseAs,
   },

@@ -1,12 +1,14 @@
 use crate::{
   interpreter::{
     bytecode::{
-      instruction::{
-        ConditionalJumpTargets, JitCompiledFunction, JitInstruction, JitInstructionBlock,
-        JitTerminalInstruction,
+      compiler::{
+        instruction::{
+          ConditionalJumpTargets, JitCompiledFunction, JitInstruction, JitInstructionBlock,
+          JitTerminalInstruction,
+        },
+        instruction_block_list::BlockId,
       },
-      instruction_block_list::BlockId,
-      local_table::LocalTable,
+      runtime::local_table::LocalTable,
     },
     error::{InterpreterError, InterpreterResult},
     value::Value,
@@ -271,12 +273,11 @@ mod tests {
   use crate::{
     interpreter::{
       bytecode::{
-        instruction::{
+        compiler::instruction::{
           JitCallInstruction, JitCompiledFunction, JitInstruction, JitTerminalInstruction,
           testing::{block, function_bytecode},
         },
-        local_table::testing::local_id,
-        machine::evaluate_function,
+        runtime::{local_table::testing::local_id, machine::evaluate_function},
       },
       error::{InterpreterError, InterpreterResult},
       value::{
@@ -430,13 +431,7 @@ mod tests {
   #[gtest]
   fn function_call() {
     let sub_function = function_bytecode(vec![block(
-      vec![
-        JitInstruction::StoreLocal(local_id(0)),
-        JitInstruction::LoadLocal(local_id(0)),
-        JitInstruction::StoreLocal(local_id(1)),
-        JitInstruction::LoadLocal(local_id(1)),
-        JitInstruction::BinaryOp(BinaryOp::Sub),
-      ],
+      vec![JitInstruction::BinaryOp(BinaryOp::Sub)],
       JitTerminalInstruction::Return,
     )]);
     let sub_function_name = Ident::new("sub");

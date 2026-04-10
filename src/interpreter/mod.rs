@@ -1,5 +1,7 @@
 pub mod bytecode;
 pub mod error;
-pub mod machine;
+mod interpreter;
 mod parse_as;
 mod value;
+
+pub use interpreter::*;
