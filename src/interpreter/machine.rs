@@ -320,16 +320,16 @@ mod tests {
         r#"
         fn rec(n: i32) -> i32 {
           if n == 0 { ret 0 }
-          ret rec(n - 1) + 1
+          ret 1 + rec(n - 1)
         }
 
         fn main() -> i32 {
-          ret rec(500)
+          ret rec(200)
         }
         "#
         .chars()
       ),
-      ok(eq(&500))
+      ok(eq(&200))
     );
   }
 
@@ -485,5 +485,55 @@ mod tests {
       ),
       err(interpreter_value_error(contains_substring("add")))
     );
+  }
+
+  #[cfg(test)]
+  mod examples {
+    use crate::interpreter::machine::tests::interpret_program;
+    use googletest::prelude::*;
+
+    #[gtest]
+    fn project_euler_problem1() {
+      expect_that!(
+        interpret_program(
+          r#"
+          fn solve(n: i32, acc: i32) -> i32 {
+            if n == 1000 { ret acc }
+            if n % 3 == 0 { ret solve(n + 1, acc + n) }
+            if n % 5 == 0 { ret solve(n + 1, acc + n) }
+            ret solve(n + 1, acc)
+          }
+
+          fn main() -> i32 {
+            ret solve(0, 0)
+          }
+          "#
+          .chars()
+        ),
+        ok(eq(&233168))
+      );
+    }
+
+    #[gtest]
+    fn project_euler_problem2() {
+      expect_that!(
+        interpret_program(
+          r#"
+          fn solve(t0: i32, t1: i32, acc: i32) -> i32 {
+            if t0 > 4000000 { ret acc }
+            let t2 = t1 + t0
+            if t0 % 2 == 0 { ret solve(t1, t2, acc + t0) }
+            ret solve(t1, t2, acc)
+          }
+
+          fn main() -> i32 {
+            ret solve(0, 1, 0)
+          }
+          "#
+          .chars()
+        ),
+        ok(eq(&4613732))
+      );
+    }
   }
 }

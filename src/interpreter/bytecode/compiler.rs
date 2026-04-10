@@ -20,6 +20,7 @@ use crate::{
       expression::Expression,
       function_decl::FunctionDecl,
       if_statement::{ElseClause, IfStatement},
+      ret_statement::RetStatement,
       statement::Statement,
     },
     token::{ident::Ident, literal::Literal},
@@ -60,13 +61,18 @@ struct TerminatedBlock<'a> {
 struct JitFunctionBuilder<'a> {
   entrypoint: BlockId,
   blocks: BlockListBuilder<JitInstructionBlock<'a>>,
+  fn_name: &'a Ident,
 }
 
 impl<'a> JitFunctionBuilder<'a> {
-  fn new() -> Self {
+  fn new(fn_name: &'a Ident) -> Self {
     let mut blocks = BlockListBuilder::new();
     let entrypoint = blocks.allocate_uninitialized();
-    Self { entrypoint, blocks }
+    Self {
+      entrypoint,
+      blocks,
+      fn_name,
+    }
   }
 
   fn allocate_block(&mut self) -> BlockId {
@@ -106,8 +112,8 @@ enum Cursor<'a> {
 }
 
 impl<'a> OpenCursor<'a> {
-  fn new() -> Self {
-    let fn_builder = JitFunctionBuilder::new();
+  fn new(fn_name: &'a Ident) -> Self {
+    let fn_builder = JitFunctionBuilder::new(fn_name);
     let entrypoint = fn_builder.entrypoint;
     Self {
       fn_builder,
@@ -180,12 +186,7 @@ impl<'a> OpenCursor<'a> {
           .emit_local_store(let_statement.var())
           .into(),
       ),
-      Statement::Ret(ret_statement) => Ok(
-        self
-          .compile_expr(ret_statement.expr())?
-          .terminate(JitTerminalInstruction::Return)?
-          .into(),
-      ),
+      Statement::Ret(ret_statement) => Ok(self.compile_ret_statement(ret_statement)?.into()),
       Statement::CallStatement(call_expression) => {
         Ok(self.compile_call_expression(call_expression)?.into())
       }
@@ -264,17 +265,48 @@ impl<'a> OpenCursor<'a> {
     )
   }
 
-  fn compile_call_expression(self, call_expression: &'a CallExpression) -> InterpreterResult<Self> {
+  fn compile_ret_statement(
+    self,
+    ret_statement: &'a RetStatement,
+  ) -> InterpreterResult<ClosedCursor<'a>> {
+    // Tail calls for direct recursion.
+    if let Expression::CallExpression(call) = ret_statement.expr()
+      && let Expression::Ident(name) = call.target()
+      && name == self.fn_builder.fn_name
+    {
+      let entrypoint = self.fn_builder.entrypoint;
+      return self
+        .compile_call_arguments(call)?
+        .terminate(JitTerminalInstruction::Jump(entrypoint));
+    }
+
+    self
+      .compile_expr(ret_statement.expr())?
+      .terminate(JitTerminalInstruction::Return)
+  }
+
+  fn compile_call_expression(
+    self,
+    call_expression: &'a CallExpression,
+  ) -> InterpreterResult<OpenCursor<'a>> {
     Ok(
-      call_expression
-        .argument_list()
-        .iter()
-        .try_fold(self, |cursor, expr| cursor.compile_expr(expr))?
+      self
+        .compile_call_arguments(call_expression)?
         .compile_expr(call_expression.target())?
         .emit_instr(JitInstruction::Call(JitCallInstruction::with_arity(
           call_expression.argument_list().len() as u32,
         ))),
     )
+  }
+
+  fn compile_call_arguments(
+    self,
+    call_expression: &'a CallExpression,
+  ) -> InterpreterResult<OpenCursor<'a>> {
+    call_expression
+      .argument_list()
+      .iter()
+      .try_fold(self, |cursor, expr| cursor.compile_expr(expr))
   }
 }
 
@@ -325,7 +357,7 @@ impl<'a> Cursor<'a> {
       .parameters()
       .iter()
       .rev()
-      .fold(OpenCursor::new(), |cursor, param| {
+      .fold(OpenCursor::new(fn_decl.name()), |cursor, param| {
         cursor.emit_local_store(param.name())
       })
       .compile_lexical_block(fn_decl.body())?;
@@ -680,6 +712,53 @@ mod tests {
           call_instruction(call_with_arity(eq(&1))),
         ],
         ret_terminator()
+      )))
+    )
+  }
+
+  #[gtest]
+  fn simple_tail_recursion_no_args() {
+    let decl = parse_fn_decl(
+      r#"
+      fn f() -> i32 {
+        ret f()
+      }
+      "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![],
+        jump_terminator(eq(&block_id(0))),
+      )))
+    )
+  }
+
+  #[gtest]
+  fn simple_tail_recursion_with_args() {
+    let decl = parse_fn_decl(
+      r#"
+      fn f(a: i32, b: i32) -> i32 {
+        ret f(a, b)
+      }
+      "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      compile_to_bytecode(&decl),
+      ok(entry_block(instruction_block(
+        elements_are![
+          store_local_instruction(eq(&local_id(0))),
+          store_local_instruction(eq(&local_id(1))),
+          load_local_instruction(eq(&local_id(1))),
+          load_local_instruction(eq(&local_id(0))),
+        ],
+        jump_terminator(eq(&block_id(0))),
       )))
     )
   }
