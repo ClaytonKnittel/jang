@@ -9,7 +9,7 @@ cknittel-util = { git = "https://github.com/ClaytonKnittel/cknittel-util.git", r
   "from-variants",
 ] }
 itertools = "0.14.0"
-parser_generator = { git = "https://github.com/ClaytonKnittel/parser_generator.git", rev = "741af06470f44b976181b77a56918ea11f3b8c2e" }
+parser_generator = { git = "https://github.com/ClaytonKnittel/parser_generator.git", rev = "c19328baaa3177fdfad347034a07796eff94b22b" }
 
 [dev-dependencies]
 googletest = "0.14.2"
