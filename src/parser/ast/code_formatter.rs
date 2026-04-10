@@ -188,6 +188,28 @@ mod tests {
   }
 
   #[gtest]
+  fn roundtrip_mut_stmt() -> Result<()> {
+    let code = r#"
+      fn function_name() {
+        mut x = 123
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_rebind_stmt() -> Result<()> {
+    let code = r#"
+      fn function_name() {
+        x = 123
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
   fn roundtrip_complex_expr() -> Result<()> {
     let code = r#"
       fn function_name() -> i32 {
