@@ -282,7 +282,7 @@ mod tests {
       error::{InterpreterError, InterpreterResult},
       value::{
         Value,
-        matchers::{bool_value, i32_value, unit_value},
+        matchers::{bool_value, i64_value, unit_value},
       },
     },
     parser::{
@@ -364,7 +364,7 @@ mod tests {
       JitTerminalInstruction::Return,
     )]);
 
-    expect_that!(evaluate_no_arg_fn(&code), ok(i32_value(eq(&1))),)
+    expect_that!(evaluate_no_arg_fn(&code), ok(i64_value(eq(&1))),)
   }
 
   #[gtest]
@@ -396,7 +396,7 @@ mod tests {
       JitTerminalInstruction::Return,
     )]);
 
-    expect_that!(evaluate_no_arg_fn(&code), ok(i32_value(eq(&1))),)
+    expect_that!(evaluate_no_arg_fn(&code), ok(i64_value(eq(&1))),)
   }
 
   #[gtest]
@@ -456,7 +456,7 @@ mod tests {
 
     expect_that!(
       evaluate_function(&code, Vec::new(), &context),
-      ok(i32_value(eq(&1))),
+      ok(i64_value(eq(&1))),
     )
   }
 }
