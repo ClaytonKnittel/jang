@@ -49,30 +49,23 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
       .cloned()
   }
 
-  fn collect_while<F: FnMut(&char) -> bool>(
-    &mut self,
-    first_char: char,
-    mut cond: F,
-  ) -> JangResult<String> {
+  fn collect_while<F: FnMut(&char) -> bool>(&mut self, first_char: char, mut cond: F) -> String {
     let mut string_val = String::from(first_char);
-    while let Some(next_char) = self.char_iter.peek() {
-      let next_char = next_char
-        .take()
-        .map_err(|err| JangError::ForeignError(format!("{err}")))?;
-
+    while let Some(next_char) = self.peek_next_token() {
       if cond(&next_char) {
         string_val.push(next_char);
+        self.next().expect("Cannot fail if `peek` returned `Some`");
       } else {
         break;
       }
     }
-    Ok(string_val)
+    string_val
   }
 
-  fn parse_ident_or_keyword(&mut self, first_char: char) -> JangResult<JangToken> {
-    let ident = self.collect_while(first_char, is_ident_char)?;
+  fn parse_ident_or_keyword(&mut self, first_char: char) -> JangToken {
+    let ident = self.collect_while(first_char, is_ident_char);
     if let Some(keyword) = Keyword::build_from_string(&ident) {
-      return Ok(keyword.into());
+      return keyword.into();
     }
 
     if matches!(self.peek_next_token(), Some('(')) {
@@ -81,12 +74,12 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
       // an expression on the next line that starts with open parenthesis.
       self.should_emit_joint = true;
     }
-    Ok(Ident::new(ident).into())
+    Ident::new(ident).into()
   }
 
-  fn parse_numeric(&mut self, first_char: char) -> JangResult<JangToken> {
-    let numeric = self.collect_while(first_char, is_numeric_char)?;
-    Ok(Literal::from(NumericLiteral::from_str(numeric)).into())
+  fn parse_numeric(&mut self, first_char: char) -> JangToken {
+    let numeric = self.collect_while(first_char, is_numeric_char);
+    Literal::from(NumericLiteral::from_str(numeric)).into()
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
@@ -115,15 +108,15 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
     self.consume_all_whitespace();
     match self.next()? {
       Some(first_char @ ('a'..='z' | 'A'..='Z' | '_')) => {
-        Ok(Some(self.parse_ident_or_keyword(first_char)?))
+        Ok(Some(self.parse_ident_or_keyword(first_char)))
       }
-      Some(first_char @ ('0'..='9')) => self.parse_numeric(first_char).map(Some),
+      Some(first_char @ ('0'..='9')) => Ok(Some(self.parse_numeric(first_char))),
       Some('.') => {
         if self
           .peek_next_token()
           .is_some_and(|token| token.is_ascii_digit())
         {
-          self.parse_numeric('.').map(Some)
+          Ok(Some(self.parse_numeric('.')))
         } else {
           Ok(Some(self.parse_operator('.')))
         }
