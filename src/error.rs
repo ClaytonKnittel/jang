@@ -49,6 +49,7 @@ pub enum JangError {
   Grammar(ParserError<JangToken, Infallible>),
   Builder(BuilderError),
   Interpret(InterpreterError),
+  ForeignError(String),
 }
 
 impl JangError {
@@ -93,6 +94,7 @@ impl Display for JangError {
       Self::Grammar(err) => write!(f, "Grammar error: {err}"),
       Self::Builder(err) => write!(f, "Builder error: {err}"),
       Self::Interpret(err) => write!(f, "Interpret error: {err}"),
+      Self::ForeignError(message) => write!(f, "{message}"),
     }
   }
 }
