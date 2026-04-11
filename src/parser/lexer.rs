@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{convert::Infallible, error::Error};
 
 use cknittel_util::peekable_stream::{IntoPeekableStream, PeekableStream};
 
@@ -22,59 +22,71 @@ fn is_numeric_char(ch: &char) -> bool {
   matches!(ch, '0'..='9' | '.')
 }
 
-struct TokenIter<I: Iterator<Item = char>> {
+struct TokenIter<E, I: Iterator<Item = Result<char, E>>> {
   char_iter: PeekableStream<I>,
   should_emit_joint: bool,
 }
 
-impl<I: Iterator<Item = char>> TokenIter<I> {
+impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
   fn consume_all_whitespace(&mut self) {
     while self
       .char_iter
       .peek()
       .as_deref()
-      .is_some_and(char::is_ascii_whitespace)
+      .is_some_and(|res| res.as_ref().is_ok_and(char::is_ascii_whitespace))
     {
       self.char_iter.next();
     }
   }
 
-  fn peek_next_token(&mut self) -> Option<impl Deref<Target = char>> {
-    self.char_iter.peek()
+  fn peek_next_token(&mut self) -> Option<char> {
+    self
+      .char_iter
+      .peek()
+      .as_deref()
+      .map(Result::as_ref)
+      .and_then(Result::ok)
+      .cloned()
   }
 
-  fn collect_while<F: FnMut(&char) -> bool>(&mut self, first_char: char, mut cond: F) -> String {
+  fn collect_while<F: FnMut(&char) -> bool>(
+    &mut self,
+    first_char: char,
+    mut cond: F,
+  ) -> JangResult<String> {
     let mut string_val = String::from(first_char);
-    while let Some(next_char) = self.char_iter.peek()
-      && cond(&next_char)
-    {
-      string_val.push(next_char.take());
+    while let Some(next_char) = self.char_iter.peek() {
+      let next_char = next_char
+        .take()
+        .map_err(|err| JangError::ForeignError(format!("{err}")))?;
+
+      if cond(&next_char) {
+        string_val.push(next_char);
+      } else {
+        break;
+      }
     }
-    string_val
+    Ok(string_val)
   }
 
   fn parse_ident_or_keyword(&mut self, first_char: char) -> JangResult<JangToken> {
-    let ident = self.collect_while(first_char, is_ident_char);
+    let ident = self.collect_while(first_char, is_ident_char)?;
     if let Some(keyword) = Keyword::build_from_string(&ident) {
-      Ok(keyword.into())
-    } else {
-      if self
-        .peek_next_token()
-        .as_deref()
-        .is_some_and(|ch| *ch == '(')
-      {
-        // Identifiers join to open parenthesis, to disambiguate function calls
-        // from an expression on one line that ends with an ident, followed by
-        // an expression on the next line that starts with open parenthesis.
-        self.should_emit_joint = true;
-      }
-      Ok(Ident::new(ident).into())
+      return Ok(keyword.into());
     }
+
+    if matches!(self.peek_next_token(), Some('(')) {
+      // Identifiers join to open parenthesis, to disambiguate function calls
+      // from an expression on one line that ends with an ident, followed by
+      // an expression on the next line that starts with open parenthesis.
+      self.should_emit_joint = true;
+    }
+    Ok(Ident::new(ident).into())
   }
 
-  fn parse_numeric(&mut self, first_char: char) -> JangToken {
-    let numeric = self.collect_while(first_char, is_numeric_char);
-    Literal::from(NumericLiteral::from_str(numeric)).into()
+  fn parse_numeric(&mut self, first_char: char) -> JangResult<JangToken> {
+    let numeric = self.collect_while(first_char, is_numeric_char)?;
+    Ok(Literal::from(NumericLiteral::from_str(numeric)).into())
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
@@ -83,8 +95,7 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
 
     if self
       .peek_next_token()
-      .as_deref()
-      .is_some_and(|next_char| op.can_join(*next_char))
+      .is_some_and(|next_char| op.can_join(next_char))
     {
       self.should_emit_joint = true;
     }
@@ -92,21 +103,27 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
     Operator::new(op).into()
   }
 
+  fn next(&mut self) -> JangResult<Option<char>> {
+    self
+      .char_iter
+      .next()
+      .transpose()
+      .map_err(|err| JangError::ForeignError(format!("{err}")))
+  }
+
   fn parse_next(&mut self) -> JangResult<Option<JangToken>> {
     self.consume_all_whitespace();
-    match self.char_iter.next() {
+    match self.next()? {
       Some(first_char @ ('a'..='z' | 'A'..='Z' | '_')) => {
         Ok(Some(self.parse_ident_or_keyword(first_char)?))
       }
-      Some(first_char @ ('0'..='9')) => Ok(Some(self.parse_numeric(first_char))),
+      Some(first_char @ ('0'..='9')) => self.parse_numeric(first_char).map(Some),
       Some('.') => {
         if self
-          .char_iter
-          .peek()
-          .as_deref()
-          .is_some_and(char::is_ascii_digit)
+          .peek_next_token()
+          .is_some_and(|token| token.is_ascii_digit())
         {
-          Ok(Some(self.parse_numeric('.')))
+          self.parse_numeric('.').map(Some)
         } else {
           Ok(Some(self.parse_operator('.')))
         }
@@ -124,7 +141,7 @@ impl<I: Iterator<Item = char>> TokenIter<I> {
   }
 }
 
-impl<I: Iterator<Item = char>> Iterator for TokenIter<I> {
+impl<E: Error, I: Iterator<Item = Result<char, E>>> Iterator for TokenIter<E, I> {
   type Item = JangResult<JangToken>;
 
   fn next(&mut self) -> Option<Self::Item> {
@@ -137,11 +154,23 @@ impl<I: Iterator<Item = char>> Iterator for TokenIter<I> {
   }
 }
 
-pub fn lex_stream<I: IntoIterator<Item = char>>(
+pub fn try_lex_stream<E: Error, I: IntoIterator<Item = Result<char, E>>>(
   stream: I,
 ) -> impl Iterator<Item = JangResult<JangToken>> {
   TokenIter {
     char_iter: stream.into_iter().peekable_stream(),
+    should_emit_joint: false,
+  }
+}
+
+pub fn lex_stream<I: IntoIterator<Item = char>>(
+  stream: I,
+) -> impl Iterator<Item = JangResult<JangToken>> {
+  TokenIter {
+    char_iter: stream
+      .into_iter()
+      .map(Ok::<_, Infallible>)
+      .peekable_stream(),
     should_emit_joint: false,
   }
 }
