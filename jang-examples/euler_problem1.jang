@@ -1,0 +1,10 @@
+fn solve(n: i32, acc: i32) -> i32 {
+  if n == 1000 { ret acc }
+  if n % 3 == 0 { ret solve(n + 1, acc + n) }
+  if n % 5 == 0 { ret solve(n + 1, acc + n) }
+  ret solve(n + 1, acc)
+}
+
+fn main() -> i32 {
+  ret solve(0, 0)
+}
