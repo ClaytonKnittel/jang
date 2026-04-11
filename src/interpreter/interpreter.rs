@@ -628,6 +628,35 @@ mod tests {
     }
 
     #[gtest]
+    fn project_euler_problem3() {
+      expect_that!(
+        interpret_program(
+          r#"
+          fn largest_prime_factor(n: i64) -> i64 {
+            mut n2 = n
+            mut p = 2
+            loop {
+              if n2 == 1 {
+                ret p
+              } else if n2 % p == 0 {
+                n2 = n2 / p
+              } else {
+                p = p + 1
+              }
+            }
+          }
+
+          fn main() -> i64 {
+            ret largest_prime_factor(600851475143)
+          }
+          "#
+          .chars()
+        ),
+        ok(eq(&6857))
+      );
+    }
+
+    #[gtest]
     fn project_euler_problem5() {
       expect_that!(
         interpret_program(
