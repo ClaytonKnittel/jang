@@ -695,5 +695,35 @@ mod tests {
         ok(eq(&232792560))
       );
     }
+
+    #[gtest]
+    fn project_euler_problem6() {
+      expect_that!(
+        interpret_program(
+          r#"
+          fn sum_of_squares(n: i64) -> i64 {
+            mut sum = 0
+            mut i = 1
+            loop {
+              sum = sum + i * i
+              if i == n { ret sum }
+              i = i + 1
+            }
+          }
+
+          fn square_of_sum(n: i64) -> i64 {
+            let sum = n * (n + 1) / 2
+            ret sum * sum
+          }
+
+          fn main() -> i64 {
+            ret square_of_sum(100) - sum_of_squares(100)
+          }
+          "#
+          .chars()
+        ),
+        ok(eq(&25164150))
+      );
+    }
   }
 }
