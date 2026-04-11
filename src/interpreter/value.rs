@@ -16,7 +16,7 @@ use crate::{
 pub enum Value<'a> {
   Unit,
   Bool(bool),
-  Int32(i32),
+  Int64(i64),
   Float32(f32),
   JitCompiledFunctionRef(&'a JitCompiledFunction<'a>),
 }
@@ -24,7 +24,7 @@ pub enum Value<'a> {
 /// A pair of two identically-typed numeric values.
 #[derive(Debug, Clone)]
 enum NumericValuePair {
-  Int32(i32, i32),
+  Int64(i64, i64),
   Float32(f32, f32),
 }
 
@@ -33,7 +33,7 @@ impl<'a> TryFrom<&Literal> for Value<'a> {
 
   fn try_from(value: &Literal) -> InterpreterResult<Self> {
     match value {
-      Literal::Numeric(NumericLiteral::Integral(v)) => Ok(Self::Int32(v.parse_as()?)),
+      Literal::Numeric(NumericLiteral::Integral(v)) => Ok(Self::Int64(v.parse_as()?)),
       Literal::Numeric(NumericLiteral::Float(v)) => Ok(Self::Float32(v.parse_as()?)),
     }
   }
@@ -48,7 +48,7 @@ impl<'a> Value<'a> {
     match self {
       Self::Unit => "unit",
       Self::Bool(_) => "bool",
-      Self::Int32(_) => "i32",
+      Self::Int64(_) => "i64",
       Self::Float32(_) => "f32",
       Self::JitCompiledFunctionRef(_) => "<compiled-bytecode>",
     }
@@ -60,7 +60,7 @@ impl<'a> Value<'a> {
     op: &'static str,
   ) -> InterpreterResult<NumericValuePair> {
     match (self, other) {
-      (Value::Int32(a), Value::Int32(b)) => Ok(NumericValuePair::Int32(*a, *b)),
+      (Value::Int64(a), Value::Int64(b)) => Ok(NumericValuePair::Int64(*a, *b)),
       (Value::Float32(a), Value::Float32(b)) => Ok(NumericValuePair::Float32(*a, *b)),
       (lhs, rhs) => Err(InterpreterError::value_err(format!(
         "{op}: expected matching numeric operands, got {} and {}",
@@ -107,28 +107,28 @@ impl<'a> Value<'a> {
 
   pub fn multiply(&self, other: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(other, "multiply")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Int32(a * b)),
+      NumericValuePair::Int64(a, b) => Ok(Value::Int64(a * b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a * b)),
     }
   }
 
   pub fn add(&self, other: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(other, "add")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Int32(a + b)),
+      NumericValuePair::Int64(a, b) => Ok(Value::Int64(a + b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a + b)),
     }
   }
 
   pub fn subtract(&self, other: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(other, "subtract")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Int32(a - b)),
+      NumericValuePair::Int64(a, b) => Ok(Value::Int64(a - b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a - b)),
     }
   }
 
   pub fn divide(&self, divisor: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(divisor, "divide")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Int32(a.checked_div(b).ok_or_else(|| {
+      NumericValuePair::Int64(a, b) => Ok(Value::Int64(a.checked_div(b).ok_or_else(|| {
         InterpreterError::value_err(format!("division by zero: {:?} / {:?}", self, divisor))
       })?)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a.div(b))),
@@ -137,7 +137,7 @@ impl<'a> Value<'a> {
 
   pub fn modulo(&self, divisor: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(divisor, "modulo")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Int32(a.checked_rem(b).ok_or_else(|| {
+      NumericValuePair::Int64(a, b) => Ok(Value::Int64(a.checked_rem(b).ok_or_else(|| {
         InterpreterError::value_err(format!("modulo by zero: {:?} / {:?}", self, divisor))
       })?)),
       NumericValuePair::Float32(a, b) => Ok(Value::Float32(a.rem(b))),
@@ -146,28 +146,28 @@ impl<'a> Value<'a> {
 
   pub fn less_than(&self, rhs: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(rhs, "less than")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Bool(a < b)),
+      NumericValuePair::Int64(a, b) => Ok(Value::Bool(a < b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Bool(a < b)),
     }
   }
 
   pub fn less_than_equal(&self, rhs: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(rhs, "less than equal")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Bool(a <= b)),
+      NumericValuePair::Int64(a, b) => Ok(Value::Bool(a <= b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Bool(a <= b)),
     }
   }
 
   pub fn greater_than(&self, rhs: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(rhs, "greater than")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Bool(a > b)),
+      NumericValuePair::Int64(a, b) => Ok(Value::Bool(a > b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Bool(a > b)),
     }
   }
 
   pub fn greater_than_equal(&self, rhs: &Self) -> InterpreterResult<Self> {
     match self.expect_numeric_pair(rhs, "greater than equal")? {
-      NumericValuePair::Int32(a, b) => Ok(Value::Bool(a >= b)),
+      NumericValuePair::Int64(a, b) => Ok(Value::Bool(a >= b)),
       NumericValuePair::Float32(a, b) => Ok(Value::Bool(a >= b)),
     }
   }
@@ -175,7 +175,7 @@ impl<'a> Value<'a> {
   pub fn equal(&self, rhs: &Self) -> InterpreterResult<Self> {
     Ok(Value::Bool(match (self, rhs) {
       (Self::Bool(a), Value::Bool(b)) => a == b,
-      (Self::Int32(a), Value::Int32(b)) => a == b,
+      (Self::Int64(a), Value::Int64(b)) => a == b,
       _ => Err(InterpreterError::value_err(format!(
         "operands not supported for equality, got {} and {}",
         self.debug_type_name(),
@@ -200,8 +200,8 @@ pub mod matchers {
   use crate::interpreter::value::Value;
   use googletest::prelude::*;
 
-  pub fn i32_value<'a>(matcher: impl Matcher<&'a i32>) -> impl Matcher<&'a Value<'a>> {
-    pat!(Value::Int32(matcher))
+  pub fn i64_value<'a>(matcher: impl Matcher<&'a i64>) -> impl Matcher<&'a Value<'a>> {
+    pat!(Value::Int64(matcher))
   }
 
   pub fn unit_value<'a>() -> impl Matcher<&'a Value<'a>> {
@@ -222,7 +222,7 @@ mod tests {
   #[gtest]
   fn arithmetic_op_errors_for_mismatched_types() {
     expect_that!(
-      Value::Int32(1).add(&Value::Float32(2.0)),
+      Value::Int64(1).add(&Value::Float32(2.0)),
       err(interpreter_value_error(contains_substring("add:")))
     );
   }
@@ -230,7 +230,7 @@ mod tests {
   #[gtest]
   fn arithmetic_op_errors_for_non_numeric_operand() {
     expect_that!(
-      Value::Int32(1).add(&Value::Bool(true)),
+      Value::Int64(1).add(&Value::Bool(true)),
       err(interpreter_value_error(contains_substring("add:")))
     );
   }
@@ -238,7 +238,7 @@ mod tests {
   #[gtest]
   fn divide_by_zero_errors_for_int32() {
     expect_that!(
-      Value::Int32(1).divide(&Value::Int32(0)),
+      Value::Int64(1).divide(&Value::Int64(0)),
       err(interpreter_value_error(contains_substring(
         "division by zero"
       )))
@@ -248,15 +248,15 @@ mod tests {
   #[gtest]
   fn less_than() {
     expect_that!(
-      Value::Int32(1).less_than(&Value::Int32(2)),
+      Value::Int64(1).less_than(&Value::Int64(2)),
       ok(bool_value(&true))
     );
     expect_that!(
-      Value::Int32(1).less_than(&Value::Int32(1)),
+      Value::Int64(1).less_than(&Value::Int64(1)),
       ok(bool_value(&false))
     );
     expect_that!(
-      Value::Int32(2).less_than(&Value::Int32(1)),
+      Value::Int64(2).less_than(&Value::Int64(1)),
       ok(bool_value(&false))
     );
 
@@ -273,7 +273,7 @@ mod tests {
       ok(bool_value(&true))
     );
     expect_that!(
-      Value::Int32(7).equal(&Value::Int32(8)),
+      Value::Int64(7).equal(&Value::Int64(8)),
       ok(bool_value(&false))
     );
   }
@@ -286,7 +286,7 @@ mod tests {
     );
 
     expect_that!(
-      Value::Bool(true).equal(&Value::Int32(1)),
+      Value::Bool(true).equal(&Value::Int64(1)),
       err(interpreter_value_error(contains_substring("equality")))
     );
   }
@@ -294,9 +294,9 @@ mod tests {
   #[gtest]
   fn expect_bool_rejects_non_bool() {
     expect_that!(
-      Value::Int32(1).expect_bool(),
+      Value::Int64(1).expect_bool(),
       err(interpreter_value_error(contains_substring(
-        "expected bool, got i32"
+        "expected bool, got i64"
       )))
     );
   }
@@ -320,7 +320,7 @@ mod tests {
   #[gtest]
   fn logical_and_with_invalid_type() {
     expect_that!(
-      Value::Int32(123).logical_and(&Value::Bool(false)),
+      Value::Int64(123).logical_and(&Value::Bool(false)),
       err(interpreter_value_error(contains_substring("logical and")))
     );
   }

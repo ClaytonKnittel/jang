@@ -1,0 +1,40 @@
+{
+  "name": "jang-highlight",
+  "displayName": "jang-highlight",
+  "description": "Syntax highlighting for the Jang programming language",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.115.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "scripts": {
+    "build": "npx js-yaml syntaxes/jang.tmLanguage.yaml > syntaxes/jang.tmLanguage.json"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "jang",
+        "aliases": [
+          "Jang",
+          "jang"
+        ],
+        "extensions": [
+          ".jang"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "jang",
+        "scopeName": "source.jang",
+        "path": "./syntaxes/jang.tmLanguage.json"
+      }
+    ]
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.1"
+  }
+}

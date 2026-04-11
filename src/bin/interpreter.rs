@@ -15,7 +15,7 @@ struct Args {
   input: String,
 }
 
-fn run_program<E: Error>(text: impl IntoIterator<Item = Result<char, E>>) -> JangResult<i32> {
+fn run_program<E: Error>(text: impl IntoIterator<Item = Result<char, E>>) -> JangResult<i64> {
   let ast = lex_and_parse_jang_file(text)?;
   let interp = Interpreter::new(&ast)?;
   interp.run_main().map_err(JangError::Interpret)
