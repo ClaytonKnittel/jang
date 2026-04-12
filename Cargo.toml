@@ -10,7 +10,7 @@ cknittel-util = { git = "https://github.com/ClaytonKnittel/cknittel-util.git", r
 ] }
 clap = { version = "4.6.0", features = ["derive"] }
 itertools = "0.14.0"
-parser_generator = { git = "https://github.com/ClaytonKnittel/parser_generator.git", rev = "1ea3e588a5a50baedbcf6845fd28e9095c810900" }
+parser_generator = { git = "https://github.com/ClaytonKnittel/parser_generator.git", rev = "168257d942f4e23cbeef467ceae0e0da3c480179" }
 utf8-chars = "3.0.6"
 
 [dev-dependencies]
