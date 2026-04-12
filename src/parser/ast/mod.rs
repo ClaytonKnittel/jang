@@ -1,4 +1,5 @@
 pub mod assignment_statement;
+mod ast;
 pub mod binary_expression;
 pub mod block;
 pub mod call_expression;
@@ -17,3 +18,5 @@ pub mod structured_type_decl;
 pub mod type_decl;
 pub mod type_expr;
 pub mod unary_experssion;
+
+pub use ast::*;
