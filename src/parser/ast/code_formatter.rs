@@ -102,7 +102,7 @@ macro_rules! format_ast {
 mod tests {
   use googletest::prelude::*;
   use itertools::Itertools;
-  use parser_generator::parser::Parser;
+  use parser_generator::parser::ParserNoContext;
 
   use crate::{
     error::JangResult,

@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use parser_generator::parser::Parser;
+use parser_generator::parser::ParserNoContext;
 
 use crate::{
   error::JangResult,
