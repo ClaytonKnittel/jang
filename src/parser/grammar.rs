@@ -310,7 +310,7 @@ pub_grammar!(
 
 #[cfg(test)]
 pub mod testing {
-  use parser_generator::parser::ParserNoContext;
+  use parser_generator::parser::Parser;
 
   use crate::{
     error::JangResult,
@@ -325,7 +325,7 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
   use googletest::prelude::*;
-  use parser_generator::parser::ParserNoContext;
+  use parser_generator::parser::Parser;
 
   use crate::{
     error::JangResult,
