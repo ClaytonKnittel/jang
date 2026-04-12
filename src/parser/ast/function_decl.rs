@@ -3,12 +3,17 @@ use std::fmt::Display;
 use cknittel_util::builder::Builder;
 
 use crate::parser::{
-  ast::{block::Block, type_expr::TypeExpression},
+  ast::{
+    block::Block,
+    ids::{AstGlobalDeclId, AstLocalDeclId},
+    type_expr::TypeExpression,
+  },
   token::ident::Ident,
 };
 
 #[derive(Clone, Debug)]
 pub struct FunctionDecl {
+  decl_id: AstGlobalDeclId,
   name: Ident,
   parameters: FunctionParameters,
   return_type: Option<TypeExpression>,
@@ -17,12 +22,14 @@ pub struct FunctionDecl {
 
 impl FunctionDecl {
   pub fn new(
+    decl_id: AstGlobalDeclId,
     name: Ident,
     parameters: FunctionParameters,
     return_type: Option<TypeExpression>,
     body: Block,
   ) -> Self {
     Self {
+      decl_id,
       name,
       parameters,
       return_type,
@@ -44,6 +51,10 @@ impl FunctionDecl {
 
   pub fn body(&self) -> &Block {
     &self.body
+  }
+
+  pub fn decl_id(&self) -> AstGlobalDeclId {
+    self.decl_id
   }
 }
 
@@ -87,13 +98,14 @@ impl Display for FunctionParameters {
 
 #[derive(Clone, Debug)]
 pub struct FunctionParameter {
+  decl_id: AstLocalDeclId,
   name: Ident,
   ty: TypeExpression,
 }
 
 impl FunctionParameter {
-  pub fn new(name: Ident, ty: TypeExpression) -> Self {
-    Self { name, ty }
+  pub fn new(decl_id: AstLocalDeclId, name: Ident, ty: TypeExpression) -> Self {
+    Self { decl_id, name, ty }
   }
 
   pub fn name(&self) -> &Ident {
@@ -102,6 +114,10 @@ impl FunctionParameter {
 
   pub fn ty(&self) -> &TypeExpression {
     &self.ty
+  }
+
+  pub fn decl_id(&self) -> AstLocalDeclId {
+    self.decl_id
   }
 }
 

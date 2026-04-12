@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::parser::ast::expression::Expression;
+use crate::parser::ast::{expression::Expression, ids::AstExpressionId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOp {
@@ -21,6 +21,7 @@ impl Display for UnaryOp {
 
 #[derive(Clone, Debug)]
 pub struct UnaryExpression {
+  id: AstExpressionId,
   expr: Box<Expression>,
   op: UnaryOp,
 }
@@ -33,11 +34,16 @@ impl UnaryExpression {
   pub fn op(&self) -> UnaryOp {
     self.op
   }
+
+  pub fn id(&self) -> AstExpressionId {
+    self.id
+  }
 }
 
 impl UnaryExpression {
-  pub fn new(expr: impl Into<Box<Expression>>, op: UnaryOp) -> Self {
+  pub fn new(id: AstExpressionId, expr: impl Into<Box<Expression>>, op: UnaryOp) -> Self {
     Self {
+      id,
       expr: expr.into(),
       op,
     }
@@ -65,6 +71,7 @@ pub(crate) mod matchers {
     expr_matcher: impl Matcher<&'a Expression>,
   ) -> impl Matcher<&'a Expression> {
     pat!(Expression::UnaryExpression(pat!(UnaryExpression {
+      id: anything(),
       expr: result_of!(Box::deref, expr_matcher),
       op: eq(op)
     })))

@@ -2,18 +2,16 @@ use std::fmt::Display;
 
 use cknittel_util::from_variants::FromVariants;
 
-use crate::parser::{
-  ast::{
-    binary_expression::BinaryExpression, call_expression::CallExpression,
-    dot_expression::DotExpression, unary_experssion::UnaryExpression,
-  },
-  token::{ident::Ident, literal::Literal},
+use crate::parser::ast::{
+  binary_expression::BinaryExpression, call_expression::CallExpression,
+  dot_expression::DotExpression, ids::AstExpressionId, literal_expression::LiteralExpression,
+  name_ref_expression::NameRefExpression, unary_experssion::UnaryExpression,
 };
 
 #[derive(Clone, Debug, FromVariants)]
 pub enum Expression {
-  Literal(Literal),
-  Ident(Ident),
+  Literal(LiteralExpression),
+  NameRef(NameRefExpression),
   BinaryExpression(BinaryExpression),
   UnaryExpression(UnaryExpression),
   CallExpression(CallExpression),
@@ -24,7 +22,7 @@ impl Display for Expression {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Literal(literal) => write!(f, "{literal}"),
-      Self::Ident(ident) => write!(f, "{ident}"),
+      Self::NameRef(ident) => write!(f, "{ident}"),
       Self::BinaryExpression(binary_expr) => write!(f, "({binary_expr})"),
       Self::UnaryExpression(unary_expr) => write!(f, "{unary_expr}"),
       Self::CallExpression(call_expr) => write!(f, "{call_expr}"),
@@ -33,21 +31,15 @@ impl Display for Expression {
   }
 }
 
-#[cfg(test)]
-pub(crate) mod matchers {
-  use crate::parser::{
-    ast::expression::Expression,
-    token::{ident::Ident, literal::Literal},
-  };
-  use googletest::prelude::*;
-
-  pub fn literal_expression<'a>(
-    matcher: impl Matcher<&'a Literal>,
-  ) -> impl Matcher<&'a Expression> {
-    pat!(Expression::Literal(matcher))
-  }
-
-  pub fn ident_expression<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a Expression> {
-    pat!(Expression::Ident(matcher))
+impl Expression {
+  pub fn id(&self) -> AstExpressionId {
+    match self {
+      Self::Literal(literal) => literal.id(),
+      Self::NameRef(ident) => ident.id(),
+      Self::BinaryExpression(binary_expr) => binary_expr.id(),
+      Self::UnaryExpression(unary_expr) => unary_expr.id(),
+      Self::CallExpression(call_expr) => call_expr.id(),
+      Self::DotExpression(dot_expr) => dot_expr.id(),
+    }
   }
 }

@@ -1,16 +1,21 @@
 use std::fmt::Display;
 
-use crate::parser::{ast::expression::Expression, token::ident::Ident};
+use crate::parser::{
+  ast::{expression::Expression, ids::AstExpressionId},
+  token::ident::Ident,
+};
 
 #[derive(Clone, Debug)]
 pub struct DotExpression {
+  id: AstExpressionId,
   base: Box<Expression>,
   member: Ident,
 }
 
 impl DotExpression {
-  pub fn new(base: impl Into<Box<Expression>>, member: Ident) -> Self {
+  pub fn new(id: AstExpressionId, base: impl Into<Box<Expression>>, member: Ident) -> Self {
     Self {
+      id,
       base: base.into(),
       member,
     }
@@ -22,6 +27,10 @@ impl DotExpression {
 
   pub fn member(&self) -> &Ident {
     &self.member
+  }
+
+  pub fn id(&self) -> AstExpressionId {
+    self.id
   }
 }
 

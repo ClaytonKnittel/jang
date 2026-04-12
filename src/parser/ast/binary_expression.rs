@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::parser::ast::expression::Expression;
+use crate::parser::ast::{expression::Expression, ids::AstExpressionId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
@@ -45,6 +45,7 @@ impl Display for BinaryOp {
 
 #[derive(Clone, Debug)]
 pub struct BinaryExpression {
+  id: AstExpressionId,
   lhs: Box<Expression>,
   rhs: Box<Expression>,
   op: BinaryOp,
@@ -62,15 +63,21 @@ impl BinaryExpression {
   pub fn op(&self) -> BinaryOp {
     self.op
   }
+
+  pub fn id(&self) -> AstExpressionId {
+    self.id
+  }
 }
 
 impl BinaryExpression {
   pub fn new(
+    id: AstExpressionId,
     lhs: impl Into<Box<Expression>>,
     rhs: impl Into<Box<Expression>>,
     op: BinaryOp,
   ) -> Self {
     Self {
+      id,
       lhs: lhs.into(),
       rhs: rhs.into(),
       op,
@@ -100,6 +107,7 @@ pub(crate) mod matchers {
     rhs_matcher: impl Matcher<&'a Expression>,
   ) -> impl Matcher<&'a Expression> {
     pat!(Expression::BinaryExpression(pat!(BinaryExpression {
+      id: anything(),
       lhs: result_of!(Box::deref, lhs_matcher),
       rhs: result_of!(Box::deref, rhs_matcher),
       op: eq(op)

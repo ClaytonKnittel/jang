@@ -5,7 +5,7 @@ use crate::{
     bytecode::runtime::local_table::LocalId,
     error::{InterpreterError, InterpreterResult},
   },
-  parser::{ast::assignment_statement::Mutability, token::ident::Ident},
+  parser::{ast::bind_statement::Mutability, token::ident::Ident},
 };
 
 #[derive(Debug)]
