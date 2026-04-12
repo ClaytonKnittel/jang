@@ -1,16 +1,24 @@
 use std::fmt::Display;
 
-use crate::parser::ast::{expression::Expression, expression_list::ExpressionList};
+use crate::parser::ast::{
+  expression::Expression, expression_list::ExpressionList, ids::AstExpressionId,
+};
 
 #[derive(Clone, Debug)]
 pub struct CallExpression {
+  id: AstExpressionId,
   target: Box<Expression>,
   argument_list: ExpressionList,
 }
 
 impl CallExpression {
-  pub fn new(target: impl Into<Box<Expression>>, argument_list: impl Into<ExpressionList>) -> Self {
+  pub fn new(
+    id: AstExpressionId,
+    target: impl Into<Box<Expression>>,
+    argument_list: impl Into<ExpressionList>,
+  ) -> Self {
     Self {
+      id,
       target: target.into(),
       argument_list: argument_list.into(),
     }
@@ -22,6 +30,10 @@ impl CallExpression {
 
   pub fn argument_list(&self) -> &[Expression] {
     self.argument_list.expressions()
+  }
+
+  pub fn id(&self) -> AstExpressionId {
+    self.id
   }
 }
 
