@@ -102,11 +102,10 @@ macro_rules! format_ast {
 mod tests {
   use googletest::prelude::*;
   use itertools::Itertools;
-  use parser_generator::parser::Parser;
 
   use crate::{
     error::JangResult,
-    parser::{ast::jang_file::JangFile, grammar::JangGrammar, lexer::lex_stream},
+    parser::{ast::jang_file::JangFile, grammar::testing::lex_and_parse_jang_file},
   };
 
   fn remove_leading_whitespace(mut code: &str) -> String {
@@ -123,7 +122,7 @@ mod tests {
   }
 
   fn parse_code(code: &str) -> JangResult<JangFile> {
-    Ok(JangGrammar::parse_fallible(lex_stream(code.chars()))?)
+    lex_and_parse_jang_file(code.chars())
   }
 
   fn check_print_roundtrip(formatted_code: &str) -> Result<()> {

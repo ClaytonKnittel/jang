@@ -15,14 +15,17 @@ use crate::{
   },
   parser::{
     ast::{
-      assignment_statement::{AssignmentKind, AssignmentStatement, Mutability},
       binary_expression::BinaryExpression,
+      bind_statement::{BindStatement, Mutability},
       block::Block,
       call_expression::CallExpression,
       expression::Expression,
       function_decl::FunctionDecl,
       if_statement::{ElseClause, IfStatement},
+      literal_expression::LiteralExpression,
       loop_statement::LoopStatement,
+      name_ref_expression::NameRefExpression,
+      rebind_statement::RebindStatement,
       ret_statement::RetStatement,
       statement::Statement,
       unary_experssion::UnaryExpression,
@@ -210,11 +213,10 @@ impl<'a> OpenCursor<'a> {
 
   fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a>> {
     match statement {
-      Statement::Assign(assignment_statement) => Ok(
-        self
-          .compile_assignment_statement(assignment_statement)?
-          .into(),
-      ),
+      Statement::Bind(bind_statement) => Ok(self.compile_bind_statement(bind_statement)?.into()),
+      Statement::Rebind(rebind_statement) => {
+        Ok(self.compile_rebind_statement(rebind_statement)?.into())
+      }
       Statement::Ret(ret_statement) => Ok(self.compile_ret_statement(ret_statement)?.into()),
       Statement::CallStatement(call_expression) => {
         Ok(self.compile_call_expression(call_expression)?.into())
@@ -228,20 +230,18 @@ impl<'a> OpenCursor<'a> {
     }
   }
 
-  fn compile_assignment_statement(
-    self,
-    statement: &'a AssignmentStatement,
-  ) -> InterpreterResult<Self> {
+  fn compile_bind_statement(self, statement: &'a BindStatement) -> InterpreterResult<Self> {
     let compiled_expr = self.compile_expr(statement.expr())?;
-    match statement.kind() {
-      AssignmentKind::Declaration(Mutability::Immutable) => {
-        Ok(compiled_expr.emit_local_store(statement.var()))
-      }
-      AssignmentKind::Declaration(Mutability::Mutable) => {
-        Ok(compiled_expr.emit_local_mutable_store(statement.var()))
-      }
-      AssignmentKind::Rebind => compiled_expr.emit_local_rebind(statement.var()),
+    match statement.mutability() {
+      Mutability::Immutable => Ok(compiled_expr.emit_local_store(statement.var())),
+      Mutability::Mutable => Ok(compiled_expr.emit_local_mutable_store(statement.var())),
     }
+  }
+
+  fn compile_rebind_statement(self, statement: &'a RebindStatement) -> InterpreterResult<Self> {
+    self
+      .compile_expr(statement.expr())?
+      .emit_local_rebind(statement.var())
   }
 
   fn compile_lexical_block(self, block: &'a Block) -> InterpreterResult<Cursor<'a>> {
@@ -303,8 +303,8 @@ impl<'a> OpenCursor<'a> {
 
   fn compile_expr(self, expr: &'a Expression) -> InterpreterResult<Self> {
     match expr {
-      Expression::Literal(literal) => Ok(self.emit_literal_load(literal)),
-      Expression::Ident(ident) => Ok(self.emit_local_load(ident)),
+      Expression::Literal(expr) => self.compile_literal_expression(expr),
+      Expression::NameRef(expr) => self.compile_name_ref_expression(expr),
       Expression::BinaryExpression(expr) => self.compile_binary_expression(expr),
       Expression::UnaryExpression(expr) => self.compile_unary_expression(expr),
       Expression::CallExpression(expr) => self.compile_call_expression(expr),
@@ -312,6 +312,14 @@ impl<'a> OpenCursor<'a> {
         "evaluation of expression not yet implemented: {expr}"
       ))),
     }
+  }
+
+  fn compile_name_ref_expression(self, expr: &'a NameRefExpression) -> InterpreterResult<Self> {
+    Ok(self.emit_local_load(expr.ident()))
+  }
+
+  fn compile_literal_expression(self, expr: &'a LiteralExpression) -> InterpreterResult<Self> {
+    Ok(self.emit_literal_load(expr.literal()))
   }
 
   fn compile_else_block(self, else_clause: &'a ElseClause) -> InterpreterResult<Cursor<'a>> {
@@ -345,8 +353,8 @@ impl<'a> OpenCursor<'a> {
   ) -> InterpreterResult<ClosedCursor<'a>> {
     // Tail calls for direct recursion.
     if let Expression::CallExpression(call) = ret_statement.expr()
-      && let Expression::Ident(name) = call.target()
-      && name == self.fn_builder.fn_name
+      && let Expression::NameRef(name) = call.target()
+      && name.ident() == self.fn_builder.fn_name
     {
       let entrypoint = self.fn_builder.entrypoint;
       return self

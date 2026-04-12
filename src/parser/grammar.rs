@@ -4,9 +4,10 @@ use crate::{
   error::JangError,
   parser::{
     ast::{
-      assignment_statement::AssignmentStatement,
       binary_expression::{BinaryExpression, BinaryOp},
+      bind_statement::BindStatement,
       block::{Block, BlockBuilder},
+      builder_context::AstBuilderContext,
       call_expression::CallExpression,
       dot_expression::DotExpression,
       enum_type_decl::{EnumTypeDecl, EnumTypeDeclBuilder, EnumVariant, EnumVariantType},
@@ -17,7 +18,10 @@ use crate::{
       },
       if_statement::IfStatement,
       jang_file::{JangFile, JangFileBuilder},
+      literal_expression::LiteralExpression,
       loop_statement::LoopStatement,
+      name_ref_expression::NameRefExpression,
+      rebind_statement::RebindStatement,
       ret_statement::RetStatement,
       statement::Statement,
       structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
@@ -38,6 +42,7 @@ use crate::{
 pub_grammar!(
   name: JangGrammar;
   enum_terminal: JangToken;
+  context_type: AstBuilderContext;
   error_type: JangError;
 
   <root>: JangFile => <jang_file>;
@@ -112,7 +117,7 @@ pub_grammar!(
       <function_ret_type>
       <block_scope>
   {
-    FunctionDecl::new(#ident, #function_params, #function_ret_type, #block_scope)
+    FunctionDecl::new(#ctx.new_global_decl_id(), #ident, #function_params, #function_ret_type, #block_scope)
   };
 
   <function_ret_type>: Option<TypeExpression> => ! { None };
@@ -145,16 +150,16 @@ pub_grammar!(
     Statement::Break
   };
 
-  <let_binding>: AssignmentStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
-    AssignmentStatement::new_let(#ident, #expr)
+  <let_binding>: BindStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
+    BindStatement::new_let(#ctx.new_local_decl_id(), #ident, #expr)
   };
 
-  <mut_binding>: AssignmentStatement => Keyword(Keyword::Mut) <ident> <eq> <expr> {
-    AssignmentStatement::new_mut(#ident, #expr)
+  <mut_binding>: BindStatement => Keyword(Keyword::Mut) <ident> <eq> <expr> {
+    BindStatement::new_mut(#ctx.new_local_decl_id(), #ident, #expr)
   };
 
-  <rebind>: AssignmentStatement => <ident> <eq> <expr> {
-    AssignmentStatement::new_rebind(#ident, #expr)
+  <rebind>: RebindStatement => <ident> <eq> <expr> {
+    RebindStatement::new(#ctx.new_name_ref_id(), #ident, #expr)
   };
 
   <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
@@ -184,55 +189,55 @@ pub_grammar!(
   <expr>: Expression => <logical_or_expr>;
 
   <logical_or_expr>: Expression => <logical_or_expr> <logical_or> <logical_and_expr> {
-    BinaryExpression::new(#logical_or_expr, #logical_and_expr, BinaryOp::LogicalOr).into()
+    BinaryExpression::new(#ctx.new_expr_id(), #logical_or_expr, #logical_and_expr, BinaryOp::LogicalOr).into()
   };
   <logical_or_expr>: Expression => <logical_and_expr>;
 
   <logical_and_expr>: Expression => <logical_and_expr> <logical_and> <comparison_expr> {
-    BinaryExpression::new(#logical_and_expr, #comparison_expr, BinaryOp::LogicalAnd).into()
+    BinaryExpression::new(#ctx.new_expr_id(), #logical_and_expr, #comparison_expr, BinaryOp::LogicalAnd).into()
   };
   <logical_and_expr>: Expression => <comparison_expr>;
 
   <comparison_expr>: Expression => <comparison_expr> <comparator> <add_expr> {
-    BinaryExpression::new(#0, #2, #comparator).into()
+    BinaryExpression::new(#ctx.new_expr_id(), #0, #2, #comparator).into()
   };
   <comparison_expr>: Expression => <add_expr>;
 
   <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
-    BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Add).into()
+    BinaryExpression::new(#ctx.new_expr_id(), #add_expr, #mul_expr, BinaryOp::Add).into()
   };
   <add_expr>: Expression => <add_expr> <minus> <mul_expr> {
-    BinaryExpression::new(#add_expr, #mul_expr, BinaryOp::Sub).into()
+    BinaryExpression::new(#ctx.new_expr_id(), #add_expr, #mul_expr, BinaryOp::Sub).into()
   };
   <add_expr>: Expression => <mul_expr>;
 
   <mul_expr>: Expression => <mul_expr> <mul> <unary_expr> {
-    BinaryExpression::new(#mul_expr, #unary_expr, BinaryOp::Mul).into()
+    BinaryExpression::new(#ctx.new_expr_id(), #mul_expr, #unary_expr, BinaryOp::Mul).into()
   };
   <mul_expr>: Expression => <mul_expr> <div> <unary_expr> {
-    BinaryExpression::new(#mul_expr, #unary_expr, BinaryOp::Div).into()
+    BinaryExpression::new(#ctx.new_expr_id(), #mul_expr, #unary_expr, BinaryOp::Div).into()
   };
   <mul_expr>: Expression => <mul_expr> <modulo> <unary_expr> {
-    BinaryExpression::new(#mul_expr, #unary_expr, BinaryOp::Mod).into()
+    BinaryExpression::new(#ctx.new_expr_id(), #mul_expr, #unary_expr, BinaryOp::Mod).into()
   };
   <mul_expr>: Expression => <unary_expr>;
 
   // Unary expressions:
   <unary_expr>: Expression => <bang> <unary_expr> {
-    UnaryExpression::new(#unary_expr, UnaryOp::LogicalNot).into()
+    UnaryExpression::new(#ctx.new_expr_id(), #unary_expr, UnaryOp::LogicalNot).into()
   };
   <unary_expr>: Expression => <call_or_dot_expr>;
-  <unary_expr>: Expression => <literal>;
+  <unary_expr>: Expression => <literal> { LiteralExpression::new(#ctx.new_expr_id(), #literal).into() };
 
   // Call expressions.
   <call_or_dot_expr>: Expression => <call_expr>;
   <call_or_dot_expr>: Expression => <call_or_dot_expr> <dot> <ident> {
-    DotExpression::new(#call_or_dot_expr, #ident).into()
+    DotExpression::new(#ctx.new_expr_id(), #call_or_dot_expr, #ident).into()
   };
   <call_or_dot_expr>: Expression => <leaf_expr>;
 
   <call_expr>: CallExpression => <call_or_dot_expr> Joint <call_args> {
-    CallExpression::new(#call_or_dot_expr, #call_args)
+    CallExpression::new(#ctx.new_expr_id(), #call_or_dot_expr, #call_args)
   };
 
   <call_args>: ExpressionList => <open_paren> <expr_list_builder> <close_paren> {
@@ -240,7 +245,7 @@ pub_grammar!(
   };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
-  <leaf_expr>: Expression => <ident>;
+  <leaf_expr>: Expression => <ident> { NameRefExpression::new(#ctx.new_expr_id(), #ctx.new_name_ref_id(), #ident).into() };
 
   <expr_list_builder>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
   <expr_list_builder>: ExpressionListBuilder => <non_empty_expr_list>;
@@ -261,11 +266,11 @@ pub_grammar!(
   <non_empty_parameter_list>: FunctionParametersBuilder =>
       <non_empty_parameter_list> <comma> <ident> <colon> <type_expr>
   {
-    #non_empty_parameter_list.add_parameters(FunctionParameter::new(#ident, #type_expr))
+    #non_empty_parameter_list.add_parameters(FunctionParameter::new(#ctx.new_local_decl_id(), #ident, #type_expr))
   };
   <non_empty_parameter_list>: FunctionParametersBuilder => <ident> <colon> <type_expr> {
     let builder = FunctionParametersBuilder::default();
-    builder.add_parameters(FunctionParameter::new(#ident, #type_expr))
+    builder.add_parameters(FunctionParameter::new(#ctx.new_local_decl_id(), #ident, #type_expr))
   };
 
   <comparator>: BinaryOp => <greater_than> { BinaryOp::GreaterThan };
@@ -314,25 +319,32 @@ pub mod testing {
 
   use crate::{
     error::JangResult,
-    parser::{ast::jang_file::JangFile, grammar::JangGrammar, lexer::lex_stream},
+    parser::{
+      ast::{builder_context::AstBuilderContext, jang_file::JangFile},
+      grammar::JangGrammar,
+      lexer::lex_stream,
+    },
   };
 
   pub fn lex_and_parse_jang_file(text: impl IntoIterator<Item = char>) -> JangResult<JangFile> {
-    Ok(JangGrammar::parse_fallible(lex_stream(text))?)
+    let mut ctx = AstBuilderContext::default();
+    Ok(JangGrammar::parse_fallible_with_ctx(
+      lex_stream(text),
+      &mut ctx,
+    )?)
   }
 }
 
 #[cfg(test)]
 mod tests {
   use googletest::prelude::*;
-  use parser_generator::parser::Parser;
 
   use crate::{
     error::JangResult,
     parser::{
       ast::{
-        assignment_statement::matchers::{let_stmt, mut_stmt, rebind_stmt},
         binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
+        bind_statement::matchers::{let_stmt, mut_stmt},
         block::matchers::{block, block_statement},
         call_expression::matchers::{
           call_expr_args, call_expr_target, call_expression, call_statement,
@@ -341,10 +353,7 @@ mod tests {
         enum_type_decl::matchers::{
           enum_ref_type, enum_structured_type, enum_variant, enum_variant_with,
         },
-        expression::{
-          Expression,
-          matchers::{ident_expression as id_exp, literal_expression as lit_exp},
-        },
+        expression::Expression,
         function_decl::matchers::{
           fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
           fn_return_type_none,
@@ -353,7 +362,10 @@ mod tests {
           if_else_clause, if_else_if_statement, if_else_statement, if_statement,
         },
         jang_file::matchers::{jang_file_functions, jang_file_with_fn, jang_file_with_type},
+        literal_expression::matchers::literal_expression as lit_exp,
         loop_statement::matchers::loop_statement,
+        name_ref_expression::matchers::ident_expression as id_exp,
+        rebind_statement::matchers::rebind_stmt,
         ret_statement::matchers::ret_statement as ret_stmt,
         statement::{Statement, matchers::break_statement},
         structured_type_decl::matchers::type_field,
@@ -361,8 +373,7 @@ mod tests {
         type_expr::matchers::type_expr_name,
         unary_experssion::matchers::logical_not_exp,
       },
-      grammar::JangGrammar,
-      lexer::lex_stream,
+      grammar::{JangGrammar, testing::lex_and_parse_jang_file},
       token::{ident::matchers::ident, literal::matchers::integral},
     },
   };
@@ -373,7 +384,7 @@ mod tests {
   }
 
   fn parse_single_exp(expression: &str) -> JangResult<Expression> {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       format!(
         r#"
         fn function_name() {{
@@ -383,11 +394,11 @@ mod tests {
         expression
       )
       .chars(),
-    ))?;
+    )?;
 
     let statement = &ast.function_decls()[0].body().statements()[0];
     match statement {
-      Statement::Assign(stmt) => Ok(stmt.expr().clone()),
+      Statement::Bind(stmt) => Ok(stmt.expr().clone()),
       _ => {
         panic!(
           "parse_single_exp expects a let statement, got: {}",
@@ -404,14 +415,14 @@ mod tests {
 
   #[gtest]
   fn parse_minimal_function() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() -> i32 {
           ret 123
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(ast, jang_file_with_fn(fn_name(ident("function_name"))));
@@ -430,12 +441,12 @@ mod tests {
 
   #[gtest]
   fn function_without_return_type() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {}
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(ast, jang_file_with_fn(fn_name(ident("function_name"))));
@@ -446,12 +457,12 @@ mod tests {
 
   #[gtest]
   fn empty_type_decl() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         type X = {}
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -462,14 +473,14 @@ mod tests {
 
   #[gtest]
   fn type_decl_one_field() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         type X = {
           field1: i32
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -483,7 +494,7 @@ mod tests {
 
   #[gtest]
   fn type_decl_many_fields() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         type X = {
           a: i32
@@ -492,7 +503,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -510,13 +521,13 @@ mod tests {
 
   #[gtest]
   fn enum_decl_single_variant() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         type E =
           | V1
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -530,13 +541,13 @@ mod tests {
 
   #[gtest]
   fn enum_decl_single_variant_with_data() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         type E =
           | V1 i32
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -550,13 +561,13 @@ mod tests {
 
   #[gtest]
   fn enum_decl_structured_variant() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         type E =
           | V1 { field1: i32 }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -576,7 +587,7 @@ mod tests {
 
   #[gtest]
   fn enum_decl_many_variants() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         type E =
           | V1
@@ -587,7 +598,7 @@ mod tests {
           | V3 String
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -611,14 +622,14 @@ mod tests {
 
   #[gtest]
   fn ret_ident() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() -> i32 {
           ret x
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -629,7 +640,7 @@ mod tests {
 
   #[gtest]
   fn ret_in_block() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() -> i32 {
           {
@@ -638,7 +649,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -651,14 +662,14 @@ mod tests {
 
   #[gtest]
   fn let_binding() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           let x = 123
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -672,14 +683,14 @@ mod tests {
 
   #[gtest]
   fn mut_binding() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name(x: i32) {
           mut x = 123
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -693,14 +704,14 @@ mod tests {
 
   #[gtest]
   fn rebind_statment() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name(x: i32) {
           x = 123
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -714,7 +725,7 @@ mod tests {
 
   #[gtest]
   fn lets_followed_by_ret() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           let x = 123
@@ -723,7 +734,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -738,7 +749,7 @@ mod tests {
 
   #[gtest]
   fn call_expr_statement() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           f()
@@ -747,7 +758,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -779,7 +790,7 @@ mod tests {
 
   #[gtest]
   fn nested_blocks() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           {
@@ -797,7 +808,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -817,14 +828,14 @@ mod tests {
 
   #[gtest]
   fn parse_unary_function() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn func(a: i32) {
           ret 123
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -838,14 +849,14 @@ mod tests {
 
   #[gtest]
   fn parse_multi_param_function() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn func(a: i32, b: i32) {
           ret 123
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -970,7 +981,7 @@ mod tests {
 
   #[gtest]
   fn mul_div_mod_equal_precedence() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           let mdm = a * b / c % d
@@ -979,7 +990,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1360,28 +1371,28 @@ mod tests {
 
   #[gtest]
   fn cannot_call_literal() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           let x = 1()
         }
         "#
       .chars(),
-    ));
+    );
 
     expect_that!(ast, failed_to_parse());
   }
 
   #[gtest]
   fn standalone_if_statement() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           if x {}
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1395,7 +1406,7 @@ mod tests {
 
   #[gtest]
   fn if_statement_with_body() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           if x + 3 {
@@ -1405,7 +1416,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1422,7 +1433,7 @@ mod tests {
 
   #[gtest]
   fn if_else() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           if y(2) {
@@ -1433,7 +1444,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1451,7 +1462,7 @@ mod tests {
 
   #[gtest]
   fn if_else_if() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           if x {
@@ -1465,7 +1476,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1487,7 +1498,7 @@ mod tests {
 
   #[gtest]
   fn empty_loop() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           loop {
@@ -1495,7 +1506,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1506,7 +1517,7 @@ mod tests {
 
   #[gtest]
   fn loop_with_statements() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           loop {
@@ -1516,7 +1527,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1532,7 +1543,7 @@ mod tests {
 
   #[gtest]
   fn loop_with_break() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           loop {
@@ -1541,7 +1552,7 @@ mod tests {
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1554,14 +1565,14 @@ mod tests {
 
   #[gtest]
   fn parenthesis_expression() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           let x = (y + z) - (w * 3)
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1579,14 +1590,14 @@ mod tests {
 
   #[gtest]
   fn many_parenthesis() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn function_name() {
           let x = (((((((((y))))) + (((((((z)))))))))))
         }
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
@@ -1600,14 +1611,14 @@ mod tests {
 
   #[gtest]
   fn empty_jang_file() {
-    let ast = JangGrammar::parse_fallible(lex_stream("".chars())).unwrap();
+    let ast = lex_and_parse_jang_file("".chars()).unwrap();
 
     expect_that!(ast, jang_file_functions(is_empty()));
   }
 
   #[gtest]
   fn multiple_function_jang_file() {
-    let ast = JangGrammar::parse_fallible(lex_stream(
+    let ast = lex_and_parse_jang_file(
       r#"
         fn a() {}
 
@@ -1616,7 +1627,7 @@ mod tests {
         fn c() {}
         "#
       .chars(),
-    ))
+    )
     .unwrap();
 
     expect_that!(
