@@ -58,7 +58,7 @@ define_ast_id_gen!(
   AstLocalDeclId => local_decl_id, new_local_decl_id;
 
   // ID for global name declarations.
-  AstGlobalDeclId => gbl_decl_id, new_gbl_decl_id;
+  AstGlobalDeclId => gbl_decl_id, new_global_decl_id;
 
   // ID for a name occuring in an expression
   // or on the LHS of a rebind.

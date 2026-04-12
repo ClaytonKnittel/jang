@@ -117,7 +117,7 @@ pub_grammar!(
       <function_ret_type>
       <block_scope>
   {
-    FunctionDecl::new(#ctx.new_gbl_decl_id(), #ident, #function_params, #function_ret_type, #block_scope)
+    FunctionDecl::new(#ctx.new_global_decl_id(), #ident, #function_params, #function_ret_type, #block_scope)
   };
 
   <function_ret_type>: Option<TypeExpression> => ! { None };
@@ -227,7 +227,7 @@ pub_grammar!(
     UnaryExpression::new(#ctx.new_expr_id(), #unary_expr, UnaryOp::LogicalNot).into()
   };
   <unary_expr>: Expression => <call_or_dot_expr>;
-  <unary_expr>: Expression => <literal> { LiteralExpression::new(#ctx.new_expr_id(), #0).into() };
+  <unary_expr>: Expression => <literal> { LiteralExpression::new(#ctx.new_expr_id(), #literal).into() };
 
   // Call expressions.
   <call_or_dot_expr>: Expression => <call_expr>;
@@ -245,7 +245,7 @@ pub_grammar!(
   };
 
   <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
-  <leaf_expr>: Expression => <ident> { NameRefExpression::new(#ctx.new_expr_id(), #ctx.new_name_ref_id(), #0).into() };
+  <leaf_expr>: Expression => <ident> { NameRefExpression::new(#ctx.new_expr_id(), #ctx.new_name_ref_id(), #ident).into() };
 
   <expr_list_builder>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
   <expr_list_builder>: ExpressionListBuilder => <non_empty_expr_list>;
