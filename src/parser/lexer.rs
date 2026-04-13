@@ -125,10 +125,7 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
         first_char @ ('=' | ',' | '(' | ')' | '{' | '}' | '-' | '<' | '>' | ':' | '+' | '*' | '/'
         | '%' | '|' | '!' | '&'),
       ) => Ok(Some(self.parse_operator(first_char))),
-      Some(ch) => Err(JangError::parse_error(
-        format!("Unexpected symbol '{ch}'"),
-        SourceLocation::new(0),
-      )),
+      Some(ch) => Err(JangError::unexpected_symbol(ch, SourceLocation::new(0))),
       None => Ok(None),
     }
   }

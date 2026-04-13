@@ -24,12 +24,14 @@ use crate::{
       if_statement::{ElseClause, IfStatement},
       literal_expression::LiteralExpression,
       loop_statement::LoopStatement,
-      name_ref_expression::NameRefExpression,
       rebind_statement::RebindStatement,
       ret_statement::RetStatement,
       statement::Statement,
       unary_experssion::UnaryExpression,
-      var_decl::{GlobalDecl, LocalDecl},
+      var::{
+        var_decl::{GlobalDecl, LocalDecl},
+        var_ref::VarRef,
+      },
     },
     token::{ident::Ident, literal::Literal},
   },
@@ -184,7 +186,7 @@ impl<'a> OpenCursor<'a> {
     self.emit_instr(JitInstruction::StoreLocal(local_id))
   }
 
-  fn emit_local_rebind(self, ref_expr: &'a NameRefExpression) -> InterpreterResult<Self> {
+  fn emit_local_rebind(self, ref_expr: &'a VarRef) -> InterpreterResult<Self> {
     let info = self
       .lexical_scope
       .get_binding(ref_expr.name())
@@ -305,7 +307,7 @@ impl<'a> OpenCursor<'a> {
   fn compile_expr(self, expr: &'a Expression) -> InterpreterResult<Self> {
     match expr.variant() {
       ExpressionVariant::Literal(expr) => self.compile_literal_expression(expr),
-      ExpressionVariant::NameRef(expr) => self.compile_name_ref_expression(expr),
+      ExpressionVariant::VarRef(expr) => self.compile_var_ref_expression(expr),
       ExpressionVariant::BinaryExpression(expr) => self.compile_binary_expression(expr),
       ExpressionVariant::UnaryExpression(expr) => self.compile_unary_expression(expr),
       ExpressionVariant::CallExpression(expr) => self.compile_call_expression(expr),
@@ -315,7 +317,7 @@ impl<'a> OpenCursor<'a> {
     }
   }
 
-  fn compile_name_ref_expression(self, expr: &'a NameRefExpression) -> InterpreterResult<Self> {
+  fn compile_var_ref_expression(self, expr: &'a VarRef) -> InterpreterResult<Self> {
     Ok(self.emit_local_load(expr.name()))
   }
 
@@ -354,8 +356,8 @@ impl<'a> OpenCursor<'a> {
   ) -> InterpreterResult<ClosedCursor<'a>> {
     // Tail calls for direct recursion.
     if let ExpressionVariant::CallExpression(call) = ret_statement.expr().variant()
-      && let ExpressionVariant::NameRef(ref_expr) = call.target().variant()
-      && ref_expr.name() == self.fn_builder.fn_name
+      && let ExpressionVariant::VarRef(var_ref) = call.target().variant()
+      && var_ref.name() == self.fn_builder.fn_name
     {
       let entrypoint = self.fn_builder.entrypoint;
       return self

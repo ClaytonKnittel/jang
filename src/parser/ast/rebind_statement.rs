@@ -1,19 +1,19 @@
 use std::fmt::Display;
 
-use crate::parser::ast::{expression::Expression, name_ref_expression::NameRefExpression};
+use crate::parser::ast::{expression::Expression, var::var_ref::VarRef};
 
 #[derive(Clone, Debug)]
 pub struct RebindStatement {
-  var: NameRefExpression,
+  var: VarRef,
   expr: Expression,
 }
 
 impl RebindStatement {
-  pub fn new(var: NameRefExpression, expr: Expression) -> Self {
+  pub fn new(var: VarRef, expr: Expression) -> Self {
     Self { var, expr }
   }
 
-  pub fn var(&self) -> &NameRefExpression {
+  pub fn var(&self) -> &VarRef {
     &self.var
   }
 
@@ -32,8 +32,8 @@ impl Display for RebindStatement {
 pub(crate) mod matchers {
   use crate::parser::{
     ast::{
-      expression::Expression, name_ref_expression::matchers::name_ref_expr,
-      rebind_statement::RebindStatement, statement::Statement,
+      expression::Expression, rebind_statement::RebindStatement, statement::Statement,
+      var::var_ref::matchers::var_ref,
     },
     token::ident::Ident,
   };
@@ -44,7 +44,7 @@ pub(crate) mod matchers {
     expr_matcher: impl Matcher<&'a Expression>,
   ) -> impl Matcher<&'a Statement> {
     pat!(Statement::Rebind(pat!(RebindStatement {
-      var: name_ref_expr(var_matcher),
+      var: var_ref(var_matcher),
       expr: expr_matcher,
     })))
   }
