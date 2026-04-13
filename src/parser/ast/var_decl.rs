@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
 use crate::parser::{
-  ast::id::def::{AstGlobalDeclId, AstLocalDeclId},
+  ast::id::{
+    AstId,
+    def::{AstGlobalDeclId, AstLocalDeclId},
+  },
   token::ident::Ident,
 };
 
@@ -11,10 +14,7 @@ pub struct VarDecl<ID> {
   name: Ident,
 }
 
-impl<ID> VarDecl<ID>
-where
-  ID: Copy,
-{
+impl<ID: AstId> VarDecl<ID> {
   pub(super) fn new(id: ID, name: Ident) -> Self {
     Self { id, name }
   }
