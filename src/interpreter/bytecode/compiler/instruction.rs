@@ -4,8 +4,8 @@ use crate::{
     runtime::local_table::LocalId,
   },
   parser::{
-    ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
-    token::{ident::Ident, literal::Literal},
+    ast::{binary_expression::BinaryOp, id::def::AstGlobalDeclId, unary_experssion::UnaryOp},
+    token::literal::Literal,
   },
 };
 
@@ -27,7 +27,7 @@ pub enum JitInstruction<'a> {
   LoadLiteral(&'a Literal),
 
   // Pushes a global value onto the stack.
-  LoadGlobal(&'a Ident),
+  LoadGlobal(AstGlobalDeclId),
 
   // Pushes a local onto the stack.
   LoadLocal(LocalId),

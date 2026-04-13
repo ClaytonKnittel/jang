@@ -61,7 +61,7 @@ impl VarDeclMap {
         Ok(GlobalDecl::new(entry.get().id, ident))
       }
       Entry::Vacant(entry) => {
-        let id = id_builder.new_global_decl_id();
+        let id = id_builder.new_global(ident.clone());
         entry.insert(GlobalDeclInfo {
           id,
           state: GlobalDeclState::Resolved,

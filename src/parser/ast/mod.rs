@@ -1,3 +1,4 @@
+mod ast;
 pub mod binary_expression;
 pub mod bind_statement;
 pub mod block;
@@ -22,3 +23,5 @@ pub mod type_decl;
 pub mod type_expr;
 pub mod unary_experssion;
 pub mod var;
+
+pub use ast::*;

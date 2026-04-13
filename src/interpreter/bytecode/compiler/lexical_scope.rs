@@ -5,7 +5,7 @@ use crate::{
     bytecode::runtime::local_table::LocalId,
     error::{InterpreterError, InterpreterResult},
   },
-  parser::{ast::bind_statement::Mutability, token::ident::Ident},
+  parser::ast::{bind_statement::Mutability, id::def::AstLocalDeclId},
 };
 
 #[derive(Debug)]
@@ -25,27 +25,27 @@ impl IdentInfo {
 }
 
 #[derive(Debug, Default)]
-pub struct JitCompilerLexicalScope<'a> {
-  parent: Option<Box<JitCompilerLexicalScope<'a>>>,
+pub struct JitCompilerLexicalScope {
+  parent: Option<Box<JitCompilerLexicalScope>>,
   next_local_id: LocalId,
-  locals: HashMap<&'a Ident, IdentInfo>,
+  locals: HashMap<AstLocalDeclId, IdentInfo>,
 }
 
-impl<'a> JitCompilerLexicalScope<'a> {
-  pub fn get_binding(&self, name: &Ident) -> Option<&IdentInfo> {
+impl JitCompilerLexicalScope {
+  pub fn get_binding(&self, local: AstLocalDeclId) -> Option<&IdentInfo> {
     self
       .locals
-      .get(name)
-      .or_else(|| self.parent.as_ref()?.get_binding(name))
+      .get(&local)
+      .or_else(move || self.parent.as_ref()?.get_binding(local))
   }
 
-  pub fn bind(&mut self, name: &'a Ident, mutability: Mutability) -> LocalId {
-    debug_assert!(!self.locals.contains_key(name));
+  pub fn bind(&mut self, local: AstLocalDeclId, mutability: Mutability) -> LocalId {
+    debug_assert!(!self.locals.contains_key(&local));
 
     let local_id = self.next_local_id;
     self.next_local_id = local_id.next();
     self.locals.insert(
-      name,
+      local,
       IdentInfo {
         local_id,
         mutability,

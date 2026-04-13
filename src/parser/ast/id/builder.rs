@@ -1,63 +1,66 @@
-use crate::parser::ast::id::def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId};
+use crate::parser::{
+  ast::id::{
+    AstIdImpl,
+    def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
+    node_map::{NodeMap, NodeMapBuilder},
+  },
+  token::ident::Ident,
+};
 
-macro_rules! define_ast_id_gen {
-  (
-    name: $ids_name:ident,
-    context: $ctx_name:ident,
+pub type IdTable = NodeMap<(), Ident, Ident>;
 
-    $($(#[$meta:meta])* $id_type:ident => $field:ident, $method:ident;)*
-  ) => {
-    pub struct $ids_name {
-      $($field: $id_type,)*
+struct IdGenerator<ID, T> {
+  cur_id: ID,
+  table: Vec<T>,
+}
+
+impl<ID: AstIdImpl, T> IdGenerator<ID, T> {
+  fn next_id(&mut self, value: T) -> ID {
+    self.table.push(value);
+
+    let id = self.cur_id;
+    self.cur_id = id.next_id();
+    id
+  }
+}
+
+impl<ID: AstIdImpl, T> Default for IdGenerator<ID, T> {
+  fn default() -> Self {
+    Self {
+      cur_id: ID::default(),
+      table: Vec::new(),
     }
-
-    impl Default for $ids_name {
-      fn default() -> Self {
-        Self {
-          $($field: $id_type(0),)*
-        }
-      }
-    }
-
-    impl $ids_name {
-      $(
-        fn $method(&mut self) -> $id_type {
-          let id = self.$field;
-          self.$field.0 += 1;
-          id
-        }
-      )*
-    }
-
-    impl $ctx_name {
-      $(
-        pub fn $method(&mut self) -> $id_type {
-          self.ids.$method()
-        }
-      )*
-    }
-  };
+  }
 }
 
 #[derive(Default)]
 pub struct IdBuilder {
-  ids: AstIds,
+  expressions: IdGenerator<AstExpressionId, ()>,
+  globals: IdGenerator<AstGlobalDeclId, Ident>,
+  locals: IdGenerator<AstLocalDeclId, Ident>,
 }
 
-define_ast_id_gen!(
-  name: AstIds,
-  context: IdBuilder,
+impl IdBuilder {
+  pub fn new_expr(&mut self) -> AstExpressionId {
+    self.expressions.next_id(())
+  }
 
-  // ID to describe an expression in the AST.
-  AstExpressionId => expr_id, new_expr_id;
+  pub fn new_global(&mut self, ident: Ident) -> AstGlobalDeclId {
+    self.globals.next_id(ident)
+  }
 
-  // ID for local name declarations in a function parameter
-  // or a local binding.
-  AstLocalDeclId => local_decl_id, new_local_decl_id;
+  pub fn new_local(&mut self, ident: Ident) -> AstLocalDeclId {
+    self.locals.next_id(ident)
+  }
 
-  // ID for global name declarations.
-  AstGlobalDeclId => gbl_decl_id, new_global_decl_id;
-);
+  pub fn build(self) -> IdTable {
+    let mut builder = NodeMapBuilder::default();
+    builder.set_expressions(self.expressions.table);
+    builder.set_globals(self.globals.table);
+    builder.set_locals(self.locals.table);
+    builder.build().expect("All values should have been set")
+  }
+}
 
 pub enum AstDeclId {
   Global(AstGlobalDeclId),
@@ -73,8 +76,8 @@ mod tests {
   #[gtest]
   fn test_ast_expr_id() {
     let mut ctx = IdBuilder::default();
-    let expr_id_a = ctx.new_expr_id();
-    let expr_id_b = ctx.new_expr_id();
+    let expr_id_a = ctx.new_expr();
+    let expr_id_b = ctx.new_expr();
     expect_eq!(expr_id_a.0, 0);
     expect_eq!(expr_id_b.0, 1);
   }

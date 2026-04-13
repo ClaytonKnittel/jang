@@ -105,7 +105,7 @@ impl<'a> JitFunctionBuilder<'a> {
 // Function compilation state when there is an unterminated instruction block.
 struct OpenCursor<'a> {
   fn_builder: JitFunctionBuilder<'a>,
-  lexical_scope: JitCompilerLexicalScope<'a>,
+  lexical_scope: JitCompilerLexicalScope,
   loop_context: LoopContext,
   block: JitInstructionBlockBuilder<'a>,
 }
@@ -113,7 +113,7 @@ struct OpenCursor<'a> {
 // Function compilation state when all blocks have been terminated.
 struct ClosedCursor<'a> {
   fn_builder: JitFunctionBuilder<'a>,
-  lexical_scope: JitCompilerLexicalScope<'a>,
+  lexical_scope: JitCompilerLexicalScope,
   loop_context: LoopContext,
 }
 
