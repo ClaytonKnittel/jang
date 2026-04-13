@@ -1,4 +1,4 @@
-pub mod builder;
+pub(super) mod builder;
 pub mod def;
 mod id;
 
