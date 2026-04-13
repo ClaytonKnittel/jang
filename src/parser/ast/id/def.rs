@@ -9,6 +9,12 @@ macro_rules! define_ast_ids {
       $(#[$meta])*
       #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
       pub struct $id_type(pub (super) usize);
+      impl $id_type {
+        #[cfg(test)]
+        pub fn new(id: usize) -> Self {
+          Self(id)
+        }
+      }
       impl crate::parser::ast::id::AstId for $id_type {}
       impl crate::parser::ast::id::AstIdImpl for $id_type {
         fn default() -> Self {

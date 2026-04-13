@@ -382,18 +382,16 @@ pub mod testing {
   use crate::{
     error::JangResult,
     parser::{
-      ast::{builder_context::AstBuilderContext, jang_file::JangFile},
+      ast::{JangAst, builder_context::AstBuilderContext},
       grammar::JangGrammar,
       lexer::lex_stream,
     },
   };
 
-  pub fn lex_and_parse_jang_file(text: impl IntoIterator<Item = char>) -> JangResult<JangFile> {
+  pub fn lex_and_parse_jang_file(text: impl IntoIterator<Item = char>) -> JangResult<JangAst> {
     let mut ctx = AstBuilderContext::default();
-    Ok(JangGrammar::parse_fallible_with_ctx(
-      lex_stream(text),
-      &mut ctx,
-    )?)
+    let jang_file = JangGrammar::parse_fallible_with_ctx(lex_stream(text), &mut ctx)?;
+    Ok(JangAst::new(jang_file, ctx.build()))
   }
 }
 
@@ -458,7 +456,7 @@ mod tests {
       .chars(),
     )?;
 
-    let statement = &ast.function_decls()[0].body().statements()[0];
+    let statement = &ast.file().function_decls()[0].body().statements()[0];
     match statement {
       Statement::Bind(stmt) => Ok(stmt.expr().clone()),
       _ => {
@@ -486,6 +484,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(ast, jang_file_with_fn(fn_name(ident("function_name"))));
     expect_that!(
@@ -510,6 +509,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(ast, jang_file_with_fn(fn_name(ident("function_name"))));
     expect_that!(ast, jang_file_with_fn(fn_return_type_none()));
@@ -526,6 +526,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -544,6 +545,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -567,6 +569,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -591,6 +594,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -611,6 +615,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -631,6 +636,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -662,6 +668,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -693,6 +700,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -715,6 +723,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -735,6 +744,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -756,6 +766,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -777,6 +788,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -800,6 +812,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -824,6 +837,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -874,6 +888,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -904,6 +919,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -925,6 +941,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1103,6 +1120,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1529,6 +1547,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1553,6 +1572,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1585,6 +1605,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1617,6 +1638,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1647,6 +1669,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1668,6 +1691,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1693,6 +1717,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1713,6 +1738,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1746,6 +1772,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,
@@ -1763,6 +1790,7 @@ mod tests {
   #[gtest]
   fn empty_jang_file() {
     let ast = lex_and_parse_jang_file("".chars()).unwrap();
+    let ast = ast.file();
 
     expect_that!(ast, jang_file_functions(is_empty()));
   }
@@ -1780,6 +1808,7 @@ mod tests {
       .chars(),
     )
     .unwrap();
+    let ast = ast.file();
 
     expect_that!(
       ast,

@@ -157,8 +157,8 @@ pub mod matchers {
       compiler::instruction_block_list::BlockId, runtime::local_table::LocalId,
     },
     parser::{
-      ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
-      token::{ident::Ident, literal::Literal},
+      ast::{binary_expression::BinaryOp, id::def::AstGlobalDeclId, unary_experssion::UnaryOp},
+      token::literal::Literal,
     },
   };
   use googletest::prelude::*;
@@ -189,12 +189,9 @@ pub mod matchers {
   }
 
   pub fn load_global_instruction<'a>(
-    ident_matcher: impl Matcher<&'a Ident>,
+    ident_matcher: impl Matcher<&'a AstGlobalDeclId>,
   ) -> impl Matcher<&'a JitInstruction<'a>> {
-    pat!(JitInstruction::LoadGlobal(result_of!(
-      |ident: &&'a Ident| *ident,
-      ident_matcher
-    )))
+    pat!(JitInstruction::LoadGlobal(ident_matcher))
   }
 
   pub fn load_local_instruction<'a>(

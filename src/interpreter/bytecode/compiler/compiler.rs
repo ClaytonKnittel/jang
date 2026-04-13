@@ -177,37 +177,41 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn emit_local_store(mut self, var: &'a LocalDecl) -> Self {
-    let local_id = self.lexical_scope.bind(var.name(), Mutability::Immutable);
+    let local_id = self.lexical_scope.bind(var.id(), Mutability::Immutable);
     self.emit_instr(JitInstruction::StoreLocal(local_id))
   }
 
   fn emit_local_mutable_store(mut self, var: &'a LocalDecl) -> Self {
-    let local_id = self.lexical_scope.bind(var.name(), Mutability::Mutable);
+    let local_id = self.lexical_scope.bind(var.id(), Mutability::Mutable);
     self.emit_instr(JitInstruction::StoreLocal(local_id))
   }
 
-  fn emit_local_rebind(self, ref_expr: &'a VarRef) -> InterpreterResult<Self> {
+  fn emit_local_rebind(self, var: &'a LocalDecl) -> InterpreterResult<Self> {
     let info = self
       .lexical_scope
-      .get_binding(ref_expr.name())
-      .ok_or_else(|| InterpreterError::jit_err(format!("Unknown variable {ref_expr}")))?;
+      .get_binding(var.id())
+      .ok_or_else(|| InterpreterError::jit_err(format!("Unknown variable {var}")))?;
     if !matches!(info.mutability(), Mutability::Mutable) {
       return Err(InterpreterError::jit_err(format!(
-        "Cannot rebind immutable variable {ref_expr}"
+        "Cannot rebind immutable variable {var}"
       )));
     }
     let local_id = info.local_id();
     Ok(self.emit_instr(JitInstruction::StoreLocal(local_id)))
   }
 
-  fn emit_local_load(self, name: &'a Ident) -> Self {
-    match self.lexical_scope.get_binding(name) {
-      Some(info) => {
-        let local_id = info.local_id();
-        self.emit_instr(JitInstruction::LoadLocal(local_id))
-      }
-      None => self.emit_instr(JitInstruction::LoadGlobal(name)),
-    }
+  fn emit_load(self, var: &VarRef) -> Self {
+    let instruction = match var {
+      VarRef::Local(local_decl) => JitInstruction::LoadLocal(
+        self
+          .lexical_scope
+          .get_binding(local_decl.id())
+          .expect("")
+          .local_id(),
+      ),
+      VarRef::Global(global_decl) => JitInstruction::LoadGlobal(global_decl.id()),
+    };
+    self.emit_instr(instruction)
   }
 
   fn emit_literal_load(self, literal: &'a Literal) -> Self {
@@ -242,9 +246,14 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_rebind_statement(self, statement: &'a RebindStatement) -> InterpreterResult<Self> {
-    self
-      .compile_expr(statement.expr())?
-      .emit_local_rebind(statement.var())
+    match statement.var() {
+      VarRef::Global(global_decl) => Err(InterpreterError::jit_err(format!(
+        "Cannot rebind globals yet: {global_decl}"
+      ))),
+      VarRef::Local(local_decl) => self
+        .compile_expr(statement.expr())?
+        .emit_local_rebind(local_decl),
+    }
   }
 
   fn compile_lexical_block(self, block: &'a Block) -> InterpreterResult<Cursor<'a>> {
@@ -318,7 +327,7 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_var_ref_expression(self, expr: &'a VarRef) -> InterpreterResult<Self> {
-    Ok(self.emit_local_load(expr.name()))
+    Ok(self.emit_load(expr))
   }
 
   fn compile_literal_expression(self, expr: &'a LiteralExpression) -> InterpreterResult<Self> {

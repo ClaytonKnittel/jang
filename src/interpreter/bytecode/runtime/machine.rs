@@ -13,10 +13,7 @@ use crate::{
     error::{InterpreterError, InterpreterResult},
     value::Value,
   },
-  parser::{
-    ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
-    token::ident::Ident,
-  },
+  parser::ast::{binary_expression::BinaryOp, id::def::AstGlobalDeclId, unary_experssion::UnaryOp},
 };
 
 #[derive(Default)]
@@ -41,8 +38,8 @@ impl<'a> ValueStack<'a> {
   }
 }
 
-pub trait JitFunctionContext<'a> {
-  fn resolve_ident(&'a self, name: &'_ Ident) -> InterpreterResult<Value<'a>>;
+pub trait JitFunctionContext {
+  fn resolve_id<'a>(&'a self, function_id: AstGlobalDeclId) -> InterpreterResult<Value<'a>>;
 }
 
 #[derive(Clone, Copy)]
@@ -131,10 +128,7 @@ impl<'a> JitCallFrame<'a> {
   }
 
   // Executes a single instruction.
-  fn step(
-    &mut self,
-    context: &'a impl JitFunctionContext<'a>,
-  ) -> InterpreterResult<FrameAction<'a>> {
+  fn step(&mut self, context: &'a impl JitFunctionContext) -> InterpreterResult<FrameAction<'a>> {
     match self.next_instruction() {
       CurrentInstruction::Instr(instr) => match instr {
         JitInstruction::BinaryOp(op) => {
@@ -147,7 +141,7 @@ impl<'a> JitCallFrame<'a> {
           self.stack.push_value(Value::from_literal(literal)?);
         }
         JitInstruction::LoadGlobal(ident) => {
-          self.stack.push_value(context.resolve_ident(ident)?);
+          self.stack.push_value(context.resolve_id(*ident)?);
         }
         JitInstruction::LoadLocal(local_id) => {
           self.stack.push_value(self.locals.read(*local_id)?.clone());
@@ -241,7 +235,7 @@ impl<'a> JitCallFrame<'a> {
 pub fn evaluate_function<'a>(
   jit_fn: &'a JitCompiledFunction<'a>,
   args: Vec<Value<'a>>,
-  context: &'a impl JitFunctionContext<'a>,
+  context: &'a impl JitFunctionContext,
 ) -> InterpreterResult<Value<'a>> {
   let mut parent_frames = vec![];
   let mut current_frame = JitCallFrame::from_call(jit_fn, args)?;
@@ -286,19 +280,16 @@ mod tests {
       },
     },
     parser::{
-      ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
-      token::{
-        ident::Ident,
-        literal::{Literal, NumericLiteral},
-      },
+      ast::{binary_expression::BinaryOp, id::def::AstGlobalDeclId, unary_experssion::UnaryOp},
+      token::literal::{Literal, NumericLiteral},
     },
   };
   use googletest::prelude::*;
 
   struct EmptyContext;
 
-  impl<'a> JitFunctionContext<'a> for EmptyContext {
-    fn resolve_ident(&'a self, name: &'_ Ident) -> InterpreterResult<Value<'a>> {
+  impl JitFunctionContext for EmptyContext {
+    fn resolve_id<'a>(&'a self, name: AstGlobalDeclId) -> InterpreterResult<Value<'a>> {
       Err(InterpreterError::generic_err(format!(
         "not found in empty context: {name:?}"
       )))
@@ -307,14 +298,16 @@ mod tests {
 
   #[derive(Default)]
   struct ConstContext<'a> {
-    vals: HashMap<Ident, Value<'a>>,
+    vals: HashMap<AstGlobalDeclId, Value<'a>>,
   }
 
-  impl<'a> JitFunctionContext<'a> for ConstContext<'a> {
-    fn resolve_ident(&'a self, name: &'_ Ident) -> InterpreterResult<Value<'a>> {
-      self.vals.get(name).cloned().ok_or_else(|| {
-        InterpreterError::generic_err(format!("not found in test context: {name:?}"))
-      })
+  impl<'a> JitFunctionContext for ConstContext<'a> {
+    fn resolve_id<'b>(&'b self, id: AstGlobalDeclId) -> InterpreterResult<Value<'a>> {
+      self
+        .vals
+        .get(&id)
+        .cloned()
+        .ok_or_else(|| InterpreterError::generic_err(format!("not found in test context: {id:?}")))
     }
   }
 
@@ -369,9 +362,9 @@ mod tests {
 
   #[gtest]
   fn global_not_found() {
-    let global = Ident::new("x");
+    let global = AstGlobalDeclId::new(0);
     let code = function_bytecode(vec![block(
-      vec![JitInstruction::LoadGlobal(&global)],
+      vec![JitInstruction::LoadGlobal(global)],
       JitTerminalInstruction::Return,
     )]);
 
@@ -434,10 +427,10 @@ mod tests {
       vec![JitInstruction::BinaryOp(BinaryOp::Sub)],
       JitTerminalInstruction::Return,
     )]);
-    let sub_function_name = Ident::new("sub");
+    let sub_function_id = AstGlobalDeclId::new(0);
     let context = ConstContext {
       vals: HashMap::from([(
-        sub_function_name.clone(),
+        sub_function_id,
         Value::JitCompiledFunctionRef(&sub_function),
       )]),
     };
@@ -448,7 +441,7 @@ mod tests {
       vec![
         JitInstruction::LoadLiteral(&two),
         JitInstruction::LoadLiteral(&one),
-        JitInstruction::LoadGlobal(&sub_function_name),
+        JitInstruction::LoadGlobal(sub_function_id),
         JitInstruction::Call(JitCallInstruction::with_arity(2)),
       ],
       JitTerminalInstruction::Return,

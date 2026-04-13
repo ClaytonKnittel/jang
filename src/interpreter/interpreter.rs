@@ -9,7 +9,10 @@ use crate::{
     error::{InterpreterError, InterpreterResult},
     value::Value,
   },
-  parser::{ast::jang_file::JangFile, token::ident::Ident},
+  parser::{
+    ast::{id::def::AstGlobalDeclId, jang_file::JangFile},
+    token::ident::Ident,
+  },
 };
 
 const MAIN_FN_NAME: &str = "main";
@@ -29,7 +32,7 @@ pub struct Interpreter<'a> {
 }
 
 impl<'a> JitFunctionContext<'a> for Interpreter<'a> {
-  fn resolve_ident(&'a self, name: &Ident) -> InterpreterResult<Value<'a>> {
+  fn resolve_ident(&'a self, function_id: AstGlobalDeclId) -> InterpreterResult<Value<'a>> {
     Ok(Value::JitCompiledFunctionRef(
       self
         .program
