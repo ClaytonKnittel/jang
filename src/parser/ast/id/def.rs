@@ -23,8 +23,4 @@ define_ast_ids!(
 
   /// ID for a global name decl.
   AstGlobalDeclId;
-
-  /// ID for a name occuring in an expression or on the LHS of a rebind.
-  /// Each name ref is associated with a AstLocalDeclId or a AstGlobalDeclId.
-  AstNameRefExpressionId;
 );

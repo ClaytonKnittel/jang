@@ -1,6 +1,4 @@
-use crate::parser::ast::id::def::{
-  AstExpressionId, AstGlobalDeclId, AstLocalDeclId, AstNameRefExpressionId,
-};
+use crate::parser::ast::id::def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId};
 
 macro_rules! define_ast_id_gen {
   (
@@ -59,10 +57,6 @@ define_ast_id_gen!(
 
   // ID for global name declarations.
   AstGlobalDeclId => gbl_decl_id, new_global_decl_id;
-
-  // ID for a name occuring in an expression
-  // or on the LHS of a rebind.
-  AstNameRefExpressionId => name_ref_id, new_name_ref_id;
 );
 
 #[cfg(test)]

@@ -2,7 +2,6 @@ use crate::parser::{
   ast::{
     expression::{Expression, ExpressionVariant},
     id::builder::IdBuilder,
-    name_ref_expression::NameRefExpression,
     var_decl::{GlobalDecl, LocalDecl},
   },
   token::ident::Ident,
@@ -24,9 +23,5 @@ impl AstBuilderContext {
 
   pub fn new_local_decl(&mut self, name: Ident) -> LocalDecl {
     LocalDecl::new(self.id_builder.new_local_decl_id(), name)
-  }
-
-  pub fn new_name_ref_expr(&mut self, name: Ident) -> NameRefExpression {
-    NameRefExpression::new(self.id_builder.new_name_ref_id(), name)
   }
 }
