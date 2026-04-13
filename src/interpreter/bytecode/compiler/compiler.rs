@@ -19,7 +19,7 @@ use crate::{
       bind_statement::{BindStatement, Mutability},
       block::Block,
       call_expression::CallExpression,
-      expression::Expression,
+      expression::{Expression, ExpressionVariant},
       function_decl::FunctionDecl,
       if_statement::{ElseClause, IfStatement},
       literal_expression::LiteralExpression,
@@ -29,6 +29,7 @@ use crate::{
       ret_statement::RetStatement,
       statement::Statement,
       unary_experssion::UnaryExpression,
+      var_decl::{GlobalDecl, LocalDecl},
     },
     token::{ident::Ident, literal::Literal},
   },
@@ -121,8 +122,8 @@ enum Cursor<'a> {
 }
 
 impl<'a> OpenCursor<'a> {
-  fn new(fn_name: &'a Ident) -> Self {
-    let fn_builder = JitFunctionBuilder::new(fn_name);
+  fn new(fn_name: &'a GlobalDecl) -> Self {
+    let fn_builder = JitFunctionBuilder::new(fn_name.name());
     let entrypoint = fn_builder.entrypoint;
     Self {
       fn_builder,
@@ -173,24 +174,24 @@ impl<'a> OpenCursor<'a> {
     })
   }
 
-  fn emit_local_store(mut self, name: &'a Ident) -> Self {
-    let local_id = self.lexical_scope.bind(name, Mutability::Immutable);
+  fn emit_local_store(mut self, var: &'a LocalDecl) -> Self {
+    let local_id = self.lexical_scope.bind(var.name(), Mutability::Immutable);
     self.emit_instr(JitInstruction::StoreLocal(local_id))
   }
 
-  fn emit_local_mutable_store(mut self, name: &'a Ident) -> Self {
-    let local_id = self.lexical_scope.bind(name, Mutability::Mutable);
+  fn emit_local_mutable_store(mut self, var: &'a LocalDecl) -> Self {
+    let local_id = self.lexical_scope.bind(var.name(), Mutability::Mutable);
     self.emit_instr(JitInstruction::StoreLocal(local_id))
   }
 
-  fn emit_local_rebind(self, name: &'a Ident) -> InterpreterResult<Self> {
+  fn emit_local_rebind(self, ref_expr: &'a NameRefExpression) -> InterpreterResult<Self> {
     let info = self
       .lexical_scope
-      .get_binding(name)
-      .ok_or_else(|| InterpreterError::jit_err(format!("Unknown variable {name}")))?;
+      .get_binding(ref_expr.name())
+      .ok_or_else(|| InterpreterError::jit_err(format!("Unknown variable {ref_expr}")))?;
     if !matches!(info.mutability(), Mutability::Mutable) {
       return Err(InterpreterError::jit_err(format!(
-        "Cannot rebind immutable variable {name}"
+        "Cannot rebind immutable variable {ref_expr}"
       )));
     }
     let local_id = info.local_id();
@@ -302,12 +303,12 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_expr(self, expr: &'a Expression) -> InterpreterResult<Self> {
-    match expr {
-      Expression::Literal(expr) => self.compile_literal_expression(expr),
-      Expression::NameRef(expr) => self.compile_name_ref_expression(expr),
-      Expression::BinaryExpression(expr) => self.compile_binary_expression(expr),
-      Expression::UnaryExpression(expr) => self.compile_unary_expression(expr),
-      Expression::CallExpression(expr) => self.compile_call_expression(expr),
+    match expr.variant() {
+      ExpressionVariant::Literal(expr) => self.compile_literal_expression(expr),
+      ExpressionVariant::NameRef(expr) => self.compile_name_ref_expression(expr),
+      ExpressionVariant::BinaryExpression(expr) => self.compile_binary_expression(expr),
+      ExpressionVariant::UnaryExpression(expr) => self.compile_unary_expression(expr),
+      ExpressionVariant::CallExpression(expr) => self.compile_call_expression(expr),
       expr => Err(InterpreterError::unimplemented(format!(
         "evaluation of expression not yet implemented: {expr}"
       ))),
@@ -315,7 +316,7 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_name_ref_expression(self, expr: &'a NameRefExpression) -> InterpreterResult<Self> {
-    Ok(self.emit_local_load(expr.ident()))
+    Ok(self.emit_local_load(expr.name()))
   }
 
   fn compile_literal_expression(self, expr: &'a LiteralExpression) -> InterpreterResult<Self> {
@@ -352,9 +353,9 @@ impl<'a> OpenCursor<'a> {
     ret_statement: &'a RetStatement,
   ) -> InterpreterResult<ClosedCursor<'a>> {
     // Tail calls for direct recursion.
-    if let Expression::CallExpression(call) = ret_statement.expr()
-      && let Expression::NameRef(name) = call.target()
-      && name.ident() == self.fn_builder.fn_name
+    if let ExpressionVariant::CallExpression(call) = ret_statement.expr().variant()
+      && let ExpressionVariant::NameRef(ref_expr) = call.target().variant()
+      && ref_expr.name() == self.fn_builder.fn_name
     {
       let entrypoint = self.fn_builder.entrypoint;
       return self
@@ -463,8 +464,8 @@ impl<'a> Cursor<'a> {
       .parameters()
       .iter()
       .rev()
-      .fold(OpenCursor::new(fn_decl.name()), |cursor, param| {
-        cursor.emit_local_store(param.name())
+      .fold(OpenCursor::new(fn_decl.name_decl()), |cursor, param| {
+        cursor.emit_local_store(param.var())
       })
       .compile_lexical_block(fn_decl.body())?;
 

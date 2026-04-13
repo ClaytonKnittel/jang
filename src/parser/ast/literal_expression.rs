@@ -1,24 +1,19 @@
 use std::fmt::Display;
 
-use crate::parser::{ast::ids::AstExpressionId, token::literal::Literal};
+use crate::parser::token::literal::Literal;
 
 #[derive(Clone, Debug)]
 pub struct LiteralExpression {
-  id: AstExpressionId,
   literal: Literal,
 }
 
 impl LiteralExpression {
-  pub fn new(id: AstExpressionId, literal: Literal) -> Self {
-    Self { id, literal }
+  pub fn new(literal: Literal) -> Self {
+    Self { literal }
   }
 
   pub fn literal(&self) -> &Literal {
     &self.literal
-  }
-
-  pub fn id(&self) -> AstExpressionId {
-    self.id
   }
 }
 
@@ -33,16 +28,18 @@ pub mod matchers {
   use googletest::prelude::*;
 
   use crate::parser::{
-    ast::{expression::Expression, literal_expression::LiteralExpression},
+    ast::{
+      expression::{Expression, ExpressionVariant, matchers::expr_variant},
+      literal_expression::LiteralExpression,
+    },
     token::literal::Literal,
   };
 
   pub fn literal_expression<'a>(
     matcher: impl Matcher<&'a Literal>,
   ) -> impl Matcher<&'a Expression> {
-    pat!(Expression::Literal(pat!(LiteralExpression {
-      id: anything(),
+    expr_variant(pat!(ExpressionVariant::Literal(pat!(LiteralExpression {
       literal: matcher,
-    })))
+    }))))
   }
 }

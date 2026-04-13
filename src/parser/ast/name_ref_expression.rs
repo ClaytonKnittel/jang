@@ -1,32 +1,20 @@
 use std::fmt::Display;
 
-use crate::parser::{
-  ast::ids::{AstExpressionId, AstNameRefExpressionId},
-  token::ident::Ident,
-};
+use crate::parser::{ast::id::def::AstNameRefExpressionId, token::ident::Ident};
 
 #[derive(Clone, Debug)]
 pub struct NameRefExpression {
-  id: AstExpressionId,
   name_ref_id: AstNameRefExpressionId,
   ident: Ident,
 }
 
 impl NameRefExpression {
-  pub fn new(id: AstExpressionId, name_ref_id: AstNameRefExpressionId, ident: Ident) -> Self {
-    Self {
-      id,
-      name_ref_id,
-      ident,
-    }
+  pub(super) fn new(name_ref_id: AstNameRefExpressionId, ident: Ident) -> Self {
+    Self { name_ref_id, ident }
   }
 
-  pub fn ident(&self) -> &Ident {
+  pub fn name(&self) -> &Ident {
     &self.ident
-  }
-
-  pub fn id(&self) -> AstExpressionId {
-    self.id
   }
 
   pub fn name_ref_id(&self) -> AstNameRefExpressionId {
@@ -45,15 +33,23 @@ pub mod matchers {
   use googletest::prelude::*;
 
   use crate::parser::{
-    ast::{expression::Expression, name_ref_expression::NameRefExpression},
+    ast::{
+      expression::{Expression, ExpressionVariant, matchers::expr_variant},
+      name_ref_expression::NameRefExpression,
+    },
     token::ident::Ident,
   };
 
+  pub fn name_ref_expr<'a>(
+    matcher: impl Matcher<&'a Ident>,
+  ) -> impl Matcher<&'a NameRefExpression> {
+    property!(&NameRefExpression.name(), matcher)
+  }
+
   pub fn ident_expression<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a Expression> {
-    pat!(Expression::NameRef(pat!(NameRefExpression {
-      id: anything(),
+    expr_variant(pat!(ExpressionVariant::NameRef(pat!(NameRefExpression {
       name_ref_id: anything(),
       ident: matcher,
-    })))
+    }))))
   }
 }

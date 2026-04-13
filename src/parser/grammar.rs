@@ -11,7 +11,7 @@ use crate::{
       call_expression::CallExpression,
       dot_expression::DotExpression,
       enum_type_decl::{EnumTypeDecl, EnumTypeDeclBuilder, EnumVariant, EnumVariantType},
-      expression::Expression,
+      expression::{Expression, ExpressionVariant},
       expression_list::{ExpressionList, ExpressionListBuilder},
       function_decl::{
         FunctionDecl, FunctionParameter, FunctionParameters, FunctionParametersBuilder,
@@ -20,7 +20,6 @@ use crate::{
       jang_file::{JangFile, JangFileBuilder},
       literal_expression::LiteralExpression,
       loop_statement::LoopStatement,
-      name_ref_expression::NameRefExpression,
       rebind_statement::RebindStatement,
       ret_statement::RetStatement,
       statement::Statement,
@@ -117,7 +116,12 @@ pub_grammar!(
       <function_ret_type>
       <block_scope>
   {
-    FunctionDecl::new(#ctx.new_global_decl_id(), #ident, #function_params, #function_ret_type, #block_scope)
+    FunctionDecl::new(
+      #ctx.new_global_decl(#ident),
+      #function_params,
+      #function_ret_type,
+      #block_scope
+    )
   };
 
   <function_ret_type>: Option<TypeExpression> => ! { None };
@@ -151,15 +155,15 @@ pub_grammar!(
   };
 
   <let_binding>: BindStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
-    BindStatement::new_let(#ctx.new_local_decl_id(), #ident, #expr)
+    BindStatement::new_let(#ctx.new_local_decl(#ident), #expr)
   };
 
   <mut_binding>: BindStatement => Keyword(Keyword::Mut) <ident> <eq> <expr> {
-    BindStatement::new_mut(#ctx.new_local_decl_id(), #ident, #expr)
+    BindStatement::new_mut(#ctx.new_local_decl(#ident), #expr)
   };
 
   <rebind>: RebindStatement => <ident> <eq> <expr> {
-    RebindStatement::new(#ctx.new_name_ref_id(), #ident, #expr)
+    RebindStatement::new(#ctx.new_name_ref_expr(#ident), #expr)
   };
 
   <ret_statement>: RetStatement => Keyword(Keyword::Ret) <expr> {
@@ -186,66 +190,106 @@ pub_grammar!(
     LoopStatement::new(#block_scope)
   };
 
-  <expr>: Expression => <logical_or_expr>;
+  <expr>: Expression => <expr_variant> {
+    #ctx.new_expression(#expr_variant)
+  };
 
-  <logical_or_expr>: Expression => <logical_or_expr> <logical_or> <logical_and_expr> {
-    BinaryExpression::new(#ctx.new_expr_id(), #logical_or_expr, #logical_and_expr, BinaryOp::LogicalOr).into()
-  };
-  <logical_or_expr>: Expression => <logical_and_expr>;
+  <expr_variant>: ExpressionVariant => <logical_or_expr>;
 
-  <logical_and_expr>: Expression => <logical_and_expr> <logical_and> <comparison_expr> {
-    BinaryExpression::new(#ctx.new_expr_id(), #logical_and_expr, #comparison_expr, BinaryOp::LogicalAnd).into()
+  <logical_or_expr>: ExpressionVariant => <logical_or_expr> <logical_or> <logical_and_expr> {
+    BinaryExpression::new(
+      #ctx.new_expression(#logical_or_expr),
+      #ctx.new_expression(#logical_and_expr),
+      BinaryOp::LogicalOr
+    ).into()
   };
-  <logical_and_expr>: Expression => <comparison_expr>;
+  <logical_or_expr>: ExpressionVariant => <logical_and_expr>;
 
-  <comparison_expr>: Expression => <comparison_expr> <comparator> <add_expr> {
-    BinaryExpression::new(#ctx.new_expr_id(), #0, #2, #comparator).into()
+  <logical_and_expr>: ExpressionVariant => <logical_and_expr> <logical_and> <comparison_expr> {
+    BinaryExpression::new(
+      #ctx.new_expression(#logical_and_expr),
+      #ctx.new_expression(#comparison_expr),
+      BinaryOp::LogicalAnd
+    ).into()
   };
-  <comparison_expr>: Expression => <add_expr>;
+  <logical_and_expr>: ExpressionVariant => <comparison_expr>;
 
-  <add_expr>: Expression => <add_expr> <plus> <mul_expr> {
-    BinaryExpression::new(#ctx.new_expr_id(), #add_expr, #mul_expr, BinaryOp::Add).into()
+  <comparison_expr>: ExpressionVariant => <comparison_expr> <comparator> <add_expr> {
+    BinaryExpression::new(
+      #ctx.new_expression(#comparison_expr),
+      #ctx.new_expression(#add_expr),
+      #comparator
+    ).into()
   };
-  <add_expr>: Expression => <add_expr> <minus> <mul_expr> {
-    BinaryExpression::new(#ctx.new_expr_id(), #add_expr, #mul_expr, BinaryOp::Sub).into()
-  };
-  <add_expr>: Expression => <mul_expr>;
+  <comparison_expr>: ExpressionVariant => <add_expr>;
 
-  <mul_expr>: Expression => <mul_expr> <mul> <unary_expr> {
-    BinaryExpression::new(#ctx.new_expr_id(), #mul_expr, #unary_expr, BinaryOp::Mul).into()
+  <add_expr>: ExpressionVariant => <add_expr> <plus> <mul_expr> {
+    BinaryExpression::new(
+      #ctx.new_expression(#add_expr),
+      #ctx.new_expression(#mul_expr),
+      BinaryOp::Add
+    ).into()
   };
-  <mul_expr>: Expression => <mul_expr> <div> <unary_expr> {
-    BinaryExpression::new(#ctx.new_expr_id(), #mul_expr, #unary_expr, BinaryOp::Div).into()
+  <add_expr>: ExpressionVariant => <add_expr> <minus> <mul_expr> {
+    BinaryExpression::new(
+      #ctx.new_expression(#add_expr),
+      #ctx.new_expression(#mul_expr),
+      BinaryOp::Sub
+    ).into()
   };
-  <mul_expr>: Expression => <mul_expr> <modulo> <unary_expr> {
-    BinaryExpression::new(#ctx.new_expr_id(), #mul_expr, #unary_expr, BinaryOp::Mod).into()
+  <add_expr>: ExpressionVariant => <mul_expr>;
+
+  <mul_expr>: ExpressionVariant => <mul_expr> <mul> <unary_expr> {
+    BinaryExpression::new(
+      #ctx.new_expression(#mul_expr),
+      #ctx.new_expression(#unary_expr),
+      BinaryOp::Mul
+    ).into()
   };
-  <mul_expr>: Expression => <unary_expr>;
+  <mul_expr>: ExpressionVariant => <mul_expr> <div> <unary_expr> {
+    BinaryExpression::new(
+      #ctx.new_expression(#mul_expr),
+      #ctx.new_expression(#unary_expr),
+      BinaryOp::Div
+    ).into()
+  };
+  <mul_expr>: ExpressionVariant => <mul_expr> <modulo> <unary_expr> {
+    BinaryExpression::new(
+      #ctx.new_expression(#mul_expr),
+      #ctx.new_expression(#unary_expr),
+      BinaryOp::Mod
+    ).into()
+  };
+  <mul_expr>: ExpressionVariant => <unary_expr>;
 
   // Unary expressions:
-  <unary_expr>: Expression => <bang> <unary_expr> {
-    UnaryExpression::new(#ctx.new_expr_id(), #unary_expr, UnaryOp::LogicalNot).into()
+  <unary_expr>: ExpressionVariant => <bang> <unary_expr> {
+    UnaryExpression::new(#ctx.new_expression(#unary_expr), UnaryOp::LogicalNot).into()
   };
-  <unary_expr>: Expression => <call_or_dot_expr>;
-  <unary_expr>: Expression => <literal> { LiteralExpression::new(#ctx.new_expr_id(), #literal).into() };
+  <unary_expr>: ExpressionVariant => <call_or_dot_expr>;
+  <unary_expr>: ExpressionVariant => <literal> {
+    LiteralExpression::new(#literal).into()
+  };
 
   // Call expressions.
-  <call_or_dot_expr>: Expression => <call_expr>;
-  <call_or_dot_expr>: Expression => <call_or_dot_expr> <dot> <ident> {
-    DotExpression::new(#ctx.new_expr_id(), #call_or_dot_expr, #ident).into()
+  <call_or_dot_expr>: ExpressionVariant => <call_expr>;
+  <call_or_dot_expr>: ExpressionVariant => <call_or_dot_expr> <dot> <ident> {
+    DotExpression::new(#ctx.new_expression(#call_or_dot_expr), #ident).into()
   };
-  <call_or_dot_expr>: Expression => <leaf_expr>;
+  <call_or_dot_expr>: ExpressionVariant => <leaf_expr>;
 
   <call_expr>: CallExpression => <call_or_dot_expr> Joint <call_args> {
-    CallExpression::new(#ctx.new_expr_id(), #call_or_dot_expr, #call_args)
+    CallExpression::new(#ctx.new_expression(#call_or_dot_expr), #call_args)
   };
 
   <call_args>: ExpressionList => <open_paren> <expr_list_builder> <close_paren> {
     #expr_list_builder.build()?
   };
 
-  <leaf_expr>: Expression => <open_paren> <expr> <close_paren> { #expr };
-  <leaf_expr>: Expression => <ident> { NameRefExpression::new(#ctx.new_expr_id(), #ctx.new_name_ref_id(), #ident).into() };
+  <leaf_expr>: ExpressionVariant => <open_paren> <expr_variant> <close_paren> { #expr_variant };
+  <leaf_expr>: ExpressionVariant => <ident> {
+    #ctx.new_name_ref_expr(#ident).into()
+  };
 
   <expr_list_builder>: ExpressionListBuilder => ! { ExpressionListBuilder::default() };
   <expr_list_builder>: ExpressionListBuilder => <non_empty_expr_list>;
@@ -266,11 +310,13 @@ pub_grammar!(
   <non_empty_parameter_list>: FunctionParametersBuilder =>
       <non_empty_parameter_list> <comma> <ident> <colon> <type_expr>
   {
-    #non_empty_parameter_list.add_parameters(FunctionParameter::new(#ctx.new_local_decl_id(), #ident, #type_expr))
+    #non_empty_parameter_list.add_parameters(
+      FunctionParameter::new(#ctx.new_local_decl(#ident), #type_expr)
+    )
   };
   <non_empty_parameter_list>: FunctionParametersBuilder => <ident> <colon> <type_expr> {
     let builder = FunctionParametersBuilder::default();
-    builder.add_parameters(FunctionParameter::new(#ctx.new_local_decl_id(), #ident, #type_expr))
+    builder.add_parameters(FunctionParameter::new(#ctx.new_local_decl(#ident), #type_expr))
   };
 
   <comparator>: BinaryOp => <greater_than> { BinaryOp::GreaterThan };
@@ -410,7 +456,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 343);
+    expect_eq!(JangGrammar::TABLE_SIZE, 346);
   }
 
   #[gtest]

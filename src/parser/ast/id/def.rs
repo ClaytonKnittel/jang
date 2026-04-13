@@ -6,8 +6,10 @@ macro_rules! define_ast_ids {
     )*
   ) => {
     $(
+      $(#[$meta])*
       #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
       pub struct $id_type(pub (super) usize);
+      impl crate::parser::ast::id::AstId for $id_type {}
     )*
   };
 }

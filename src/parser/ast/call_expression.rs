@@ -1,24 +1,16 @@
 use std::fmt::Display;
 
-use crate::parser::ast::{
-  expression::Expression, expression_list::ExpressionList, ids::AstExpressionId,
-};
+use crate::parser::ast::{expression::Expression, expression_list::ExpressionList};
 
 #[derive(Clone, Debug)]
 pub struct CallExpression {
-  id: AstExpressionId,
   target: Box<Expression>,
   argument_list: ExpressionList,
 }
 
 impl CallExpression {
-  pub fn new(
-    id: AstExpressionId,
-    target: impl Into<Box<Expression>>,
-    argument_list: impl Into<ExpressionList>,
-  ) -> Self {
+  pub fn new(target: impl Into<Box<Expression>>, argument_list: impl Into<ExpressionList>) -> Self {
     Self {
-      id,
       target: target.into(),
       argument_list: argument_list.into(),
     }
@@ -31,10 +23,6 @@ impl CallExpression {
   pub fn argument_list(&self) -> &[Expression] {
     self.argument_list.expressions()
   }
-
-  pub fn id(&self) -> AstExpressionId {
-    self.id
-  }
 }
 
 impl Display for CallExpression {
@@ -46,7 +34,9 @@ impl Display for CallExpression {
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::ast::{
-    call_expression::CallExpression, expression::Expression, statement::Statement,
+    call_expression::CallExpression,
+    expression::{Expression, ExpressionVariant, matchers::expr_variant},
+    statement::Statement,
   };
   use googletest::prelude::*;
 
@@ -59,7 +49,7 @@ pub(crate) mod matchers {
   pub fn call_expression<'a>(
     matcher: impl Matcher<&'a CallExpression>,
   ) -> impl Matcher<&'a Expression> {
-    pat!(Expression::CallExpression(matcher))
+    expr_variant(pat!(ExpressionVariant::CallExpression(matcher)))
   }
 
   pub fn call_expr_target<'a>(

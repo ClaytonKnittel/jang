@@ -2,19 +2,15 @@ use std::fmt::Display;
 
 use cknittel_util::builder::Builder;
 
-use crate::parser::{
-  ast::{
-    block::Block,
-    ids::{AstGlobalDeclId, AstLocalDeclId},
-    type_expr::TypeExpression,
-  },
-  token::ident::Ident,
+use crate::parser::ast::{
+  block::Block,
+  type_expr::TypeExpression,
+  var_decl::{GlobalDecl, LocalDecl},
 };
 
 #[derive(Clone, Debug)]
 pub struct FunctionDecl {
-  decl_id: AstGlobalDeclId,
-  name: Ident,
+  name: GlobalDecl,
   parameters: FunctionParameters,
   return_type: Option<TypeExpression>,
   body: Block,
@@ -22,14 +18,12 @@ pub struct FunctionDecl {
 
 impl FunctionDecl {
   pub fn new(
-    decl_id: AstGlobalDeclId,
-    name: Ident,
+    name: GlobalDecl,
     parameters: FunctionParameters,
     return_type: Option<TypeExpression>,
     body: Block,
   ) -> Self {
     Self {
-      decl_id,
       name,
       parameters,
       return_type,
@@ -37,7 +31,7 @@ impl FunctionDecl {
     }
   }
 
-  pub fn name(&self) -> &Ident {
+  pub fn name_decl(&self) -> &GlobalDecl {
     &self.name
   }
 
@@ -51,10 +45,6 @@ impl FunctionDecl {
 
   pub fn body(&self) -> &Block {
     &self.body
-  }
-
-  pub fn decl_id(&self) -> AstGlobalDeclId {
-    self.decl_id
   }
 }
 
@@ -98,32 +88,27 @@ impl Display for FunctionParameters {
 
 #[derive(Clone, Debug)]
 pub struct FunctionParameter {
-  decl_id: AstLocalDeclId,
-  name: Ident,
+  var: LocalDecl,
   ty: TypeExpression,
 }
 
 impl FunctionParameter {
-  pub fn new(decl_id: AstLocalDeclId, name: Ident, ty: TypeExpression) -> Self {
-    Self { decl_id, name, ty }
+  pub fn new(var: LocalDecl, ty: TypeExpression) -> Self {
+    Self { var, ty }
   }
 
-  pub fn name(&self) -> &Ident {
-    &self.name
+  pub fn var(&self) -> &LocalDecl {
+    &self.var
   }
 
   pub fn ty(&self) -> &TypeExpression {
     &self.ty
   }
-
-  pub fn decl_id(&self) -> AstLocalDeclId {
-    self.decl_id
-  }
 }
 
 impl Display for FunctionParameter {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}: {}", self.name, self.ty)
+    write!(f, "{}: {}", self.var, self.ty)
   }
 }
 
@@ -134,13 +119,14 @@ pub(crate) mod matchers {
       block::Block,
       function_decl::{FunctionDecl, FunctionParameter},
       type_expr::TypeExpression,
+      var_decl::matchers::{global_decl, local_decl},
     },
     token::ident::Ident,
   };
   use googletest::prelude::*;
 
   pub fn fn_name<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a FunctionDecl> {
-    property!(&FunctionDecl.name(), matcher)
+    property!(&FunctionDecl.name_decl(), global_decl(matcher))
   }
 
   pub fn fn_return_type_none<'a>() -> impl Matcher<&'a FunctionDecl> {
@@ -166,7 +152,7 @@ pub(crate) mod matchers {
   pub fn fn_parameter_name<'a>(
     matcher: impl Matcher<&'a Ident>,
   ) -> impl Matcher<&'a FunctionParameter> {
-    property!(&FunctionParameter.name(), matcher)
+    property!(&FunctionParameter.var(), local_decl(matcher))
   }
 
   pub fn fn_parameter_type<'a>(

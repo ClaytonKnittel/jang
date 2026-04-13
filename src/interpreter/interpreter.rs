@@ -44,7 +44,7 @@ impl<'a> Interpreter<'a> {
     let function_decls_by_name: HashMap<Ident, JitCompiledFunction<'a>> = jang_file
       .function_decls()
       .iter()
-      .map(|f| Ok((f.name().clone(), compile_to_bytecode(f)?)))
+      .map(|f| Ok((f.name_decl().name().clone(), compile_to_bytecode(f)?)))
       .collect::<InterpreterResult<_>>()?;
 
     Ok(Interpreter {
