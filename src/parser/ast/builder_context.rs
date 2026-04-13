@@ -3,7 +3,7 @@ use crate::{
   parser::{
     ast::{
       expression::{Expression, ExpressionVariant},
-      id::builder::IdBuilder,
+      id::builder::{IdBuilder, IdTable},
       var::{
         var_decl::{GlobalDecl, LocalDecl},
         var_decl_map::VarDeclMap,
@@ -21,8 +21,12 @@ pub struct AstBuilderContext {
 }
 
 impl AstBuilderContext {
+  pub fn build(self) -> IdTable {
+    self.id_builder.build()
+  }
+
   pub fn new_expression(&mut self, variant: ExpressionVariant) -> Expression {
-    Expression::new(self.id_builder.new_expr_id(), variant)
+    Expression::new(self.id_builder.new_expr(), variant)
   }
 
   pub fn new_global_decl(&mut self, ident: Ident) -> JangResult<GlobalDecl> {

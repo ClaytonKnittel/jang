@@ -1,7 +1,4 @@
-use crate::parser::{
-  ast::{id::node_map::NodeMap, jang_file::JangFile},
-  token::ident::Ident,
-};
+use crate::parser::ast::{id::builder::IdTable, jang_file::JangFile};
 
 pub struct JangAst {
   file: JangFile,

@@ -81,7 +81,7 @@ impl VarDeclMap {
       .last_mut()
       .expect("Cannot create a local variable in the global scope");
 
-    let new_id = id_builder.new_local_decl_id();
+    let new_id = id_builder.new_local(ident.clone());
     local_scope.insert(ident.clone(), new_id);
     LocalDecl::new(new_id, ident)
   }
@@ -108,7 +108,7 @@ impl VarDeclMap {
       VarRef::from_id(id, ident)
     } else {
       debug_assert!(self.lookup_var_ref(&ident).is_none());
-      let id = id_builder.new_global_decl_id();
+      let id = id_builder.new_global(ident.clone());
       self.globals.insert(
         ident.clone(),
         GlobalDeclInfo {
