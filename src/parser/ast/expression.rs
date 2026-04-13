@@ -4,12 +4,12 @@ use cknittel_util::from_variants::FromVariants;
 
 use crate::parser::ast::{
   binary_expression::BinaryExpression, call_expression::CallExpression,
-  dot_expression::DotExpression, ids::AstExpressionId, literal_expression::LiteralExpression,
+  dot_expression::DotExpression, id::def::AstExpressionId, literal_expression::LiteralExpression,
   name_ref_expression::NameRefExpression, unary_experssion::UnaryExpression,
 };
 
 #[derive(Clone, Debug, FromVariants)]
-pub enum Expression {
+pub enum ExpressionVariant {
   Literal(LiteralExpression),
   NameRef(NameRefExpression),
   BinaryExpression(BinaryExpression),
@@ -18,7 +18,7 @@ pub enum Expression {
   DotExpression(DotExpression),
 }
 
-impl Display for Expression {
+impl Display for ExpressionVariant {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Literal(literal) => write!(f, "{literal}"),
@@ -31,15 +31,43 @@ impl Display for Expression {
   }
 }
 
+#[derive(Clone, Debug)]
+pub struct Expression {
+  id: AstExpressionId,
+  variant: ExpressionVariant,
+}
+
 impl Expression {
+  pub(super) fn new(id: AstExpressionId, variant: ExpressionVariant) -> Self {
+    Self { id, variant }
+  }
+
   pub fn id(&self) -> AstExpressionId {
-    match self {
-      Self::Literal(literal) => literal.id(),
-      Self::NameRef(ident) => ident.id(),
-      Self::BinaryExpression(binary_expr) => binary_expr.id(),
-      Self::UnaryExpression(unary_expr) => unary_expr.id(),
-      Self::CallExpression(call_expr) => call_expr.id(),
-      Self::DotExpression(dot_expr) => dot_expr.id(),
-    }
+    self.id
+  }
+
+  pub fn variant(&self) -> &ExpressionVariant {
+    &self.variant
+  }
+}
+
+impl Display for Expression {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.variant)
+  }
+}
+
+#[cfg(test)]
+pub(crate) mod matchers {
+  use crate::parser::ast::expression::{Expression, ExpressionVariant};
+  use googletest::prelude::*;
+
+  pub fn expr_variant<'a>(
+    variant_matcher: impl Matcher<&'a ExpressionVariant>,
+  ) -> impl Matcher<&'a Expression> {
+    pat!(Expression {
+      id: anything(),
+      variant: variant_matcher
+    })
   }
 }

@@ -1,9 +1,6 @@
 use std::fmt::Display;
 
-use crate::parser::{
-  ast::{expression::Expression, ids::AstLocalDeclId},
-  token::ident::Ident,
-};
+use crate::parser::ast::{expression::Expression, var_decl::LocalDecl};
 
 #[derive(Copy, Clone, Debug)]
 pub enum Mutability {
@@ -13,40 +10,33 @@ pub enum Mutability {
 
 #[derive(Clone, Debug)]
 pub struct BindStatement {
-  decl_id: AstLocalDeclId,
   mutability: Mutability,
-  var: Ident,
+  var: LocalDecl,
   expr: Expression,
 }
 
 impl BindStatement {
-  pub fn new_let(decl_id: AstLocalDeclId, var: Ident, expr: Expression) -> Self {
+  pub fn new_let(var: LocalDecl, expr: Expression) -> Self {
     Self {
-      decl_id,
       mutability: Mutability::Immutable,
       var,
       expr,
     }
   }
 
-  pub fn new_mut(decl_id: AstLocalDeclId, var: Ident, expr: Expression) -> Self {
+  pub fn new_mut(var: LocalDecl, expr: Expression) -> Self {
     Self {
-      decl_id,
       mutability: Mutability::Mutable,
       var,
       expr,
     }
   }
 
-  pub fn decl_id(&self) -> AstLocalDeclId {
-    self.decl_id
-  }
-
   pub fn mutability(&self) -> &Mutability {
     &self.mutability
   }
 
-  pub fn var(&self) -> &Ident {
+  pub fn var(&self) -> &LocalDecl {
     &self.var
   }
 
@@ -71,6 +61,7 @@ pub(crate) mod matchers {
       bind_statement::{BindStatement, Mutability},
       expression::Expression,
       statement::Statement,
+      var_decl::matchers::local_decl,
     },
     token::ident::Ident,
   };
@@ -81,8 +72,7 @@ pub(crate) mod matchers {
     expr_matcher: impl Matcher<&'a Expression>,
   ) -> impl Matcher<&'a Statement> {
     pat!(Statement::Bind(pat!(BindStatement {
-      decl_id: anything(),
-      var: var_matcher,
+      var: local_decl(var_matcher),
       expr: expr_matcher,
       mutability: pat!(Mutability::Immutable)
     })))
@@ -93,8 +83,7 @@ pub(crate) mod matchers {
     expr_matcher: impl Matcher<&'a Expression>,
   ) -> impl Matcher<&'a Statement> {
     pat!(Statement::Bind(pat!(BindStatement {
-      decl_id: anything(),
-      var: var_matcher,
+      var: local_decl(var_matcher),
       expr: expr_matcher,
       mutability: pat!(Mutability::Mutable)
     })))
