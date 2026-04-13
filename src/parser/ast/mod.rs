@@ -21,5 +21,4 @@ pub mod structured_type_decl;
 pub mod type_decl;
 pub mod type_expr;
 pub mod unary_experssion;
-pub mod var_decl;
-pub mod var_ref;
+pub mod var;

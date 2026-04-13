@@ -40,7 +40,7 @@ pub type LocalDecl = VarDecl<AstLocalDeclId>;
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::{
-    ast::var_decl::{GlobalDecl, LocalDecl},
+    ast::var::var_decl::{GlobalDecl, LocalDecl},
     token::ident::Ident,
   };
   use googletest::prelude::*;

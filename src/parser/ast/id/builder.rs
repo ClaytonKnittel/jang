@@ -59,6 +59,11 @@ define_ast_id_gen!(
   AstGlobalDeclId => gbl_decl_id, new_global_decl_id;
 );
 
+pub enum AstDeclId {
+  Global(AstGlobalDeclId),
+  Local(AstLocalDeclId),
+}
+
 #[cfg(test)]
 mod tests {
   use googletest::prelude::*;

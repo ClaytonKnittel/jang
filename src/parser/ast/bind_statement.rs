@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::parser::ast::{expression::Expression, var_decl::LocalDecl};
+use crate::parser::ast::{expression::Expression, var::var_decl::LocalDecl};
 
 #[derive(Copy, Clone, Debug)]
 pub enum Mutability {
@@ -61,7 +61,7 @@ pub(crate) mod matchers {
       bind_statement::{BindStatement, Mutability},
       expression::Expression,
       statement::Statement,
-      var_decl::matchers::local_decl,
+      var::var_decl::matchers::local_decl,
     },
     token::ident::Ident,
   };

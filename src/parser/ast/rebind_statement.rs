@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::parser::ast::{expression::Expression, var_ref::VarRef};
+use crate::parser::ast::{expression::Expression, var::var_ref::VarRef};
 
 #[derive(Clone, Debug)]
 pub struct RebindStatement {
@@ -33,7 +33,7 @@ pub(crate) mod matchers {
   use crate::parser::{
     ast::{
       expression::Expression, rebind_statement::RebindStatement, statement::Statement,
-      var_ref::matchers::var_ref,
+      var::var_ref::matchers::var_ref,
     },
     token::ident::Ident,
   };

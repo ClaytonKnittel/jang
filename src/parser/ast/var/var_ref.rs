@@ -1,17 +1,29 @@
 use std::fmt::Display;
 
+use cknittel_util::from_variants::FromVariants;
+
 use crate::parser::{
-  ast::var_decl::{GlobalDecl, LocalDecl},
+  ast::{
+    id::builder::AstDeclId,
+    var::var_decl::{GlobalDecl, LocalDecl},
+  },
   token::ident::Ident,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, FromVariants)]
 pub enum VarRef {
   Global(GlobalDecl),
   Local(LocalDecl),
 }
 
 impl VarRef {
+  pub(super) fn from_id(id: AstDeclId, name: Ident) -> Self {
+    match id {
+      AstDeclId::Global(id) => Self::Global(GlobalDecl::new(id, name)),
+      AstDeclId::Local(id) => Self::Local(LocalDecl::new(id, name)),
+    }
+  }
+
   pub fn name(&self) -> &Ident {
     match self {
       Self::Global(global_decl) => global_decl.name(),
@@ -31,10 +43,20 @@ impl Display for VarRef {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::{ast::var_ref::VarRef, token::ident::Ident};
+  use crate::parser::{
+    ast::{
+      expression::{Expression, ExpressionVariant, matchers::expr_variant},
+      var::var_ref::VarRef,
+    },
+    token::ident::Ident,
+  };
   use googletest::prelude::*;
 
   pub fn var_ref<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a VarRef> {
     property!(&VarRef.name(), matcher)
+  }
+
+  pub fn var_ref_expr<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a Expression> {
+    expr_variant(pat!(ExpressionVariant::VarRef(var_ref(matcher))))
   }
 }

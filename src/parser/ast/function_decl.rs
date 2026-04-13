@@ -5,7 +5,7 @@ use cknittel_util::builder::Builder;
 use crate::parser::ast::{
   block::Block,
   type_expr::TypeExpression,
-  var_decl::{GlobalDecl, LocalDecl},
+  var::var_decl::{GlobalDecl, LocalDecl},
 };
 
 #[derive(Clone, Debug)]
@@ -119,7 +119,7 @@ pub(crate) mod matchers {
       block::Block,
       function_decl::{FunctionDecl, FunctionParameter},
       type_expr::TypeExpression,
-      var_decl::matchers::{global_decl, local_decl},
+      var::var_decl::matchers::{global_decl, local_decl},
     },
     token::ident::Ident,
   };

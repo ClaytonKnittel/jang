@@ -5,7 +5,7 @@ use cknittel_util::from_variants::FromVariants;
 use crate::parser::ast::{
   binary_expression::BinaryExpression, call_expression::CallExpression,
   dot_expression::DotExpression, id::def::AstExpressionId, literal_expression::LiteralExpression,
-  unary_experssion::UnaryExpression, var_ref::VarRef,
+  unary_experssion::UnaryExpression, var::var_ref::VarRef,
 };
 
 #[derive(Clone, Debug, FromVariants)]
