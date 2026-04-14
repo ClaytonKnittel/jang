@@ -206,7 +206,10 @@ impl<'a> OpenCursor<'a> {
         self
           .lexical_scope
           .get_binding(local_decl.name())
-          .expect("")
+          .expect(
+            "Local variables will have been assigned a local ID by this point. \
+             Unresolved references will be considered globals by the parser",
+          )
           .local_id(),
       ),
       VarRef::Global(global_decl) => JitInstruction::LoadGlobal(global_decl.name()),
