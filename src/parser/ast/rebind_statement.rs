@@ -33,7 +33,7 @@ pub(crate) mod matchers {
   use crate::parser::{
     ast::{
       expression::Expression, rebind_statement::RebindStatement, statement::Statement,
-      var::var_ref::matchers::var_ref,
+      var::var_ref::matchers::local_var_ref,
     },
     token::ident::Ident,
   };
@@ -44,7 +44,7 @@ pub(crate) mod matchers {
     expr_matcher: impl Matcher<&'a Expression>,
   ) -> impl Matcher<&'a Statement> {
     pat!(Statement::Rebind(pat!(RebindStatement {
-      var: var_ref(var_matcher),
+      var: local_var_ref(var_matcher),
       expr: expr_matcher,
     })))
   }

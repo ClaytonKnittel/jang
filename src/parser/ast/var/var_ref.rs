@@ -46,17 +46,35 @@ pub(crate) mod matchers {
   use crate::parser::{
     ast::{
       expression::{Expression, ExpressionVariant, matchers::expr_variant},
-      var::var_ref::VarRef,
+      var::{
+        var_decl::{GlobalDecl, LocalDecl},
+        var_ref::VarRef,
+      },
     },
     token::ident::Ident,
   };
   use googletest::prelude::*;
 
-  pub fn var_ref<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a VarRef> {
-    property!(&VarRef.name(), matcher)
+  pub fn local_var_ref<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a VarRef> {
+    pat!(VarRef::Local(property!(&LocalDecl.name(), matcher)))
   }
 
-  pub fn var_ref_expr<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a Expression> {
-    expr_variant(pat!(ExpressionVariant::VarRef(var_ref(matcher))))
+  pub fn local_var_ref_expr<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a Expression> {
+    expr_variant(pat!(ExpressionVariant::VarRef(local_var_ref(matcher))))
+  }
+
+  pub fn global_var_ref<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a VarRef> {
+    pat!(VarRef::Global(property!(&GlobalDecl.name(), matcher)))
+  }
+
+  pub fn global_var_ref_expr<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a Expression> {
+    expr_variant(pat!(ExpressionVariant::VarRef(global_var_ref(matcher))))
+  }
+
+  pub fn any_var_ref_expr<'a>(matcher: impl Matcher<&'a Ident>) -> impl Matcher<&'a Expression> {
+    expr_variant(pat!(ExpressionVariant::VarRef(property!(
+      &VarRef.name(),
+      matcher
+    ))))
   }
 }

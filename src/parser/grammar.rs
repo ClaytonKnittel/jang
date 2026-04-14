@@ -433,7 +433,7 @@ mod tests {
         type_decl::matchers::{enum_type, structured_type},
         type_expr::matchers::type_expr_name,
         unary_experssion::matchers::logical_not_exp,
-        var::var_ref::matchers::var_ref_expr,
+        var::var_ref::matchers::{any_var_ref_expr, global_var_ref_expr, local_var_ref_expr},
       },
       grammar::{JangGrammar, testing::lex_and_parse_jang_file},
       token::{ident::matchers::ident, literal::matchers::integral},
@@ -696,7 +696,7 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_fn(fn_body(block(elements_are![ret_stmt(var_ref_expr(
+      jang_file_with_fn(fn_body(block(elements_are![ret_stmt(any_var_ref_expr(
         ident("x")
       ))])))
     );
@@ -719,7 +719,7 @@ mod tests {
     expect_that!(
       ast,
       jang_file_with_fn(fn_body(block(elements_are![block_statement(
-        elements_are![ret_stmt(var_ref_expr(ident("x")))]
+        elements_are![ret_stmt(any_var_ref_expr(ident("x")))]
       )])))
     );
   }
@@ -805,7 +805,7 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![
         let_stmt(ident("x"), lit_exp(integral("123"))),
-        let_stmt(ident("y"), var_ref_expr(ident("x"))),
+        let_stmt(ident("y"), local_var_ref_expr(ident("x"))),
         ret_stmt(lit_exp(integral("789")))
       ])))
     );
@@ -829,24 +829,24 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![
         call_statement(all![
-          call_expr_target(var_ref_expr(ident("f"))),
+          call_expr_target(any_var_ref_expr(ident("f"))),
           call_expr_args(is_empty())
         ]),
         call_statement(all![
-          call_expr_target(var_ref_expr(ident("x"))),
+          call_expr_target(any_var_ref_expr(ident("x"))),
           call_expr_args(elements_are![bin_exp(
             lit_exp(integral("1")),
             &BinaryOp::Add,
-            var_ref_expr(ident("y"))
+            any_var_ref_expr(ident("y"))
           )])
         ]),
         call_statement(all![
           call_expr_target(bin_exp(
-            var_ref_expr(ident("x")),
+            any_var_ref_expr(ident("x")),
             &BinaryOp::Add,
             lit_exp(integral("1"))
           )),
-          call_expr_args(elements_are![var_ref_expr(ident("y"))])
+          call_expr_args(elements_are![any_var_ref_expr(ident("y"))])
         ])
       ])))
     );
@@ -880,13 +880,13 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![
         block_statement(elements_are![let_stmt(
           ident("y"),
-          var_ref_expr(ident("z"))
+          any_var_ref_expr(ident("z"))
         )]),
         let_stmt(ident("x"), lit_exp(integral("123"))),
         block_statement(elements_are![
-          let_stmt(ident("x"), var_ref_expr(ident("x"))),
+          let_stmt(ident("x"), local_var_ref_expr(ident("x"))),
           block_statement(elements_are![block_statement(elements_are![ret_stmt(
-            var_ref_expr(ident("z"))
+            any_var_ref_expr(ident("z"))
           )])])
         ])
       ])))
@@ -941,7 +941,7 @@ mod tests {
     expect_that!(
       parse_single_exp(expr).unwrap(),
       bin_exp(
-        var_ref_expr(ident("y")),
+        any_var_ref_expr(ident("y")),
         &BinaryOp::Add,
         lit_exp(integral("3"))
       )
@@ -956,7 +956,7 @@ mod tests {
       bin_exp(
         lit_exp(integral("5")),
         &BinaryOp::Sub,
-        var_ref_expr(ident("a"))
+        any_var_ref_expr(ident("a"))
       ),
     );
   }
@@ -969,7 +969,7 @@ mod tests {
       bin_exp(
         lit_exp(integral("2")),
         &BinaryOp::Mul,
-        var_ref_expr(ident("a")),
+        any_var_ref_expr(ident("a")),
       )
     );
   }
@@ -980,9 +980,9 @@ mod tests {
     expect_that!(
       parse_single_exp(expression).unwrap(),
       bin_exp(
-        var_ref_expr(ident("a")),
+        any_var_ref_expr(ident("a")),
         &BinaryOp::Div,
-        var_ref_expr(ident("b"))
+        any_var_ref_expr(ident("b"))
       )
     );
   }
@@ -993,7 +993,7 @@ mod tests {
     expect_that!(
       parse_single_exp(expr).unwrap(),
       bin_exp(
-        var_ref_expr(ident("a")),
+        any_var_ref_expr(ident("a")),
         &BinaryOp::Mod,
         lit_exp(integral("10"))
       )
@@ -1007,12 +1007,12 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       bin_exp(
         bin_exp(
-          var_ref_expr(ident("a")),
+          any_var_ref_expr(ident("a")),
           &BinaryOp::Add,
-          var_ref_expr(ident("b"))
+          any_var_ref_expr(ident("b"))
         ),
         &BinaryOp::Add,
-        var_ref_expr(ident("c"))
+        any_var_ref_expr(ident("c"))
       )
     );
   }
@@ -1024,12 +1024,12 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       bin_exp(
         bin_exp(
-          var_ref_expr(ident("a")),
+          any_var_ref_expr(ident("a")),
           &BinaryOp::Mul,
-          var_ref_expr(ident("b"))
+          any_var_ref_expr(ident("b"))
         ),
         &BinaryOp::Mul,
-        var_ref_expr(ident("c"))
+        any_var_ref_expr(ident("c"))
       )
     );
   }
@@ -1041,12 +1041,12 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       bin_exp(
         bin_exp(
-          var_ref_expr(ident("a")),
+          any_var_ref_expr(ident("a")),
           &BinaryOp::Add,
-          var_ref_expr(ident("b"))
+          any_var_ref_expr(ident("b"))
         ),
         &BinaryOp::Sub,
-        var_ref_expr(ident("c"))
+        any_var_ref_expr(ident("c"))
       )
     );
 
@@ -1055,12 +1055,12 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       bin_exp(
         bin_exp(
-          var_ref_expr(ident("a")),
+          any_var_ref_expr(ident("a")),
           &BinaryOp::Sub,
-          var_ref_expr(ident("b"))
+          any_var_ref_expr(ident("b"))
         ),
         &BinaryOp::Add,
-        var_ref_expr(ident("c"))
+        any_var_ref_expr(ident("c"))
       )
     );
   }
@@ -1072,19 +1072,19 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       bin_exp(
         bin_exp(
-          var_ref_expr(ident("a")),
+          any_var_ref_expr(ident("a")),
           &BinaryOp::Add,
           bin_exp(
-            var_ref_expr(ident("b")),
+            any_var_ref_expr(ident("b")),
             &BinaryOp::Mul,
-            var_ref_expr(ident("c"))
+            any_var_ref_expr(ident("c"))
           )
         ),
         &BinaryOp::Sub,
         bin_exp(
-          var_ref_expr(ident("d")),
+          any_var_ref_expr(ident("d")),
           &BinaryOp::Div,
-          var_ref_expr(ident("e"))
+          any_var_ref_expr(ident("e"))
         )
       )
     );
@@ -1112,15 +1112,15 @@ mod tests {
           bin_exp(
             bin_exp(
               bin_exp(
-                var_ref_expr(ident("a")),
+                any_var_ref_expr(ident("a")),
                 &BinaryOp::Mul,
-                var_ref_expr(ident("b"))
+                any_var_ref_expr(ident("b"))
               ),
               &BinaryOp::Div,
-              var_ref_expr(ident("c"))
+              any_var_ref_expr(ident("c"))
             ),
             &BinaryOp::Mod,
-            var_ref_expr(ident("d"))
+            any_var_ref_expr(ident("d"))
           )
         ),
         let_stmt(
@@ -1128,15 +1128,15 @@ mod tests {
           bin_exp(
             bin_exp(
               bin_exp(
-                var_ref_expr(ident("a")),
+                any_var_ref_expr(ident("a")),
                 &BinaryOp::Div,
-                var_ref_expr(ident("b"))
+                any_var_ref_expr(ident("b"))
               ),
               &BinaryOp::Mod,
-              var_ref_expr(ident("c"))
+              any_var_ref_expr(ident("c"))
             ),
             &BinaryOp::Mul,
-            var_ref_expr(ident("d"))
+            any_var_ref_expr(ident("d"))
           )
         ),
         let_stmt(
@@ -1144,15 +1144,15 @@ mod tests {
           bin_exp(
             bin_exp(
               bin_exp(
-                var_ref_expr(ident("a")),
+                any_var_ref_expr(ident("a")),
                 &BinaryOp::Mod,
-                var_ref_expr(ident("b"))
+                any_var_ref_expr(ident("b"))
               ),
               &BinaryOp::Mul,
-              var_ref_expr(ident("c"))
+              any_var_ref_expr(ident("c"))
             ),
             &BinaryOp::Div,
-            var_ref_expr(ident("d"))
+            any_var_ref_expr(ident("d"))
           )
         )
       ])))
@@ -1166,12 +1166,12 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       bin_exp(
         call_expression(all![
-          call_expr_target(var_ref_expr(ident("y"))),
+          call_expr_target(any_var_ref_expr(ident("y"))),
           call_expr_args(is_empty())
         ]),
         &BinaryOp::Add,
         call_expression(all![
-          call_expr_target(var_ref_expr(ident("z"))),
+          call_expr_target(any_var_ref_expr(ident("z"))),
           call_expr_args(is_empty())
         ]),
       )
@@ -1185,14 +1185,14 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       bin_exp(
         call_expression(all![
-          call_expr_target(var_ref_expr(ident("y"))),
+          call_expr_target(any_var_ref_expr(ident("y"))),
           call_expr_args(elements_are![lit_exp(integral("1"))])
         ]),
         &BinaryOp::Add,
         call_expression(all![
-          call_expr_target(var_ref_expr(ident("z"))),
+          call_expr_target(any_var_ref_expr(ident("z"))),
           call_expr_args(elements_are![
-            var_ref_expr(ident("w")),
+            any_var_ref_expr(ident("w")),
             bin_exp(
               lit_exp(integral("2")),
               &BinaryOp::Add,
@@ -1210,7 +1210,7 @@ mod tests {
     expect_that!(
       parse_single_exp(expr).unwrap(),
       all![
-        dot_expr_base(var_ref_expr(ident("y"))),
+        dot_expr_base(any_var_ref_expr(ident("y"))),
         dot_expr_member(ident("z"))
       ]
     );
@@ -1223,7 +1223,7 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       call_expression(all![
         call_expr_target(all![
-          dot_expr_base(var_ref_expr(ident("y"))),
+          dot_expr_base(any_var_ref_expr(ident("y"))),
           dot_expr_member(ident("z"))
         ]),
         call_expr_args(is_empty())
@@ -1238,7 +1238,7 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       call_expression(all![
         call_expr_target(all![
-          dot_expr_base(var_ref_expr(ident("y"))),
+          dot_expr_base(any_var_ref_expr(ident("y"))),
           dot_expr_member(ident("z"))
         ]),
         call_expr_args(is_empty())
@@ -1253,7 +1253,7 @@ mod tests {
       parse_single_exp(expr).unwrap(),
       all![
         dot_expr_base(bin_exp(
-          var_ref_expr(ident("x")),
+          any_var_ref_expr(ident("x")),
           &BinaryOp::Add,
           lit_exp(integral("3"))
         )),
@@ -1271,7 +1271,7 @@ mod tests {
         dot_expr_base(call_expression(all![
           call_expr_target(all![
             dot_expr_base(all![
-              dot_expr_base(var_ref_expr(ident("a"))),
+              dot_expr_base(any_var_ref_expr(ident("a"))),
               dot_expr_member(ident("b"))
             ]),
             dot_expr_member(ident("c"))
@@ -1380,7 +1380,7 @@ mod tests {
   fn logical_not_expression() {
     expect_that!(
       parse_single_exp("!a").unwrap(),
-      logical_not_exp(var_ref_expr(ident("a"))),
+      logical_not_exp(any_var_ref_expr(ident("a"))),
     );
   }
 
@@ -1389,7 +1389,7 @@ mod tests {
     expect_that!(
       parse_single_exp("!a.b").unwrap(),
       logical_not_exp(all![
-        dot_expr_base(var_ref_expr(ident("a"))),
+        dot_expr_base(any_var_ref_expr(ident("a"))),
         dot_expr_member(ident("b")),
       ]),
     );
@@ -1400,7 +1400,7 @@ mod tests {
     expect_that!(
       parse_single_exp("!a.b()").unwrap(),
       logical_not_exp(call_expression(call_expr_target(all![
-        dot_expr_base(var_ref_expr(ident("a"))),
+        dot_expr_base(any_var_ref_expr(ident("a"))),
         dot_expr_member(ident("b")),
       ])))
     );
@@ -1411,9 +1411,9 @@ mod tests {
     expect_that!(
       parse_single_exp("!a && b").unwrap(),
       bin_exp(
-        logical_not_exp(var_ref_expr(ident("a"))),
+        logical_not_exp(any_var_ref_expr(ident("a"))),
         &BinaryOp::LogicalAnd,
-        var_ref_expr(ident("b")),
+        any_var_ref_expr(ident("b")),
       ),
     );
   }
@@ -1422,7 +1422,7 @@ mod tests {
   fn nested_logical_not_expression() {
     expect_that!(
       parse_single_exp("!!a").unwrap(),
-      logical_not_exp(logical_not_exp(var_ref_expr(ident("a")))),
+      logical_not_exp(logical_not_exp(any_var_ref_expr(ident("a")))),
     );
   }
 
@@ -1432,12 +1432,12 @@ mod tests {
       parse_single_exp("a && b && c").unwrap(),
       bin_exp(
         bin_exp(
-          var_ref_expr(ident("a")),
+          any_var_ref_expr(ident("a")),
           &BinaryOp::LogicalAnd,
-          var_ref_expr(ident("b")),
+          any_var_ref_expr(ident("b")),
         ),
         &BinaryOp::LogicalAnd,
-        var_ref_expr(ident("c"))
+        any_var_ref_expr(ident("c"))
       ),
     );
   }
@@ -1448,12 +1448,12 @@ mod tests {
       parse_single_exp("a || b || c").unwrap(),
       bin_exp(
         bin_exp(
-          var_ref_expr(ident("a")),
+          any_var_ref_expr(ident("a")),
           &BinaryOp::LogicalOr,
-          var_ref_expr(ident("b"))
+          any_var_ref_expr(ident("b"))
         ),
         &BinaryOp::LogicalOr,
-        var_ref_expr(ident("c"))
+        any_var_ref_expr(ident("c"))
       ),
     );
   }
@@ -1463,12 +1463,12 @@ mod tests {
     expect_that!(
       parse_single_exp("a || b && c").unwrap(),
       bin_exp(
-        var_ref_expr(ident("a")),
+        any_var_ref_expr(ident("a")),
         &BinaryOp::LogicalOr,
         bin_exp(
-          var_ref_expr(ident("b")),
+          any_var_ref_expr(ident("b")),
           &BinaryOp::LogicalAnd,
-          var_ref_expr(ident("c")),
+          any_var_ref_expr(ident("c")),
         ),
       ),
     );
@@ -1490,15 +1490,15 @@ mod tests {
       parse_single_exp("a < b && b < c").unwrap(),
       bin_exp(
         bin_exp(
-          var_ref_expr(ident("a")),
+          any_var_ref_expr(ident("a")),
           &BinaryOp::LessThan,
-          var_ref_expr(ident("b")),
+          any_var_ref_expr(ident("b")),
         ),
         &BinaryOp::LogicalAnd,
         bin_exp(
-          var_ref_expr(ident("b")),
+          any_var_ref_expr(ident("b")),
           &BinaryOp::LessThan,
-          var_ref_expr(ident("c")),
+          any_var_ref_expr(ident("c")),
         ),
       ),
     );
@@ -1533,7 +1533,7 @@ mod tests {
     expect_that!(
       ast,
       jang_file_with_fn(fn_body(block(elements_are![if_statement(
-        var_ref_expr(ident("x")),
+        any_var_ref_expr(ident("x")),
         block(is_empty())
       )])))
     );
@@ -1558,13 +1558,13 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![if_statement(
         bin_exp(
-          var_ref_expr(ident("x")),
+          any_var_ref_expr(ident("x")),
           &BinaryOp::Add,
           lit_exp(integral("3"))
         ),
         block(elements_are![
           let_stmt(ident("y"), lit_exp(integral("1"))),
-          ret_stmt(var_ref_expr(ident("z")))
+          ret_stmt(any_var_ref_expr(ident("z")))
         ])
       )])))
     );
@@ -1590,10 +1590,10 @@ mod tests {
       ast,
       jang_file_with_fn(fn_body(block(elements_are![if_else_statement(
         call_expression(all![
-          call_expr_target(var_ref_expr(ident("y"))),
+          call_expr_target(any_var_ref_expr(ident("y"))),
           call_expr_args(elements_are![lit_exp(integral("2"))])
         ]),
-        block(elements_are![ret_stmt(var_ref_expr(ident("z")))]),
+        block(elements_are![ret_stmt(any_var_ref_expr(ident("z")))]),
         block(elements_are![ret_stmt(lit_exp(integral("10")))])
       )])))
     );
@@ -1621,14 +1621,14 @@ mod tests {
     expect_that!(
       ast,
       jang_file_with_fn(fn_body(block(elements_are![if_else_if_statement(
-        var_ref_expr(ident("x")),
+        any_var_ref_expr(ident("x")),
         block(elements_are![ret_stmt(lit_exp(integral("1")))]),
         if_else_clause(
-          var_ref_expr(ident("y")),
+          any_var_ref_expr(ident("y")),
           block(elements_are![ret_stmt(lit_exp(integral("2")))]),
           block(elements_are![
             let_stmt(ident("a"), lit_exp(integral("3"))),
-            ret_stmt(var_ref_expr(ident("a")))
+            ret_stmt(any_var_ref_expr(ident("a")))
           ])
         )
       )])))
@@ -1674,7 +1674,7 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![loop_statement(
         elements_are![
           let_stmt(ident("x"), lit_exp(integral("3"))),
-          call_statement(call_expr_target(var_ref_expr(ident("super_fn"))))
+          call_statement(call_expr_target(any_var_ref_expr(ident("super_fn"))))
         ]
       )])))
     );
@@ -1720,13 +1720,13 @@ mod tests {
         ident("x"),
         bin_exp(
           bin_exp(
-            var_ref_expr(ident("y")),
+            any_var_ref_expr(ident("y")),
             &BinaryOp::Add,
-            var_ref_expr(ident("z"))
+            any_var_ref_expr(ident("z"))
           ),
           &BinaryOp::Sub,
           bin_exp(
-            var_ref_expr(ident("w")),
+            any_var_ref_expr(ident("w")),
             &BinaryOp::Mul,
             lit_exp(integral("3"))
           )
@@ -1752,9 +1752,9 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![let_stmt(
         ident("x"),
         bin_exp(
-          var_ref_expr(ident("y")),
+          any_var_ref_expr(ident("y")),
           &BinaryOp::Add,
-          var_ref_expr(ident("z"))
+          any_var_ref_expr(ident("z"))
         )
       )])))
     );
@@ -1788,6 +1788,39 @@ mod tests {
         fn_name(ident("b")),
         fn_name(ident("c"))
       ])
+    );
+  }
+
+  #[gtest]
+  fn local_vs_global_resolution() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name() {
+          let x = y
+          let y = x
+          let y = y
+          {
+            let z = y
+          }
+          let w = z
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![
+        let_stmt(ident("x"), global_var_ref_expr(ident("y"))),
+        let_stmt(ident("y"), local_var_ref_expr(ident("x"))),
+        let_stmt(ident("y"), local_var_ref_expr(ident("y"))),
+        block_statement(elements_are![let_stmt(
+          ident("z"),
+          local_var_ref_expr(ident("y"))
+        )]),
+        let_stmt(ident("w"), global_var_ref_expr(ident("z"))),
+      ])))
     );
   }
 }
