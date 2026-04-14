@@ -105,19 +105,19 @@ impl VarDeclMap {
   /// be used before they are declared.
   pub fn var_ref(&mut self, ident: Ident, id_builder: &mut IdBuilder) -> VarRef {
     if let Some(id) = self.lookup_var_ref(&ident) {
-      VarRef::from_id(id, ident)
-    } else {
-      debug_assert!(self.lookup_var_ref(&ident).is_none());
-      let id = id_builder.new_global_id();
-      self.globals.insert(
-        ident.clone(),
-        GlobalDeclInfo {
-          id,
-          state: GlobalDeclState::Unresolved,
-        },
-      );
-
-      GlobalDecl::new(id, ident).into()
+      return VarRef::from_id(id, ident);
     }
+
+    debug_assert!(self.lookup_var_ref(&ident).is_none());
+    let id = id_builder.new_global_id();
+    self.globals.insert(
+      ident.clone(),
+      GlobalDeclInfo {
+        id,
+        state: GlobalDeclState::Unresolved,
+      },
+    );
+
+    GlobalDecl::new(id, ident).into()
   }
 }
