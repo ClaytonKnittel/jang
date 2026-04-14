@@ -514,19 +514,27 @@ mod tests {
       error::InterpreterError,
     },
     parser::{
-      ast::{binary_expression::BinaryOp, function_decl::FunctionDecl, unary_experssion::UnaryOp},
+      ast::{
+        binary_expression::BinaryOp, function_decl::FunctionDecl, id::IdTable,
+        unary_experssion::UnaryOp,
+      },
       grammar::testing::lex_and_parse_jang_file,
       token::{ident::matchers::ident, literal::matchers::integral},
     },
   };
   use googletest::prelude::*;
 
-  fn parse_fn_decl(text: impl IntoIterator<Item = char>) -> JangResult<FunctionDecl> {
-    lex_and_parse_jang_file(text)?
+  fn parse_fn_decl(text: impl IntoIterator<Item = char>) -> JangResult<(FunctionDecl, IdTable)> {
+    let ast = lex_and_parse_jang_file(text)?;
+
+    let function_decl = ast
+      .file()
       .function_decls()
       .first()
       .cloned()
-      .ok_or_else(|| InterpreterError::generic_err("no function decls in AST").into())
+      .ok_or_else(|| InterpreterError::generic_err("no function decls in AST"))?;
+
+    Ok((function_decl, ast.id_table()))
   }
 
   #[gtest]

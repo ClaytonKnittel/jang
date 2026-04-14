@@ -1,13 +1,11 @@
 use crate::parser::{
   ast::id::{
-    AstIdImpl,
+    AstIdImpl, IdTable,
     def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
-    node_map::{NodeMap, NodeMapBuilder},
+    node_map::NodeMapBuilder,
   },
   token::ident::Ident,
 };
-
-pub type IdTable = NodeMap<(), Ident, Ident>;
 
 struct IdGenerator<ID, T> {
   cur_id: ID,

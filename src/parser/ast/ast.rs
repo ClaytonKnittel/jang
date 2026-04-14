@@ -1,4 +1,4 @@
-use crate::parser::ast::{id::builder::IdTable, jang_file::JangFile};
+use crate::parser::ast::{id::IdTable, jang_file::JangFile};
 
 #[derive(Debug)]
 pub struct JangAst {
@@ -13,5 +13,9 @@ impl JangAst {
 
   pub fn file(&self) -> &JangFile {
     &self.file
+  }
+
+  pub fn id_table(&self) -> &IdTable {
+    &self.id_table
   }
 }
