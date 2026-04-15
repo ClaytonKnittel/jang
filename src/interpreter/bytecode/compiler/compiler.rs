@@ -24,12 +24,14 @@ use crate::{
       if_statement::{ElseClause, IfStatement},
       literal_expression::LiteralExpression,
       loop_statement::LoopStatement,
-      name_ref_expression::NameRefExpression,
       rebind_statement::RebindStatement,
       ret_statement::RetStatement,
       statement::Statement,
       unary_experssion::UnaryExpression,
-      var_decl::{GlobalDecl, LocalDecl},
+      var::{
+        var_decl::{GlobalDecl, LocalDecl},
+        var_ref::VarRef,
+      },
     },
     token::{ident::Ident, literal::Literal},
   },
@@ -184,28 +186,35 @@ impl<'a> OpenCursor<'a> {
     self.emit_instr(JitInstruction::StoreLocal(local_id))
   }
 
-  fn emit_local_rebind(self, ref_expr: &'a NameRefExpression) -> InterpreterResult<Self> {
+  fn emit_local_rebind(self, var: &'a LocalDecl) -> InterpreterResult<Self> {
     let info = self
       .lexical_scope
-      .get_binding(ref_expr.name())
-      .ok_or_else(|| InterpreterError::jit_err(format!("Unknown variable {ref_expr}")))?;
+      .get_binding(var.name())
+      .ok_or_else(|| InterpreterError::jit_err(format!("Unknown variable {var}")))?;
     if !matches!(info.mutability(), Mutability::Mutable) {
       return Err(InterpreterError::jit_err(format!(
-        "Cannot rebind immutable variable {ref_expr}"
+        "Cannot rebind immutable variable {var}"
       )));
     }
     let local_id = info.local_id();
     Ok(self.emit_instr(JitInstruction::StoreLocal(local_id)))
   }
 
-  fn emit_local_load(self, name: &'a Ident) -> Self {
-    match self.lexical_scope.get_binding(name) {
-      Some(info) => {
-        let local_id = info.local_id();
-        self.emit_instr(JitInstruction::LoadLocal(local_id))
-      }
-      None => self.emit_instr(JitInstruction::LoadGlobal(name)),
-    }
+  fn emit_load(self, var: &'a VarRef) -> Self {
+    let instruction = match var {
+      VarRef::Local(local_decl) => JitInstruction::LoadLocal(
+        self
+          .lexical_scope
+          .get_binding(local_decl.name())
+          .expect(
+            "Local variables will have been assigned a local ID by this point. \
+             Unresolved references will be considered globals by the parser",
+          )
+          .local_id(),
+      ),
+      VarRef::Global(global_decl) => JitInstruction::LoadGlobal(global_decl.name()),
+    };
+    self.emit_instr(instruction)
   }
 
   fn emit_literal_load(self, literal: &'a Literal) -> Self {
@@ -240,9 +249,14 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_rebind_statement(self, statement: &'a RebindStatement) -> InterpreterResult<Self> {
-    self
-      .compile_expr(statement.expr())?
-      .emit_local_rebind(statement.var())
+    match statement.var() {
+      VarRef::Global(global_decl) => Err(InterpreterError::jit_err(format!(
+        "Cannot rebind globals yet: {global_decl}"
+      ))),
+      VarRef::Local(local_decl) => self
+        .compile_expr(statement.expr())?
+        .emit_local_rebind(local_decl),
+    }
   }
 
   fn compile_lexical_block(self, block: &'a Block) -> InterpreterResult<Cursor<'a>> {
@@ -305,7 +319,7 @@ impl<'a> OpenCursor<'a> {
   fn compile_expr(self, expr: &'a Expression) -> InterpreterResult<Self> {
     match expr.variant() {
       ExpressionVariant::Literal(expr) => self.compile_literal_expression(expr),
-      ExpressionVariant::NameRef(expr) => self.compile_name_ref_expression(expr),
+      ExpressionVariant::VarRef(expr) => self.compile_var_ref_expression(expr),
       ExpressionVariant::BinaryExpression(expr) => self.compile_binary_expression(expr),
       ExpressionVariant::UnaryExpression(expr) => self.compile_unary_expression(expr),
       ExpressionVariant::CallExpression(expr) => self.compile_call_expression(expr),
@@ -315,8 +329,8 @@ impl<'a> OpenCursor<'a> {
     }
   }
 
-  fn compile_name_ref_expression(self, expr: &'a NameRefExpression) -> InterpreterResult<Self> {
-    Ok(self.emit_local_load(expr.name()))
+  fn compile_var_ref_expression(self, expr: &'a VarRef) -> InterpreterResult<Self> {
+    Ok(self.emit_load(expr))
   }
 
   fn compile_literal_expression(self, expr: &'a LiteralExpression) -> InterpreterResult<Self> {
@@ -354,8 +368,8 @@ impl<'a> OpenCursor<'a> {
   ) -> InterpreterResult<ClosedCursor<'a>> {
     // Tail calls for direct recursion.
     if let ExpressionVariant::CallExpression(call) = ret_statement.expr().variant()
-      && let ExpressionVariant::NameRef(ref_expr) = call.target().variant()
-      && ref_expr.name() == self.fn_builder.fn_name
+      && let ExpressionVariant::VarRef(var_ref) = call.target().variant()
+      && var_ref.name() == self.fn_builder.fn_name
     {
       let entrypoint = self.fn_builder.entrypoint;
       return self

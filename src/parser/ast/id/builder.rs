@@ -1,69 +1,48 @@
-use crate::parser::ast::id::def::{
-  AstExpressionId, AstGlobalDeclId, AstLocalDeclId, AstNameRefExpressionId,
+use crate::parser::ast::id::{
+  AstIdImpl,
+  def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
 };
 
-macro_rules! define_ast_id_gen {
-  (
-    name: $ids_name:ident,
-    context: $ctx_name:ident,
+struct IdGenerator<ID> {
+  cur_id: ID,
+}
 
-    $($(#[$meta:meta])* $id_type:ident => $field:ident, $method:ident;)*
-  ) => {
-    pub struct $ids_name {
-      $($field: $id_type,)*
-    }
+impl<ID: AstIdImpl> IdGenerator<ID> {
+  fn next_id(&mut self) -> ID {
+    let id = self.cur_id;
+    self.cur_id = id.next_id();
+    id
+  }
+}
 
-    impl Default for $ids_name {
-      fn default() -> Self {
-        Self {
-          $($field: $id_type(0),)*
-        }
-      }
+impl<ID: AstIdImpl> Default for IdGenerator<ID> {
+  fn default() -> Self {
+    Self {
+      cur_id: ID::default(),
     }
-
-    impl $ids_name {
-      $(
-        fn $method(&mut self) -> $id_type {
-          let id = self.$field;
-          self.$field.0 += 1;
-          id
-        }
-      )*
-    }
-
-    impl $ctx_name {
-      $(
-        pub fn $method(&mut self) -> $id_type {
-          self.ids.$method()
-        }
-      )*
-    }
-  };
+  }
 }
 
 #[derive(Default)]
 pub struct IdBuilder {
-  ids: AstIds,
+  expressions: IdGenerator<AstExpressionId>,
+  globals: IdGenerator<AstGlobalDeclId>,
+  locals: IdGenerator<AstLocalDeclId>,
 }
 
-define_ast_id_gen!(
-  name: AstIds,
-  context: IdBuilder,
+impl IdBuilder {
+  pub fn new_expr_id(&mut self) -> AstExpressionId {
+    self.expressions.next_id()
+  }
 
-  // ID to describe an expression in the AST.
-  AstExpressionId => expr_id, new_expr_id;
+  pub fn new_global_id(&mut self) -> AstGlobalDeclId {
+    self.globals.next_id()
+  }
 
-  // ID for local name declarations in a function parameter
-  // or a local binding.
-  AstLocalDeclId => local_decl_id, new_local_decl_id;
-
-  // ID for global name declarations.
-  AstGlobalDeclId => gbl_decl_id, new_global_decl_id;
-
-  // ID for a name occuring in an expression
-  // or on the LHS of a rebind.
-  AstNameRefExpressionId => name_ref_id, new_name_ref_id;
-);
+  pub fn new_local_id(&mut self) -> AstLocalDeclId {
+    self.locals.next_id()
+  }
+}
 
 #[cfg(test)]
 mod tests {

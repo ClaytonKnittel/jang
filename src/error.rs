@@ -8,32 +8,45 @@ use cknittel_util::builder::error::BuilderError;
 use parser_generator::{ParserUserError, error::ParserError};
 
 use crate::{
-  interpreter::error::InterpreterError, parser::token::JangToken, source_location::SourceLocation,
+  interpreter::error::InterpreterError,
+  parser::token::{JangToken, ident::Ident},
+  source_location::SourceLocation,
 };
 
 #[derive(Clone)]
-pub struct ParseError {
-  message: String,
-  source_location: SourceLocation,
+pub enum ParseErrorKind {
+  UnexpectedSymbol { symbol: char },
+  DuplicateIdent { ident: String },
 }
 
-impl ParseError {
-  fn new(message: impl Into<String>, source_location: SourceLocation) -> Self {
-    Self {
-      message: message.into(),
-      source_location,
+impl Display for ParseErrorKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::UnexpectedSymbol { symbol } => {
+        write!(f, "Unexpected symbol: '{symbol}'")
+      }
+      Self::DuplicateIdent { ident } => {
+        write!(f, "Duplicate identifier: \"{ident}\"")
+      }
     }
   }
 }
 
+impl Debug for ParseErrorKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{self}")
+  }
+}
+
+#[derive(Clone)]
+pub struct ParseError {
+  kind: ParseErrorKind,
+  source_location: SourceLocation,
+}
+
 impl Display for ParseError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "Parse error: {} (pos: {})",
-      self.message,
-      self.source_location.pos()
-    )
+    write!(f, "{} (pos: {})", self.kind, self.source_location.pos())
   }
 }
 
@@ -53,8 +66,20 @@ pub enum JangError {
 }
 
 impl JangError {
-  pub fn parse_error(message: impl Into<String>, source_location: SourceLocation) -> Self {
-    Self::Parse(ParseError::new(message, source_location))
+  pub fn unexpected_symbol(symbol: char, source_location: SourceLocation) -> Self {
+    Self::Parse(ParseError {
+      kind: ParseErrorKind::UnexpectedSymbol { symbol },
+      source_location,
+    })
+  }
+
+  pub fn duplicate_ident(ident: &Ident) -> Self {
+    Self::Parse(ParseError {
+      kind: ParseErrorKind::DuplicateIdent {
+        ident: ident.name().to_owned(),
+      },
+      source_location: SourceLocation::new(0),
+    })
   }
 }
 
