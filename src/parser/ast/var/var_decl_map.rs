@@ -108,7 +108,6 @@ impl VarDeclMap {
       return VarRef::from_id(id, ident);
     }
 
-    debug_assert!(self.lookup_var_ref(&ident).is_none());
     let id = id_builder.new_global_id();
     self.globals.insert(
       ident.clone(),
