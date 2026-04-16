@@ -353,23 +353,19 @@ pub_grammar!(
   <div> => Operator(Operator { op: Op::Slash });
   <modulo> => Operator(Operator { op: Op::Percent });
   <greater_than> => Operator(Operator { op: Op::GreaterThan });
-  <greater_than_equal> => <greater_than> Joint <eq>;
+  <greater_than_equal> => Operator(Operator { op: Op::GreaterOrEqual });
   <less_than> => Operator(Operator { op: Op::LessThan });
-  <less_than_equal> => <less_than> Joint <eq>;
-  <double_equal> => <eq> Joint <eq>;
-  <not_equal> => <bang> Joint <eq>;
+  <less_than_equal> => Operator(Operator { op: Op::LessOrEqual });
+  <double_equal> => Operator(Operator { op: Op::DoubleEqual });
+  <not_equal> => Operator(Operator { op: Op::NotEqual });
   <bang> => Operator(Operator { op: Op::Bang });
   <colon> => Operator(Operator { op: Op::Colon });
   <comma> => Operator(Operator { op: Op::Comma });
   <dot> => Operator(Operator { op: Op::Dot });
   <bar> => Operator(Operator { op: Op::Bar });
-  <ampersand> => Operator(Operator { op: Op::Ampersand });
-  <logical_and> => <ampersand> Joint <ampersand>;
-  <logical_or> => <bar> Joint <bar>;
-  <right_arrow> =>
-      Operator(Operator { op: Op::Dash })
-      Joint
-      Operator(Operator { op: Op::GreaterThan });
+  <logical_and> => Operator(Operator { op: Op::LogicalAnd });
+  <logical_or> => Operator(Operator { op: Op::LogicalOr });
+  <right_arrow> => Operator(Operator { op: Op::RightArrow });
 
   <literal>: Literal => Literal(..);
   <ident>: Ident => Ident(..);
@@ -472,7 +468,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 352);
+    expect_eq!(JangGrammar::TABLE_SIZE, 334);
   }
 
   #[gtest]

@@ -1,4 +1,6 @@
-use std::fmt::Display;
+use std::{fmt::Display, hint::unreachable_unchecked};
+
+use cknittel_util::peekable_stream::ItemProxy;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
@@ -38,86 +40,139 @@ pub enum Op {
   Bang,
   /// '&'
   Ampersand,
+
+  // Multi-token operators:
+  /// ">="
+  GreaterOrEqual,
+  /// "<="
+  LessOrEqual,
+  /// "=="
+  DoubleEqual,
+  /// "!="
+  NotEqual,
+  /// "&&"
+  LogicalAnd,
+  /// "||"
+  LogicalOr,
+  /// "->"
+  RightArrow,
 }
 
 impl Op {
-  pub fn from_char(ch: char) -> Option<Self> {
+  pub fn from_char_with_peek<I: Iterator<Item = Result<char, E>>, E>(
+    ch: char,
+    peek: Option<ItemProxy<'_, I>>,
+  ) -> Self {
+    macro_rules! match_next {
+      (_ => $default:expr) => {
+        Some($default)
+      };
+
+      (
+        $($next_char:literal => $op:expr,)+
+        _ => $default:expr
+      ) => {
+        match peek {
+          $(Some(peek) => {
+            match *peek {
+              Ok($next_char) => {
+                unsafe { peek.take().unwrap_unchecked() };
+                $op
+              }
+              _ => $default,
+            }
+          })+
+          _ => $default
+        }
+      };
+    }
+
     match ch {
-      '=' => Some(Self::Equal),
-      ',' => Some(Self::Comma),
-      '(' => Some(Self::OpenParen),
-      ')' => Some(Self::CloseParen),
-      '{' => Some(Self::OpenBracket),
-      '}' => Some(Self::CloseBracket),
-      '-' => Some(Self::Dash),
-      '<' => Some(Self::LessThan),
-      '>' => Some(Self::GreaterThan),
-      ':' => Some(Self::Colon),
-      '.' => Some(Self::Dot),
-      '+' => Some(Self::Plus),
-      '*' => Some(Self::Star),
-      '/' => Some(Self::Slash),
-      '%' => Some(Self::Percent),
-      '|' => Some(Self::Bar),
-      '!' => Some(Self::Bang),
-      '&' => Some(Self::Ampersand),
-      _ => None,
+      '=' => match_next!(
+        '=' => Self::DoubleEqual,
+        _ => Self::Equal
+      ),
+      ',' => Self::Comma,
+      '(' => Self::OpenParen,
+      ')' => Self::CloseParen,
+      '{' => Self::OpenBracket,
+      '}' => Self::CloseBracket,
+      '-' => match_next!(
+        '>' => Self::RightArrow,
+        _ => Self::Dash
+      ),
+      '<' => match_next!(
+        '=' => Self::LessOrEqual,
+        _ => Self::LessThan
+      ),
+      '>' => match_next!(
+        '=' => Self::GreaterOrEqual,
+        _ => Self::GreaterThan
+      ),
+      ':' => Self::Colon,
+      '.' => Self::Dot,
+      '+' => Self::Plus,
+      '*' => Self::Star,
+      '/' => Self::Slash,
+      '%' => Self::Percent,
+      '|' => match_next!(
+        '|' => Self::LogicalOr,
+        _ => Self::Bar
+      ),
+      '!' => match_next!(
+        '=' => Self::NotEqual,
+        _ => Self::Bang
+      ),
+      '&' => match_next!(
+        '&' => Self::LogicalAnd,
+        _ => Self::Ampersand
+      ),
+      _ => unsafe { unreachable_unchecked() },
     }
   }
 
-  fn to_char(self) -> char {
-    match self {
-      Self::Equal => '=',
-      Self::Comma => ',',
-      Self::OpenParen => '(',
-      Self::CloseParen => ')',
-      Self::OpenBracket => '{',
-      Self::CloseBracket => '}',
-      Self::Dash => '-',
-      Self::LessThan => '<',
-      Self::GreaterThan => '>',
-      Self::Colon => ':',
-      Self::Dot => '.',
-      Self::Plus => '+',
-      Self::Star => '*',
-      Self::Slash => '/',
-      Self::Percent => '%',
-      Self::Bar => '|',
-      Self::Bang => '!',
-      Self::Ampersand => '&',
-    }
-  }
-
-  /// Returns true if this operator can join with `other_op`. This should
-  /// always return false for non-operator `other_op`. Joint operators are
-  /// treated differently from pairs of separated ones (e.g. "==" vs. "= =").
+  /// Returns true if this operator can join the next character.
   pub fn can_join(&self, other_op: char) -> bool {
     match self {
-      Self::Dash => other_op == '>',
       Self::CloseParen => other_op == '(',
-      Self::Bang => other_op == '=',
-      Self::LessThan => other_op == '=',
-      Self::GreaterThan => other_op == '=',
-      Self::Equal => other_op == '=',
-      Self::Ampersand => other_op == '&',
-      Self::Bar => other_op == '|',
-      Self::Comma
-      | Self::OpenParen
-      | Self::OpenBracket
-      | Self::CloseBracket
-      | Self::Colon
-      | Self::Dot
-      | Self::Plus
-      | Self::Star
-      | Self::Slash
-      | Self::Percent => false,
+      _ => false,
     }
   }
 }
 
 impl Display for Op {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.to_char())
+    write!(
+      f,
+      "{}",
+      match self {
+        Self::Equal => "=",
+        Self::Comma => ",",
+        Self::OpenParen => "(",
+        Self::CloseParen => ")",
+        Self::OpenBracket => "{",
+        Self::CloseBracket => "}",
+        Self::Dash => "-",
+        Self::LessThan => "<",
+        Self::GreaterThan => ">",
+        Self::Colon => ":",
+        Self::Dot => ".",
+        Self::Plus => "+",
+        Self::Star => "*",
+        Self::Slash => "/",
+        Self::Percent => "%",
+        Self::Bar => "|",
+        Self::Bang => "!",
+        Self::Ampersand => "&",
+        Self::GreaterOrEqual => ">=",
+        Self::LessOrEqual => "<=",
+        Self::DoubleEqual => "==",
+        Self::NotEqual => "!=",
+        Self::LogicalAnd => "&&",
+        Self::LogicalOr => "||",
+        Self::RightArrow => "->",
+      }
+    )
   }
 }
 
