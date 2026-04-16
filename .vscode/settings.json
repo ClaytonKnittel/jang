@@ -3,5 +3,11 @@
     "./Cargo.toml",
     "./fuzz/Cargo.toml"
   ],
-  "rust-analyzer.check.command": "clippy"
+  "rust-analyzer.check.command": "clippy",
+  "editor.rulers": [
+    {
+      "column": 100,
+      "color": "#4a4a4a"
+    }
+  ]
 }

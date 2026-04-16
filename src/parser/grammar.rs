@@ -90,7 +90,10 @@ pub_grammar!(
   <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_variant> {
     EnumTypeDeclBuilder::default().add_variants(#enum_type_decl_variant)
   };
-  <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_builder> <enum_type_decl_variant> {
+  <enum_type_decl_builder>: EnumTypeDeclBuilder =>
+    <enum_type_decl_builder>
+    <enum_type_decl_variant>
+  {
     #enum_type_decl_builder.add_variants(#enum_type_decl_variant)
   };
 
@@ -138,7 +141,21 @@ pub_grammar!(
     Some(#type_expr)
   };
 
-  <type_expr>: TypeExpression => <ident> { TypeExpression(#ident) };
+  <type_expr>: TypeExpression => <open_paren> <close_paren> { TypeExpression::new_unit() };
+  <type_expr>: TypeExpression => <ident> { TypeExpression::new_named(#ident) };
+  <type_expr>: TypeExpression =>
+    <open_paren> <type_expr_list> <close_paren>
+    <thiqq_right_arrow>
+    <open_bracket> <close_bracket>
+  {
+    TypeExpression::new_named(#ident)
+  };
+
+  <type_expr_list>: TypeExpressionList => <type_expr_list_builder>;
+
+  <type_expr_list_builder>: TypeExpressionListBuilder => ! {
+    TypeExpressionListBuilder::default()
+  };
 
   <block_scope>: Block => <start_block_scope> <statement_list> <end_block_scope> {
     #statement_list
@@ -366,6 +383,10 @@ pub_grammar!(
   <logical_and> => Operator(Operator { op: Op::LogicalAnd });
   <logical_or> => Operator(Operator { op: Op::LogicalOr });
   <right_arrow> => Operator(Operator { op: Op::RightArrow });
+  <thiqq_right_arrow> =>
+      Operator(Operator { op: Op::Equal })
+      Joint
+      Operator(Operator { op: Op::GreaterThan });
 
   <literal>: Literal => Literal(..);
   <ident>: Ident => Ident(..);
@@ -427,7 +448,7 @@ mod tests {
         statement::{Statement, matchers::break_statement},
         structured_type_decl::matchers::type_field,
         type_decl::matchers::{enum_type, structured_type},
-        type_expr::matchers::type_expr_name,
+        type_expr::matchers::named_type_expr,
         unary_experssion::matchers::logical_not_exp,
         var::var_ref::matchers::{any_var_ref_expr, global_var_ref_expr, local_var_ref_expr},
       },
@@ -486,7 +507,7 @@ mod tests {
     expect_that!(ast, jang_file_with_fn(fn_name(ident("function_name"))));
     expect_that!(
       ast,
-      jang_file_with_fn(fn_return_type(type_expr_name(ident("i32"))))
+      jang_file_with_fn(fn_return_type(named_type_expr(ident("i32"))))
     );
     expect_that!(
       ast,
@@ -545,7 +566,7 @@ mod tests {
       ast,
       jang_file_with_type(structured_type(
         ident("X"),
-        elements_are![type_field(ident("field1"), type_expr_name(ident("i32")))]
+        elements_are![type_field(ident("field1"), named_type_expr(ident("i32")))]
       ))
     );
   }
@@ -569,9 +590,9 @@ mod tests {
       jang_file_with_type(structured_type(
         ident("X"),
         unordered_elements_are![
-          type_field(ident("a"), type_expr_name(ident("i32"))),
-          type_field(ident("b"), type_expr_name(ident("String"))),
-          type_field(ident("c"), type_expr_name(ident("MyCustomType"))),
+          type_field(ident("a"), named_type_expr(ident("i32"))),
+          type_field(ident("b"), named_type_expr(ident("String"))),
+          type_field(ident("c"), named_type_expr(ident("MyCustomType"))),
         ]
       ))
     );
@@ -636,7 +657,7 @@ mod tests {
           ident("V1"),
           enum_structured_type(elements_are![type_field(
             ident("field1"),
-            type_expr_name(ident("i32"))
+            named_type_expr(ident("i32"))
           )])
         )]
       ))
@@ -668,8 +689,8 @@ mod tests {
           enum_variant_with(
             ident("V2"),
             enum_structured_type(elements_are![
-              type_field(ident("f1"), type_expr_name(ident("i64"))),
-              type_field(ident("f2"), type_expr_name(ident("String"))),
+              type_field(ident("f1"), named_type_expr(ident("i64"))),
+              type_field(ident("f2"), named_type_expr(ident("String"))),
             ])
           ),
           enum_variant_with(ident("V3"), enum_ref_type(ident("String"))),
@@ -905,7 +926,7 @@ mod tests {
       ast,
       jang_file_with_fn(fn_parameters(elements_are![all!(
         fn_parameter_name(ident("a")),
-        fn_parameter_type(type_expr_name(ident("i32")))
+        fn_parameter_type(named_type_expr(ident("i32")))
       )]))
     );
   }

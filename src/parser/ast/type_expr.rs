@@ -1,22 +1,103 @@
 use std::fmt::Display;
 
+use cknittel_util::builder::Builder;
+use itertools::Itertools;
+
 use crate::parser::token::ident::Ident;
 
+#[derive(Clone, Debug, Builder)]
+pub struct TypeExpressionList {
+  #[vec]
+  expressions: Vec<TypeExpression>,
+}
+
+impl TypeExpressionList {
+  pub fn expressions(&self) -> &[TypeExpression] {
+    &self.expressions
+  }
+}
+
+impl Display for TypeExpressionList {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{}",
+      self
+        .expressions()
+        .iter()
+        .map(|arg| format!("{arg}"))
+        .join(","),
+    )
+  }
+}
+
 #[derive(Clone, Debug)]
-pub struct TypeExpression(pub Ident);
+struct InlineFn {
+  args: TypeExpressionList,
+  return_type: Box<TypeExpression>,
+}
+
+impl Display for InlineFn {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "({}) => {}", self.args, self.return_type)
+  }
+}
+
+#[derive(Clone, Debug)]
+enum TypeExpressionVariant {
+  Unit,
+  Named(Ident),
+  InlineFn(InlineFn),
+}
+
+impl Display for TypeExpressionVariant {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::Unit => write!(f, "()"),
+      Self::Named(ident) => write!(f, "{ident}"),
+      Self::InlineFn(inline_fn) => write!(f, "{inline_fn}"),
+    }
+  }
+}
+
+#[derive(Clone, Debug)]
+pub struct TypeExpression {
+  variant: TypeExpressionVariant,
+}
+
+impl TypeExpression {
+  pub fn new_unit() -> Self {
+    Self {
+      variant: TypeExpressionVariant::Unit,
+    }
+  }
+
+  pub fn new_named(ident: Ident) -> Self {
+    Self {
+      variant: TypeExpressionVariant::Named(ident),
+    }
+  }
+}
 
 impl Display for TypeExpression {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.0)
+    write!(f, "{}", self.variant)
   }
 }
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::{ast::type_expr::TypeExpression, token::ident::Ident};
+  use crate::parser::{
+    ast::type_expr::{TypeExpression, TypeExpressionVariant},
+    token::ident::Ident,
+  };
   use googletest::prelude::{Matcher, pat};
 
-  pub fn type_expr_name<'a>(expected: impl Matcher<&'a Ident>) -> impl Matcher<&'a TypeExpression> {
-    pat!(TypeExpression(expected))
+  pub fn named_type_expr<'a>(
+    expected: impl Matcher<&'a Ident>,
+  ) -> impl Matcher<&'a TypeExpression> {
+    pat!(TypeExpression {
+      variant: pat!(TypeExpressionVariant::Named(expected))
+    })
   }
 }
