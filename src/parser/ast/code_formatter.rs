@@ -175,6 +175,16 @@ mod tests {
   }
 
   #[gtest]
+  fn roundtrip_empty_fn_with_fn_return_type_with_args() -> Result<()> {
+    let code = r#"
+      fn function_name(): (i32) -> i64 {
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
   fn roundtrip_fn_with_args() -> Result<()> {
     let code = r#"
       fn function_name(x: i32, y: f32) {

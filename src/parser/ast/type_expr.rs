@@ -30,7 +30,7 @@ impl Display for TypeExpressionList {
     } else {
       write!(
         f,
-        "{}",
+        "({})",
         self
           .expressions()
           .iter()
