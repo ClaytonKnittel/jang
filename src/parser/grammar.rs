@@ -118,14 +118,14 @@ pub_grammar!(
       Joint
       <start_function_scope>
       <function_params>
-      <function_ret_type>
+      <maybe_type_annotation>
       <block_scope>
       <end_function_scope>
   {
     FunctionDecl::new(
       #ctx.new_global_decl(#ident)?,
       #function_params,
-      #function_ret_type,
+      #maybe_type_annotation,
       #block_scope
     )
   };
@@ -137,8 +137,8 @@ pub_grammar!(
     #ctx.exit_block_scope();
   };
 
-  <function_ret_type>: Option<TypeExpression> => ! { None };
-  <function_ret_type>: Option<TypeExpression> => <colon> <type_expr> {
+  <maybe_type_annotation>: Option<TypeExpression> => ! { None };
+  <maybe_type_annotation>: Option<TypeExpression> => <colon> <type_expr> {
     Some(#type_expr)
   };
 
@@ -208,12 +208,16 @@ pub_grammar!(
     Statement::Break
   };
 
-  <let_binding>: BindStatement => Keyword(Keyword::Let) <ident> <eq> <expr> {
-    BindStatement::new_let(#ctx.new_local_decl(#ident), #expr)
+  <let_binding>: BindStatement =>
+    Keyword(Keyword::Let) <ident> <maybe_type_annotation> <eq> <expr>
+  {
+    BindStatement::new_let(#ctx.new_local_decl(#ident), #maybe_type_annotation, #expr)
   };
 
-  <mut_binding>: BindStatement => Keyword(Keyword::Mut) <ident> <eq> <expr> {
-    BindStatement::new_mut(#ctx.new_local_decl(#ident), #expr)
+  <mut_binding>: BindStatement =>
+    Keyword(Keyword::Mut) <ident> <maybe_type_annotation> <eq> <expr>
+  {
+    BindStatement::new_mut(#ctx.new_local_decl(#ident), #maybe_type_annotation, #expr)
   };
 
   <rebind>: RebindStatement => <ident> <eq> <expr> {
@@ -440,7 +444,7 @@ mod tests {
     parser::{
       ast::{
         binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
-        bind_statement::matchers::{let_stmt, mut_stmt},
+        bind_statement::matchers::{let_stmt, let_stmt_with_type, mut_stmt, mut_stmt_with_type},
         block::matchers::{block, block_statement},
         call_expression::matchers::{
           call_expr_args, call_expr_target, call_expression, call_statement,
@@ -512,7 +516,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 420);
+    expect_eq!(JangGrammar::TABLE_SIZE, 443);
   }
 
   #[gtest]
@@ -974,6 +978,28 @@ mod tests {
   }
 
   #[gtest]
+  fn let_binding_with_type() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name() {
+          let x: i32 = 123
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt_with_type(
+        ident("x"),
+        primitive_type_expr(&PrimitiveType::I32),
+        lit_exp(integral("123"))
+      )])))
+    );
+  }
+
+  #[gtest]
   fn mut_binding() {
     let ast = lex_and_parse_jang_file(
       r#"
@@ -990,6 +1016,28 @@ mod tests {
       jang_file_with_fn(fn_body(block(elements_are![mut_stmt(
         ident("x"),
         lit_exp(integral("123"))
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn mut_binding_with_type() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name(x: i32) {
+          mut x: bool = 1 < 0
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![mut_stmt_with_type(
+        ident("x"),
+        primitive_type_expr(&PrimitiveType::Bool),
+        anything()
       )])))
     );
   }
