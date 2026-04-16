@@ -635,7 +635,7 @@ mod tests {
       ast,
       jang_file_with_type(structured_type(
         ident("X"),
-        unordered_elements_are![
+        elements_are![
           type_field(ident("a"), named_type_expr(ident("i32"))),
           type_field(ident("b"), named_type_expr(ident("String"))),
           type_field(ident("c"), fn_type_expr(is_empty(), unit_type_expr())),
@@ -660,10 +660,47 @@ mod tests {
       ast,
       jang_file_with_type(structured_type(
         ident("X"),
-        unordered_elements_are![type_field(
+        elements_are![type_field(
           ident("f"),
           fn_type_expr(is_empty(), fn_type_expr(is_empty(), unit_type_expr()))
         ),]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn fn_type_expr_with_params() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        type X = {
+          f: (i32) -> i64
+          g: (i32, i64) -> String
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(structured_type(
+        ident("X"),
+        elements_are![
+          type_field(
+            ident("f"),
+            fn_type_expr(
+              elements_are![named_type_expr(ident("i32"))],
+              named_type_expr(ident("i64"))
+            )
+          ),
+          type_field(
+            ident("g"),
+            fn_type_expr(
+              elements_are![named_type_expr(ident("i32")), named_type_expr(ident("i64"))],
+              named_type_expr(ident("String"))
+            )
+          )
+        ]
       ))
     );
   }
