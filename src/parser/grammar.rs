@@ -45,9 +45,7 @@ pub_grammar!(
   error_type: JangError;
 
   <root>: JangFile => <jang_file> {
-    #jang_file
-      .with_id_counts(#ctx.id_counts())
-      .build()?
+    #ctx.build_jang_file(#jang_file)?
   };
 
   <jang_file>: JangFileBuilder => <jang_file> <type_decl> {
