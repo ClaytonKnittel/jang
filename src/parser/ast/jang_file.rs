@@ -2,7 +2,15 @@ use std::fmt::Display;
 
 use cknittel_util::builder::Builder;
 
-use crate::parser::ast::{function_decl::FunctionDecl, type_decl::TypeDecl};
+use crate::parser::ast::{
+  function_decl::FunctionDecl,
+  id::{
+    adt::map::IdMap,
+    def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
+    id_counts::AstIdCounts,
+  },
+  type_decl::TypeDecl,
+};
 
 #[derive(Clone, Debug, Builder)]
 pub struct JangFile {
@@ -10,6 +18,7 @@ pub struct JangFile {
   function_decls: Vec<FunctionDecl>,
   #[vec]
   type_decls: Vec<TypeDecl>,
+  id_counts: AstIdCounts,
 }
 
 impl JangFile {
@@ -19,6 +28,18 @@ impl JangFile {
 
   pub fn type_decls(&self) -> &[TypeDecl] {
     &self.type_decls
+  }
+
+  pub fn new_expression_id_map<T: std::clone::Clone>(&self) -> IdMap<AstExpressionId, T> {
+    IdMap::with_capacity(self.id_counts.expression_count())
+  }
+
+  pub fn new_global_decl_id_map<T: std::clone::Clone>(&self) -> IdMap<AstGlobalDeclId, T> {
+    IdMap::with_capacity(self.id_counts.global_decl_count())
+  }
+
+  pub fn new_local_decl_id_map<T: std::clone::Clone>(&self) -> IdMap<AstLocalDeclId, T> {
+    IdMap::with_capacity(self.id_counts.local_decl_count())
   }
 }
 

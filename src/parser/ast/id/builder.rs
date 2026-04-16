@@ -1,6 +1,7 @@
 use crate::parser::ast::id::{
   AstIdImpl,
   def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
+  id_counts::AstIdCounts,
 };
 
 struct IdGenerator<ID> {
@@ -41,6 +42,14 @@ impl IdBuilder {
 
   pub fn new_local_id(&mut self) -> AstLocalDeclId {
     self.locals.next_id()
+  }
+
+  pub fn id_counts(&self) -> AstIdCounts {
+    AstIdCounts {
+      global_decl_count: self.globals.cur_id.0,
+      local_decl_count: self.locals.cur_id.0,
+      expression_count: self.expressions.cur_id.0,
+    }
   }
 }
 
