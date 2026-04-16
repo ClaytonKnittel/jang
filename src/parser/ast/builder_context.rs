@@ -44,17 +44,17 @@ impl AstBuilderContext {
     self.var_decl_map.var_ref(ident, &mut self.id_builder)
   }
 
+  pub fn build_jang_file(&self, jang_file_builder: JangFileBuilder) -> BuilderResult<JangFile> {
+    jang_file_builder
+      .with_id_counts(self.id_builder.id_counts())
+      .build()
+  }
+
   pub fn enter_block_scope(&mut self) {
     self.var_decl_map.enter_block_scope();
   }
 
   pub fn exit_block_scope(&mut self) {
     self.var_decl_map.exit_block_scope();
-  }
-
-  pub fn build_jang_file(&self, jang_file_builder: JangFileBuilder) -> BuilderResult<JangFile> {
-    jang_file_builder
-      .with_id_counts(self.id_builder.id_counts())
-      .build()
   }
 }
