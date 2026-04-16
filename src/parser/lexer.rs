@@ -83,8 +83,7 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
-    let op = Op::from_char(first_char)
-      .expect("parse_operator should only be called on operator characters");
+    let op = Op::from_char_with_peek(first_char, self.char_iter.peek());
 
     if self
       .peek_next_token()
@@ -308,14 +307,7 @@ mod tests {
     let text = "->";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(
-      tokens,
-      ok(elements_are![
-        operator!(Dash),
-        joint(),
-        operator!(GreaterThan)
-      ])
-    );
+    expect_that!(tokens, ok(elements_are![operator!(RightArrow),]));
   }
 
   #[gtest]
@@ -323,10 +315,7 @@ mod tests {
     let text = "==";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(
-      tokens,
-      ok(elements_are![operator!(Equal), joint(), operator!(Equal)])
-    );
+    expect_that!(tokens, ok(elements_are![operator!(DoubleEqual)]));
   }
 
   #[gtest]
@@ -334,10 +323,7 @@ mod tests {
     let text = "!=";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(
-      tokens,
-      ok(elements_are![operator!(Bang), joint(), operator!(Equal)])
-    );
+    expect_that!(tokens, ok(elements_are![operator!(NotEqual)]));
   }
 
   #[gtest]
@@ -345,14 +331,7 @@ mod tests {
     let text = ">=";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(
-      tokens,
-      ok(elements_are![
-        operator!(GreaterThan),
-        joint(),
-        operator!(Equal)
-      ])
-    );
+    expect_that!(tokens, ok(elements_are![operator!(GreaterOrEqual)]));
   }
 
   #[gtest]
@@ -360,14 +339,7 @@ mod tests {
     let text = "<=";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(
-      tokens,
-      ok(elements_are![
-        operator!(LessThan),
-        joint(),
-        operator!(Equal)
-      ])
-    );
+    expect_that!(tokens, ok(elements_are![operator!(LessOrEqual)]));
   }
 
   #[gtest]
@@ -375,14 +347,7 @@ mod tests {
     let text = "&&";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(
-      tokens,
-      ok(elements_are![
-        operator!(Ampersand),
-        joint(),
-        operator!(Ampersand)
-      ])
-    );
+    expect_that!(tokens, ok(elements_are![operator!(LogicalAnd)]));
   }
 
   #[gtest]
@@ -390,10 +355,7 @@ mod tests {
     let text = "||";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(
-      tokens,
-      ok(elements_are![operator!(Bar), joint(), operator!(Bar)])
-    );
+    expect_that!(tokens, ok(elements_are![operator!(LogicalOr)]));
   }
 
   #[gtest]
