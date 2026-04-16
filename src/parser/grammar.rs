@@ -645,6 +645,30 @@ mod tests {
   }
 
   #[gtest]
+  fn fn_type_expr_right_associative() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        type X = {
+          f: () -> () -> unit
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(structured_type(
+        ident("X"),
+        unordered_elements_are![type_field(
+          ident("f"),
+          fn_type_expr(is_empty(), fn_type_expr(is_empty(), unit_type_expr()))
+        ),]
+      ))
+    );
+  }
+
+  #[gtest]
   fn enum_decl_single_variant() {
     let ast = lex_and_parse_jang_file(
       r#"
