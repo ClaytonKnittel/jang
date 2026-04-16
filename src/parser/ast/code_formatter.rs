@@ -145,9 +145,29 @@ mod tests {
   }
 
   #[gtest]
-  fn roundtrip_empty_fn_with_return_type() -> Result<()> {
+  fn roundtrip_empty_fn_with_unit_return_type() -> Result<()> {
+    let code = r#"
+      fn function_name(): unit {
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_empty_fn_with_named_return_type() -> Result<()> {
     let code = r#"
       fn function_name(): i32 {
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_empty_fn_with_fn_return_type() -> Result<()> {
+    let code = r#"
+      fn function_name(): () -> unit {
       }
     "#;
 

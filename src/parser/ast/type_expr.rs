@@ -25,15 +25,19 @@ impl TypeExpressionList {
 
 impl Display for TypeExpressionList {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "{}",
-      self
-        .expressions()
-        .iter()
-        .map(|arg| format!("{arg}"))
-        .join(","),
-    )
+    if self.expressions().is_empty() {
+      write!(f, "()")
+    } else {
+      write!(
+        f,
+        "{}",
+        self
+          .expressions()
+          .iter()
+          .map(|arg| format!("{arg}"))
+          .join(",")
+      )
+    }
   }
 }
 
@@ -45,7 +49,7 @@ struct InlineFn {
 
 impl Display for InlineFn {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "({}) => {}", self.args, self.return_type)
+    write!(f, "{} -> {}", self.args, self.return_type)
   }
 }
 
@@ -59,7 +63,7 @@ enum TypeExpressionVariant {
 impl Display for TypeExpressionVariant {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      Self::Unit => write!(f, "()"),
+      Self::Unit => write!(f, "unit"),
       Self::Named(ident) => write!(f, "{ident}"),
       Self::InlineFn(inline_fn) => write!(f, "{inline_fn}"),
     }
