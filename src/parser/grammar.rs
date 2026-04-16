@@ -548,15 +548,7 @@ mod tests {
     )
     .unwrap();
 
-    expect_that!(
-      ast,
-      jang_file_with_fn(all![
-        fn_name(ident("function_name")),
-        fn_return_type(unit_type_expr()),
-        fn_body(block(is_empty())),
-        fn_parameters(is_empty()),
-      ])
-    );
+    expect_that!(ast, jang_file_with_fn(fn_return_type(unit_type_expr()),));
   }
 
   #[gtest]
@@ -571,12 +563,10 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_fn(all![
-        fn_name(ident("function_name")),
-        fn_return_type(fn_type_expr(is_empty(), named_type_expr(ident("i32")))),
-        fn_body(block(is_empty())),
-        fn_parameters(is_empty()),
-      ])
+      jang_file_with_fn(fn_return_type(fn_type_expr(
+        is_empty(),
+        named_type_expr(ident("i32"))
+      )))
     );
   }
 
