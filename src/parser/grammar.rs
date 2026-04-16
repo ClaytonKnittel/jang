@@ -44,7 +44,9 @@ pub_grammar!(
   context_type: AstBuilderContext;
   error_type: JangError;
 
-  <root>: JangFile => <jang_file>;
+  <root>: JangFile => <jang_file> {
+    #ctx.build_jang_file(#jang_file)?
+  };
 
   <jang_file>: JangFileBuilder => <jang_file> <type_decl> {
     #jang_file.add_type_decls(#type_decl)
@@ -416,6 +418,7 @@ mod tests {
           fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
           fn_return_type_none,
         },
+        id::adt::map::IdMap,
         if_statement::matchers::{
           if_else_clause, if_else_if_statement, if_else_statement, if_statement,
         },
@@ -1761,6 +1764,24 @@ mod tests {
     let ast = lex_and_parse_jang_file("".chars()).unwrap();
 
     expect_that!(ast, jang_file_functions(is_empty()));
+  }
+
+  #[gtest]
+  fn jang_file_id_map() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn global_decl() {}
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    let mut id_map: IdMap<_, u32> = ast.new_global_decl_id_map();
+    let id = ast.function_decls()[0].name_decl().id();
+
+    expect_true!(id_map.get(id).is_none());
+    id_map.insert(id, 0);
+    expect_that!(id_map.get(id), pat!(Some(eq(&0))));
   }
 
   #[gtest]

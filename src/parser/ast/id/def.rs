@@ -18,6 +18,14 @@ macro_rules! define_ast_ids {
         fn next_id(&self) -> Self {
           Self(self.0 + 1)
         }
+
+        fn as_index(&self) -> usize {
+          self.0
+        }
+
+        fn from_index(index: usize) -> Self {
+          Self(index)
+        }
       }
     )*
   };
