@@ -3,7 +3,7 @@ use crate::{
   parser::{
     ast::{
       expression::{Expression, ExpressionVariant},
-      id::builder::IdBuilder,
+      id::{builder::IdBuilder, id_counts::AstIdCounts},
       var::{
         var_decl::{GlobalDecl, LocalDecl},
         var_decl_map::VarDeclMap,
@@ -47,5 +47,9 @@ impl AstBuilderContext {
 
   pub fn exit_block_scope(&mut self) {
     self.var_decl_map.exit_block_scope();
+  }
+
+  pub fn id_counts(&self) -> AstIdCounts {
+    self.id_builder.id_counts()
   }
 }

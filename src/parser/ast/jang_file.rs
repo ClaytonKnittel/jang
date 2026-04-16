@@ -2,7 +2,9 @@ use std::fmt::Display;
 
 use cknittel_util::builder::Builder;
 
-use crate::parser::ast::{function_decl::FunctionDecl, type_decl::TypeDecl};
+use crate::parser::ast::{
+  function_decl::FunctionDecl, id::id_counts::AstIdCounts, type_decl::TypeDecl,
+};
 
 #[derive(Clone, Debug, Builder)]
 pub struct JangFile {
@@ -10,6 +12,7 @@ pub struct JangFile {
   function_decls: Vec<FunctionDecl>,
   #[vec]
   type_decls: Vec<TypeDecl>,
+  id_counts: AstIdCounts,
 }
 
 impl JangFile {
@@ -19,6 +22,10 @@ impl JangFile {
 
   pub fn type_decls(&self) -> &[TypeDecl] {
     &self.type_decls
+  }
+
+  pub fn id_counts(&self) -> &AstIdCounts {
+    &self.id_counts
   }
 }
 
@@ -36,7 +43,14 @@ impl Display for JangFile {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::ast::{function_decl::FunctionDecl, jang_file::JangFile, type_decl::TypeDecl};
+  use crate::parser::ast::{
+    function_decl::FunctionDecl,
+    id::id_counts::matchers::{
+      ast_expression_id_count, ast_global_decl_id_count, ast_local_decl_id_count,
+    },
+    jang_file::JangFile,
+    type_decl::TypeDecl,
+  };
   use googletest::prelude::*;
 
   pub fn jang_file_functions<'a>(
@@ -61,5 +75,17 @@ pub(crate) mod matchers {
     type_decl_matcher: impl Matcher<&'a TypeDecl> + 'a,
   ) -> impl Matcher<&'a JangFile> {
     jang_file_with_types(elements_are![type_decl_matcher])
+  }
+
+  pub fn jang_file_expression_count<'a>(count: impl Matcher<usize>) -> impl Matcher<&'a JangFile> {
+    property!(&JangFile.id_counts(), ast_expression_id_count(count))
+  }
+
+  pub fn jang_file_local_decl_count<'a>(count: impl Matcher<usize>) -> impl Matcher<&'a JangFile> {
+    property!(&JangFile.id_counts(), ast_local_decl_id_count(count))
+  }
+
+  pub fn jang_file_global_decl_count<'a>(count: impl Matcher<usize>) -> impl Matcher<&'a JangFile> {
+    property!(&JangFile.id_counts(), ast_global_decl_id_count(count))
   }
 }

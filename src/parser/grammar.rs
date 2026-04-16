@@ -44,7 +44,11 @@ pub_grammar!(
   context_type: AstBuilderContext;
   error_type: JangError;
 
-  <root>: JangFile => <jang_file>;
+  <root>: JangFile => <jang_file> {
+    #jang_file
+      .with_id_counts(#ctx.id_counts())
+      .build()?
+  };
 
   <jang_file>: JangFileBuilder => <jang_file> <type_decl> {
     #jang_file.add_type_decls(#type_decl)
@@ -423,7 +427,10 @@ mod tests {
         if_statement::matchers::{
           if_else_clause, if_else_if_statement, if_else_statement, if_statement,
         },
-        jang_file::matchers::{jang_file_functions, jang_file_with_fn, jang_file_with_type},
+        jang_file::matchers::{
+          jang_file_expression_count, jang_file_functions, jang_file_global_decl_count,
+          jang_file_local_decl_count, jang_file_with_fn, jang_file_with_type,
+        },
         literal_expression::matchers::literal_expression as lit_exp,
         loop_statement::matchers::loop_statement,
         rebind_statement::matchers::rebind_stmt,
@@ -1765,6 +1772,29 @@ mod tests {
     let ast = lex_and_parse_jang_file("".chars()).unwrap();
 
     expect_that!(ast, jang_file_functions(is_empty()));
+  }
+
+  #[gtest]
+  fn jang_file_id_counts() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn global_decl() {
+          let local_decl1 = 0
+          let local_decl2 = 0
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      all![
+        jang_file_global_decl_count(eq(1)),
+        jang_file_local_decl_count(eq(2)),
+        jang_file_expression_count(gt(0)),
+      ]
+    );
   }
 
   #[gtest]
