@@ -248,7 +248,7 @@ mod tests {
 
   #[gtest]
   fn test_all_keywords() {
-    let text = "fn let ret if else loop break type mut unit";
+    let text = "fn let ret if else loop break type mut unit bool i32 i64 f32 f64";
 
     let tokens = lex_stream(text.chars()).collect_result_vec().unwrap();
     expect_that!(
@@ -264,6 +264,11 @@ mod tests {
         keyword!(Type),
         keyword!(Mut),
         keyword!(Unit),
+        keyword!(Bool),
+        keyword!(I32),
+        keyword!(I64),
+        keyword!(F32),
+        keyword!(F64),
       ]
     );
   }

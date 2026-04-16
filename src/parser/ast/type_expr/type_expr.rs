@@ -3,7 +3,7 @@ use std::fmt::Display;
 use cknittel_util::builder::Builder;
 use itertools::Itertools;
 
-use crate::parser::token::ident::Ident;
+use crate::parser::{ast::type_expr::primitive::PrimitiveType, token::ident::Ident};
 
 #[derive(Clone, Debug, Builder)]
 pub struct TypeExpressionList {
@@ -56,6 +56,7 @@ impl Display for InlineFn {
 #[derive(Clone, Debug)]
 enum TypeExpressionVariant {
   Unit,
+  Primitive(PrimitiveType),
   Named(Ident),
   InlineFn(InlineFn),
 }
@@ -64,6 +65,7 @@ impl Display for TypeExpressionVariant {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Unit => write!(f, "unit"),
+      Self::Primitive(primitive) => write!(f, "{primitive}"),
       Self::Named(ident) => write!(f, "{ident}"),
       Self::InlineFn(inline_fn) => write!(f, "{inline_fn}"),
     }
@@ -79,6 +81,12 @@ impl TypeExpression {
   pub fn new_unit() -> Self {
     Self {
       variant: TypeExpressionVariant::Unit,
+    }
+  }
+
+  pub fn new_primitive(primitive: PrimitiveType) -> Self {
+    Self {
+      variant: TypeExpressionVariant::Primitive(primitive),
     }
   }
 
@@ -109,10 +117,8 @@ impl Display for TypeExpression {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::{
-    ast::type_expr::{InlineFn, TypeExpression, TypeExpressionList, TypeExpressionVariant},
-    token::ident::Ident,
-  };
+  use super::*;
+  use crate::parser::token::ident::Ident;
   use googletest::prelude::*;
 
   pub fn unit_type_expr<'a>() -> impl Matcher<&'a TypeExpression> {
@@ -121,11 +127,17 @@ pub(crate) mod matchers {
     })
   }
 
+  pub fn primitive_type_expr(primitive: &PrimitiveType) -> impl Matcher<&TypeExpression> {
+    pat!(TypeExpression {
+      variant: pat!(TypeExpressionVariant::Primitive(eq(primitive)))
+    })
+  }
+
   pub fn named_type_expr<'a>(
-    expected: impl Matcher<&'a Ident>,
+    name_matcher: impl Matcher<&'a Ident>,
   ) -> impl Matcher<&'a TypeExpression> {
     pat!(TypeExpression {
-      variant: pat!(TypeExpressionVariant::Named(expected))
+      variant: pat!(TypeExpressionVariant::Named(name_matcher))
     })
   }
 

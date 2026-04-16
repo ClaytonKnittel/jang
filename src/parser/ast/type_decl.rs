@@ -3,7 +3,10 @@ use std::fmt::Display;
 use cknittel_util::from_variants::FromVariants;
 
 use crate::parser::{
-  ast::{enum_type_decl::EnumTypeDecl, structured_type_decl::StructuredTypeDecl},
+  ast::{
+    enum_type_decl::EnumTypeDecl, structured_type_decl::StructuredTypeDecl,
+    type_expr::TypeExpression,
+  },
   token::ident::Ident,
 };
 
@@ -11,6 +14,7 @@ use crate::parser::{
 pub enum TypeDeclVariant {
   Structured(StructuredTypeDecl),
   Enum(EnumTypeDecl),
+  Alias(TypeExpression),
 }
 
 impl Display for TypeDeclVariant {
@@ -18,6 +22,7 @@ impl Display for TypeDeclVariant {
     match self {
       Self::Structured(structured) => write!(f, "{structured}"),
       Self::Enum(enum_decl) => write!(f, "{enum_decl}"),
+      Self::Alias(type_expr) => write!(f, "{type_expr}"),
     }
   }
 }
@@ -42,11 +47,12 @@ impl Display for TypeDecl {
 
 #[cfg(test)]
 pub(crate) mod matchers {
+  use super::*;
   use crate::parser::{
     ast::{
       enum_type_decl::{EnumTypeDecl, EnumVariant},
       structured_type_decl::StructuredTypeField,
-      type_decl::{StructuredTypeDecl, TypeDecl, TypeDeclVariant},
+      type_expr::TypeExpression,
     },
     token::ident::Ident,
   };
@@ -75,6 +81,16 @@ pub(crate) mod matchers {
         &EnumTypeDecl.variants(),
         variant_matchers
       ))),
+    })
+  }
+
+  pub fn type_alias<'a>(
+    name: impl Matcher<&'a Ident>,
+    type_expr_matcher: impl Matcher<&'a TypeExpression>,
+  ) -> impl Matcher<&'a TypeDecl> {
+    pat!(TypeDecl {
+      name: name,
+      decl: pat!(TypeDeclVariant::Alias(type_expr_matcher)),
     })
   }
 }
