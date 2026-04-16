@@ -11,6 +11,7 @@ pub enum Keyword {
   Break,
   Type,
   Mut,
+  Unit,
 }
 
 impl Keyword {
@@ -25,6 +26,7 @@ impl Keyword {
       "break" => Some(Self::Break),
       "type" => Some(Self::Type),
       "mut" => Some(Self::Mut),
+      "unit" => Some(Self::Unit),
       _ => None,
     }
   }
@@ -45,6 +47,7 @@ impl Display for Keyword {
         Self::Break => "break",
         Self::Type => "type",
         Self::Mut => "mut",
+        Self::Unit => "unit",
       }
     )
   }

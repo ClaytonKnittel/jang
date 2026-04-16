@@ -141,22 +141,18 @@ pub_grammar!(
     Some(#type_expr)
   };
 
-  <type_expr>: TypeExpression => <open_paren> <close_paren> { TypeExpression::new_unit() };
+  <type_expr>: TypeExpression => Keyword(Keyword::Unit) { TypeExpression::new_unit() };
   <type_expr>: TypeExpression => <ident> { TypeExpression::new_named(#ident) };
   <type_expr>: TypeExpression =>
-    <open_paren> <close_paren> <thiqq_right_arrow> <type_expr>
-  {
-    TypeExpression::new_inline_fn(TypeExpressionList::empty(), #type_expr)
-  };
-  <type_expr>: TypeExpression =>
-    <open_paren> <nonempty_type_expr_list> <close_paren>
+    <open_paren> <type_expr_list> <close_paren>
     <thiqq_right_arrow>
     <type_expr>
   {
-    TypeExpression::new_inline_fn(#nonempty_type_expr_list, #type_expr)
+    TypeExpression::new_inline_fn(#type_expr_list, #type_expr)
   };
 
-  <nonempty_type_expr_list>: TypeExpressionList => <nonempty_type_expr_list_builder>;
+  <type_expr_list>: TypeExpressionList => ! { TypeExpressionList::empty() };
+  <type_expr_list>: TypeExpressionList => <nonempty_type_expr_list_builder>;
 
   <nonempty_type_expr_list_builder>: TypeExpressionListBuilder =>
     <type_expr>
@@ -457,7 +453,7 @@ mod tests {
         statement::{Statement, matchers::break_statement},
         structured_type_decl::matchers::type_field,
         type_decl::matchers::{enum_type, structured_type},
-        type_expr::matchers::named_type_expr,
+        type_expr::matchers::{fn_type_expr, named_type_expr, unit_type_expr},
         unary_experssion::matchers::logical_not_exp,
         var::var_ref::matchers::{any_var_ref_expr, global_var_ref_expr, local_var_ref_expr},
       },
@@ -498,7 +494,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 334);
+    expect_eq!(JangGrammar::TABLE_SIZE, 360);
   }
 
   #[gtest]
@@ -513,18 +509,15 @@ mod tests {
     )
     .unwrap();
 
-    expect_that!(ast, jang_file_with_fn(fn_name(ident("function_name"))));
     expect_that!(
       ast,
-      jang_file_with_fn(fn_return_type(named_type_expr(ident("i32"))))
+      jang_file_with_fn(all![
+        fn_name(ident("function_name")),
+        fn_return_type(named_type_expr(ident("i32"))),
+        fn_body(block(elements_are![ret_stmt(lit_exp(integral("123")))])),
+        fn_parameters(is_empty())
+      ])
     );
-    expect_that!(
-      ast,
-      jang_file_with_fn(fn_body(block(elements_are![ret_stmt(lit_exp(integral(
-        "123"
-      )))])))
-    );
-    expect_that!(ast, jang_file_with_fn(fn_parameters(is_empty())));
   }
 
   #[gtest]
@@ -541,6 +534,48 @@ mod tests {
     expect_that!(ast, jang_file_with_fn(fn_return_type_none()));
     expect_that!(ast, jang_file_with_fn(fn_body(block(is_empty()))));
     expect_that!(ast, jang_file_with_fn(fn_parameters(is_empty())));
+  }
+
+  #[gtest]
+  fn function_with_unit_return_type() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name() -> unit {}
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(all![
+        fn_name(ident("function_name")),
+        fn_return_type(unit_type_expr()),
+        fn_body(block(is_empty())),
+        fn_parameters(is_empty()),
+      ])
+    );
+  }
+
+  #[gtest]
+  fn function_with_fn_return_type() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name() -> () => i32 {}
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(all![
+        fn_name(ident("function_name")),
+        fn_return_type(fn_type_expr(is_empty(), named_type_expr(ident("i32")))),
+        fn_body(block(is_empty())),
+        fn_parameters(is_empty()),
+      ])
+    );
   }
 
   #[gtest]
@@ -587,7 +622,7 @@ mod tests {
         type X = {
           a: i32
           b: String
-          c: MyCustomType
+          c: () => unit
         }
         "#
       .chars(),
@@ -601,7 +636,7 @@ mod tests {
         unordered_elements_are![
           type_field(ident("a"), named_type_expr(ident("i32"))),
           type_field(ident("b"), named_type_expr(ident("String"))),
-          type_field(ident("c"), named_type_expr(ident("MyCustomType"))),
+          type_field(ident("c"), fn_type_expr(is_empty(), unit_type_expr())),
         ]
       ))
     );

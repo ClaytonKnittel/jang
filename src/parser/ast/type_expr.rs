@@ -106,16 +106,40 @@ impl Display for TypeExpression {
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::{
-    ast::type_expr::{TypeExpression, TypeExpressionVariant},
+    ast::type_expr::{InlineFn, TypeExpression, TypeExpressionList, TypeExpressionVariant},
     token::ident::Ident,
   };
-  use googletest::prelude::{Matcher, pat};
+  use googletest::prelude::*;
+
+  pub fn unit_type_expr<'a>() -> impl Matcher<&'a TypeExpression> {
+    pat!(TypeExpression {
+      variant: pat!(TypeExpressionVariant::Unit)
+    })
+  }
 
   pub fn named_type_expr<'a>(
     expected: impl Matcher<&'a Ident>,
   ) -> impl Matcher<&'a TypeExpression> {
     pat!(TypeExpression {
       variant: pat!(TypeExpressionVariant::Named(expected))
+    })
+  }
+
+  fn type_expr_list<'a>(
+    expressions_matcher: impl Matcher<&'a [TypeExpression]>,
+  ) -> impl Matcher<&'a TypeExpressionList> {
+    property!(&TypeExpressionList.expressions(), expressions_matcher)
+  }
+
+  pub fn fn_type_expr<'a>(
+    args_matcher: impl Matcher<&'a [TypeExpression]>,
+    return_type_matcher: impl Matcher<&'a TypeExpression>,
+  ) -> impl Matcher<&'a TypeExpression> {
+    pat!(TypeExpression {
+      variant: pat!(TypeExpressionVariant::InlineFn(pat!(InlineFn {
+        args: type_expr_list(args_matcher),
+        return_type: result_of!(Box::as_ref, return_type_matcher),
+      })))
     })
   }
 }
