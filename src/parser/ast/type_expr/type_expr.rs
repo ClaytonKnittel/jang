@@ -3,7 +3,10 @@ use std::fmt::Display;
 use cknittel_util::builder::Builder;
 use itertools::Itertools;
 
-use crate::parser::{ast::type_expr::primitive::PrimitiveType, token::ident::Ident};
+use crate::parser::{
+  ast::{structured_type_decl::StructuredTypeDecl, type_expr::primitive::PrimitiveType},
+  token::ident::Ident,
+};
 
 #[derive(Clone, Debug, Builder)]
 pub struct TypeExpressionList {
@@ -58,6 +61,7 @@ enum TypeExpressionVariant {
   Unit,
   Primitive(PrimitiveType),
   Named(Ident),
+  AnonymousStruct(StructuredTypeDecl),
   InlineFn(InlineFn),
 }
 
@@ -67,6 +71,7 @@ impl Display for TypeExpressionVariant {
       Self::Unit => write!(f, "unit"),
       Self::Primitive(primitive) => write!(f, "{primitive}"),
       Self::Named(ident) => write!(f, "{ident}"),
+      Self::AnonymousStruct(struct_decl) => write!(f, "{struct_decl}"),
       Self::InlineFn(inline_fn) => write!(f, "{inline_fn}"),
     }
   }
@@ -96,6 +101,12 @@ impl TypeExpression {
     }
   }
 
+  pub fn new_anon_struct(type_decl: StructuredTypeDecl) -> Self {
+    Self {
+      variant: TypeExpressionVariant::AnonymousStruct(type_decl),
+    }
+  }
+
   pub fn new_inline_fn(
     args: TypeExpressionList,
     return_type: impl Into<Box<TypeExpression>>,
@@ -118,7 +129,7 @@ impl Display for TypeExpression {
 #[cfg(test)]
 pub(crate) mod matchers {
   use super::*;
-  use crate::parser::token::ident::Ident;
+  use crate::parser::{ast::structured_type_decl::StructuredTypeField, token::ident::Ident};
   use googletest::prelude::*;
 
   pub fn unit_type_expr<'a>() -> impl Matcher<&'a TypeExpression> {
@@ -138,6 +149,17 @@ pub(crate) mod matchers {
   ) -> impl Matcher<&'a TypeExpression> {
     pat!(TypeExpression {
       variant: pat!(TypeExpressionVariant::Named(name_matcher))
+    })
+  }
+
+  pub fn structured_type<'a>(
+    field_matchers: impl Matcher<&'a [StructuredTypeField]>,
+  ) -> impl Matcher<&'a TypeExpression> {
+    pat!(TypeExpression {
+      variant: pat!(TypeExpressionVariant::AnonymousStruct(property!(
+        &StructuredTypeDecl.fields(),
+        field_matchers
+      ))),
     })
   }
 

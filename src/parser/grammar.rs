@@ -66,7 +66,6 @@ pub_grammar!(
     TypeDecl::new(#ident, #type_decl_variant)
   };
 
-  <type_decl_variant>: TypeDeclVariant => <structured_type_decl>;
   <type_decl_variant>: TypeDeclVariant => <enum_type_decl>;
   <type_decl_variant>: TypeDeclVariant => <type_expr>;
 
@@ -112,9 +111,6 @@ pub_grammar!(
   <enum_variant_type>: EnumVariantType => <type_expr> {
     EnumVariantType::TypeExpression(#type_expr)
   };
-  <enum_variant_type>: EnumVariantType => <structured_type_decl> {
-    EnumVariantType::Structured(#structured_type_decl)
-  };
 
   <function_decl>: FunctionDecl =>
       Keyword(Keyword::Function)
@@ -151,6 +147,9 @@ pub_grammar!(
     TypeExpression::new_primitive(#primitive_type)
   };
   <type_expr>: TypeExpression => <ident> { TypeExpression::new_named(#ident) };
+  <type_expr>: TypeExpression => <structured_type_decl> {
+    TypeExpression::new_anon_struct(#structured_type_decl)
+  };
   <type_expr>: TypeExpression =>
     <open_paren> <type_expr_list> <close_paren>
     <right_arrow>
@@ -447,9 +446,7 @@ mod tests {
           call_expr_args, call_expr_target, call_expression, call_statement,
         },
         dot_expression::matchers::{dot_expr_base, dot_expr_member},
-        enum_type_decl::matchers::{
-          enum_expr_type, enum_structured_type, enum_variant, enum_variant_with,
-        },
+        enum_type_decl::matchers::{enum_expr_type, enum_variant, enum_variant_with},
         expression::Expression,
         function_decl::matchers::{
           fn_body, fn_name, fn_parameter_name, fn_parameter_type, fn_parameters, fn_return_type,
@@ -468,9 +465,11 @@ mod tests {
         ret_statement::matchers::ret_statement as ret_stmt,
         statement::{Statement, matchers::break_statement},
         structured_type_decl::matchers::type_field,
-        type_decl::matchers::{enum_type, structured_type, type_alias},
+        type_decl::matchers::{enum_type, type_alias},
         type_expr::{
-          matchers::{fn_type_expr, named_type_expr, primitive_type_expr, unit_type_expr},
+          matchers::{
+            fn_type_expr, named_type_expr, primitive_type_expr, structured_type, unit_type_expr,
+          },
           primitive::PrimitiveType,
         },
         unary_experssion::matchers::logical_not_exp,
@@ -513,7 +512,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 405);
+    expect_eq!(JangGrammar::TABLE_SIZE, 420);
   }
 
   #[gtest]
@@ -599,7 +598,7 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_type(structured_type(ident("X"), is_empty()))
+      jang_file_with_type(type_alias(ident("X"), structured_type(is_empty())))
     );
   }
 
@@ -617,12 +616,12 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_type(structured_type(
+      jang_file_with_type(type_alias(
         ident("X"),
-        elements_are![type_field(
+        structured_type(elements_are![type_field(
           ident("field1"),
           primitive_type_expr(&PrimitiveType::I32)
-        )]
+        )])
       ))
     );
   }
@@ -643,13 +642,13 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_type(structured_type(
+      jang_file_with_type(type_alias(
         ident("X"),
-        elements_are![
+        structured_type(elements_are![
           type_field(ident("a"), primitive_type_expr(&PrimitiveType::I32)),
           type_field(ident("b"), named_type_expr(ident("String"))),
           type_field(ident("c"), fn_type_expr(is_empty(), unit_type_expr())),
-        ]
+        ])
       ))
     );
   }
@@ -730,9 +729,9 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_type(structured_type(
+      jang_file_with_type(type_alias(
         ident("X"),
-        elements_are![
+        structured_type(elements_are![
           type_field(
             ident("f"),
             fn_type_expr(
@@ -750,7 +749,46 @@ mod tests {
               named_type_expr(ident("String"))
             )
           )
-        ]
+        ])
+      ))
+    );
+  }
+
+  #[gtest]
+  fn nested_structured_type() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        type X = {
+          a: {
+            f1: i32
+            f2: ({ z: i32 }) -> unit
+          }
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(type_alias(
+        ident("X"),
+        structured_type(elements_are![type_field(
+          ident("a"),
+          structured_type(elements_are![
+            type_field(ident("f1"), primitive_type_expr(&PrimitiveType::I32)),
+            type_field(
+              ident("f2"),
+              fn_type_expr(
+                elements_are![structured_type(elements_are![type_field(
+                  ident("z"),
+                  primitive_type_expr(&PrimitiveType::I32)
+                )])],
+                unit_type_expr()
+              )
+            ),
+          ])
+        )])
       ))
     );
   }
@@ -815,10 +853,10 @@ mod tests {
         ident("E"),
         elements_are![enum_variant_with(
           ident("V1"),
-          enum_structured_type(elements_are![type_field(
+          enum_expr_type(structured_type(elements_are![type_field(
             ident("field1"),
             primitive_type_expr(&PrimitiveType::I32)
-          )])
+          )]))
         )]
       ))
     );
@@ -850,10 +888,10 @@ mod tests {
           enum_variant(ident("V1")),
           enum_variant_with(
             ident("V2"),
-            enum_structured_type(elements_are![
+            enum_expr_type(structured_type(elements_are![
               type_field(ident("f1"), primitive_type_expr(&PrimitiveType::I64)),
               type_field(ident("f2"), named_type_expr(ident("String"))),
-            ])
+            ]))
           ),
           enum_variant_with(
             ident("V3"),
