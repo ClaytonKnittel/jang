@@ -555,7 +555,7 @@ mod tests {
   fn binary_operators() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         ret 2 * (3 + 4)
       }
       "#
@@ -582,7 +582,7 @@ mod tests {
   fn unary_operator() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> bool {
+      fn f(): bool {
         ret !(2 == 3)
       }
       "#
@@ -608,7 +608,7 @@ mod tests {
   fn if_statement() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         if 0 {
           ret 1
         } else {
@@ -661,7 +661,7 @@ mod tests {
   fn loop_statement() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         loop {
           if x {
             break
@@ -721,7 +721,7 @@ mod tests {
   fn lexical_scoping() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         let x = 1
         {
           let x = 2
@@ -782,7 +782,7 @@ mod tests {
   fn store_and_load_local() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         let x = 1 + 2
         ret x
       }
@@ -810,7 +810,7 @@ mod tests {
   fn store_and_load_mutable_local() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         mut x = 1 + 2
         ret x
       }
@@ -838,7 +838,7 @@ mod tests {
   fn rebind_mutable_local() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         mut x = 1
         x = 70
         ret x
@@ -867,7 +867,7 @@ mod tests {
   fn cannot_rebind_immutable_local() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         let x = 1
         x = 70
         ret x
@@ -884,7 +884,7 @@ mod tests {
   fn cannot_rebind_unknown_local() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         mut x = 1
         y = 70
         ret x
@@ -1021,7 +1021,7 @@ mod tests {
   fn simple_tail_recursion_no_args() {
     let decl = parse_fn_decl(
       r#"
-      fn f() -> i64 {
+      fn f(): i64 {
         ret f()
       }
       "#
@@ -1042,7 +1042,7 @@ mod tests {
   fn simple_tail_recursion_with_args() {
     let decl = parse_fn_decl(
       r#"
-      fn f(a: i64, b: i64) -> i64 {
+      fn f(a: i64, b: i64): i64 {
         ret f(a, b)
       }
       "#

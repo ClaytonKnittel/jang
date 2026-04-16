@@ -93,7 +93,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           ret 1
         }
         "#
@@ -108,11 +108,11 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn other() -> i64 {
+        fn other(): i64 {
           ret 2
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret 1 + other()
         }
         "#
@@ -127,11 +127,11 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn add_one(x: i64) -> i64 {
+        fn add_one(x: i64): i64 {
           ret x + 1
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret add_one(1) + 2 * add_one(2)
         }
         "#
@@ -146,7 +146,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           ret (8 + 9 % 5) / 2 * (7 - 3) + 6 - 5
         }
         "#
@@ -161,13 +161,13 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn g() -> i64 {
+        fn g(): i64 {
           ret x
         }
-        fn f(x: i64) -> i64 {
+        fn f(x: i64): i64 {
           ret g()
         }
-        fn main() -> i64 {
+        fn main(): i64 {
           ret f(1)
         }
         "#
@@ -182,7 +182,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           let x = 1
           let y = 2
           ret x + y
@@ -199,7 +199,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           ret 1 / 0
         }
         "#
@@ -214,7 +214,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           if 1 == 1 {
             ret 1
           }
@@ -232,7 +232,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           if 1 != 1 {
             ret 1
           } else {
@@ -252,7 +252,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           if 1 != 1 {
             ret 1
           } else if 1 == 1 {
@@ -274,7 +274,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           if 1 != 1 {
             ret 1
           } else if 1 != 1 {
@@ -296,13 +296,13 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn fib(n: i64) -> i64 {
+        fn fib(n: i64): i64 {
           if n < 2 { ret 1 }
 
           ret fib(n - 1) + fib(n - 2)
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret fib(9)
         }
         "#
@@ -317,12 +317,12 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn rec(n: i64) -> i64 {
+        fn rec(n: i64): i64 {
           if n == 0 { ret 0 }
           ret rec(n - 1) + 1
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret rec(500)
         }
         "#
@@ -350,7 +350,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           let x = 1
           {
             let x = 2
@@ -370,7 +370,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           let x = 0
           let y = 5
           {
@@ -393,7 +393,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn main() -> i64 {
+        fn main(): i64 {
           let x = 1
           {
             let x = 0
@@ -411,11 +411,11 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn sub(x: i64, y: i64) -> i64 {
+        fn sub(x: i64, y: i64): i64 {
           ret x - y
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret sub(10, 3)
         }
         "#
@@ -430,11 +430,11 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn combine(a: i64, b: i64, c: i64) -> i64 {
+        fn combine(a: i64, b: i64, c: i64): i64 {
           ret a * 100 + b * 10 + c
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret combine(1, 2, 3)
         }
         "#
@@ -449,15 +449,15 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn sub(x: i64, y: i64) -> i64 {
+        fn sub(x: i64, y: i64): i64 {
           ret x - y
         }
 
-        fn id(x: i64) -> i64 {
+        fn id(x: i64): i64 {
           ret x
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret sub(id(10), id(3))
         }
         "#
@@ -472,11 +472,11 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn test(x: i64) -> i64 {
+        fn test(x: i64): i64 {
           ret x + main
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret test(1)
         }
         "#
@@ -491,7 +491,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn test(x: i64) -> i64 {
+        fn test(x: i64): i64 {
           mut ret_val = 3
           if x == 2 {
             ret_val = 100
@@ -499,7 +499,7 @@ mod tests {
           ret ret_val
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret test(1) + test(2)
         }
         "#
@@ -514,7 +514,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn test(x: i64) -> i64 {
+        fn test(x: i64): i64 {
           mut y = x
           mut acc = 1
           loop {
@@ -528,7 +528,7 @@ mod tests {
           ret acc
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret test(5)
         }
         "#
@@ -543,7 +543,7 @@ mod tests {
     expect_that!(
       interpret_program(
         r#"
-        fn test(width: i64, height: i64) -> i64 {
+        fn test(width: i64, height: i64): i64 {
           if width == 0 || height == 0 {
             ret 0
           }
@@ -568,7 +568,7 @@ mod tests {
           ret acc
         }
 
-        fn main() -> i64 {
+        fn main(): i64 {
           ret test(10, 13)
         }
         "#
@@ -588,14 +588,14 @@ mod tests {
       expect_that!(
         interpret_program(
           r#"
-          fn solve(n: i64, acc: i64) -> i64 {
+          fn solve(n: i64, acc: i64): i64 {
             if n == 1000 { ret acc }
             if n % 3 == 0 { ret solve(n + 1, acc + n) }
             if n % 5 == 0 { ret solve(n + 1, acc + n) }
             ret solve(n + 1, acc)
           }
 
-          fn main() -> i64 {
+          fn main(): i64 {
             ret solve(0, 0)
           }
           "#
@@ -610,14 +610,14 @@ mod tests {
       expect_that!(
         interpret_program(
           r#"
-          fn solve(t0: i64, t1: i64, acc: i64) -> i64 {
+          fn solve(t0: i64, t1: i64, acc: i64): i64 {
             if t0 > 4000000 { ret acc }
             let t2 = t1 + t0
             if t0 % 2 == 0 { ret solve(t1, t2, acc + t0) }
             ret solve(t1, t2, acc)
           }
 
-          fn main() -> i64 {
+          fn main(): i64 {
             ret solve(0, 1, 0)
           }
           "#
@@ -632,7 +632,7 @@ mod tests {
       expect_that!(
         interpret_program(
           r#"
-          fn largest_prime_factor(n: i64) -> i64 {
+          fn largest_prime_factor(n: i64): i64 {
             mut n2 = n
             mut p = 2
             loop {
@@ -646,7 +646,7 @@ mod tests {
             }
           }
 
-          fn main() -> i64 {
+          fn main(): i64 {
             ret largest_prime_factor(600851475143)
           }
           "#
@@ -661,7 +661,7 @@ mod tests {
       expect_that!(
         interpret_program(
           r#"
-          fn gcd(a: i64, b: i64) -> i64 {
+          fn gcd(a: i64, b: i64): i64 {
             if b == 0 {
               ret a
             } else if a < b {
@@ -673,7 +673,7 @@ mod tests {
             }
           }
 
-          fn solve(n: i64) -> i64 {
+          fn solve(n: i64): i64 {
             mut l = 1
             mut i = 2
             loop {
@@ -686,7 +686,7 @@ mod tests {
             ret l
           }
 
-          fn main() -> i64 {
+          fn main(): i64 {
             ret solve(20)
           }
           "#
@@ -701,7 +701,7 @@ mod tests {
       expect_that!(
         interpret_program(
           r#"
-          fn sum_of_squares(n: i64) -> i64 {
+          fn sum_of_squares(n: i64): i64 {
             mut sum = 0
             mut i = 1
             loop {
@@ -711,12 +711,12 @@ mod tests {
             }
           }
 
-          fn square_of_sum(n: i64) -> i64 {
+          fn square_of_sum(n: i64): i64 {
             let sum = n * (n + 1) / 2
             ret sum * sum
           }
 
-          fn main() -> i64 {
+          fn main(): i64 {
             ret square_of_sum(100) - sum_of_squares(100)
           }
           "#

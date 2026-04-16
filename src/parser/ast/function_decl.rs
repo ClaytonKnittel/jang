@@ -51,7 +51,7 @@ impl FunctionDecl {
 impl Display for FunctionDecl {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match &self.return_type {
-      Some(ty) => write!(f, "fn {}({}) -> {} ", self.name, self.parameters, ty)?,
+      Some(ty) => write!(f, "fn {}({}): {} ", self.name, self.parameters, ty)?,
       None => write!(f, "fn {}({}) ", self.name, self.parameters)?,
     }
     writeln!(f, "{}", self.body)

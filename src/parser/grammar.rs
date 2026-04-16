@@ -139,7 +139,7 @@ pub_grammar!(
   };
 
   <function_ret_type>: Option<TypeExpression> => ! { None };
-  <function_ret_type>: Option<TypeExpression> => <right_arrow> <type_expr> {
+  <function_ret_type>: Option<TypeExpression> => <colon> <type_expr> {
     Some(#type_expr)
   };
 
@@ -147,7 +147,7 @@ pub_grammar!(
   <type_expr>: TypeExpression => <ident> { TypeExpression::new_named(#ident) };
   <type_expr>: TypeExpression =>
     <open_paren> <type_expr_list> <close_paren>
-    <thiqq_right_arrow>
+    <right_arrow>
     <type_expr>
   {
     TypeExpression::new_inline_fn(#type_expr_list, #type_expr)
@@ -393,7 +393,6 @@ pub_grammar!(
   <logical_and> => Operator(Operator { op: Op::LogicalAnd });
   <logical_or> => Operator(Operator { op: Op::LogicalOr });
   <right_arrow> => Operator(Operator { op: Op::RightArrow });
-  <thiqq_right_arrow> => Operator(Operator { op: Op::ThiqqRightArrow });
 
   <literal>: Literal => Literal(..);
   <ident>: Ident => Ident(..);
@@ -497,14 +496,14 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 360);
+    expect_eq!(JangGrammar::TABLE_SIZE, 359);
   }
 
   #[gtest]
   fn parse_minimal_function() {
     let ast = lex_and_parse_jang_file(
       r#"
-        fn function_name() -> i32 {
+        fn function_name(): i32 {
           ret 123
         }
         "#
@@ -543,7 +542,7 @@ mod tests {
   fn function_with_unit_return_type() {
     let ast = lex_and_parse_jang_file(
       r#"
-        fn function_name() -> unit {}
+        fn function_name(): unit {}
         "#
       .chars(),
     )
@@ -564,7 +563,7 @@ mod tests {
   fn function_with_fn_return_type() {
     let ast = lex_and_parse_jang_file(
       r#"
-        fn function_name() -> () => i32 {}
+        fn function_name(): () -> i32 {}
         "#
       .chars(),
     )
@@ -625,7 +624,7 @@ mod tests {
         type X = {
           a: i32
           b: String
-          c: () => unit
+          c: () -> unit
         }
         "#
       .chars(),
@@ -750,7 +749,7 @@ mod tests {
   fn ret_ident() {
     let ast = lex_and_parse_jang_file(
       r#"
-        fn function_name() -> i32 {
+        fn function_name(): i32 {
           ret x
         }
         "#
@@ -770,7 +769,7 @@ mod tests {
   fn ret_in_block() {
     let ast = lex_and_parse_jang_file(
       r#"
-        fn function_name() -> i32 {
+        fn function_name(): i32 {
           {
             ret x
           }
