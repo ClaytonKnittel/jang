@@ -2,11 +2,14 @@ use std::fmt::Display;
 
 use cknittel_util::{builder::Builder, from_variants::FromVariants};
 
-use crate::parser::{ast::structured_type_decl::StructuredTypeDecl, token::ident::Ident};
+use crate::parser::{
+  ast::{structured_type_decl::StructuredTypeDecl, type_expr::TypeExpression},
+  token::ident::Ident,
+};
 
 #[derive(Clone, Debug, FromVariants)]
 pub enum EnumVariantType {
-  TypeRef(Ident),
+  TypeExpression(TypeExpression),
   Structured(StructuredTypeDecl),
   Empty,
 }
@@ -14,7 +17,7 @@ pub enum EnumVariantType {
 impl Display for EnumVariantType {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      Self::TypeRef(name) => write!(f, "{name}"),
+      Self::TypeExpression(type_expr) => write!(f, "{type_expr}"),
       Self::Structured(structured) => write!(f, "{structured}"),
       Self::Empty => Ok(()),
     }
@@ -67,13 +70,16 @@ pub(crate) mod matchers {
     ast::{
       enum_type_decl::{EnumVariant, EnumVariantType},
       structured_type_decl::{StructuredTypeDecl, StructuredTypeField},
+      type_expr::TypeExpression,
     },
     token::ident::Ident,
   };
   use googletest::prelude::*;
 
-  pub fn enum_ref_type<'a>(name: impl Matcher<&'a Ident>) -> impl Matcher<&'a EnumVariantType> {
-    pat!(EnumVariantType::TypeRef(name))
+  pub fn enum_expr_type<'a>(
+    type_expr_matcher: impl Matcher<&'a TypeExpression>,
+  ) -> impl Matcher<&'a EnumVariantType> {
+    pat!(EnumVariantType::TypeExpression(type_expr_matcher))
   }
 
   pub fn enum_structured_type<'a>(

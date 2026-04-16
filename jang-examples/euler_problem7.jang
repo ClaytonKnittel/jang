@@ -1,5 +1,5 @@
 
-fn is_prime(n: i64) -> bool {
+fn is_prime(n: i64): bool {
   let true = 0 == 0
   let false = 0 == 1
 
@@ -15,7 +15,7 @@ fn is_prime(n: i64) -> bool {
   }
 }
 
-fn nth_prime(n: i64) -> i64 {
+fn nth_prime(n: i64): i64 {
   mut num_primes = 0
   mut i = 2
   loop {
@@ -30,6 +30,6 @@ fn nth_prime(n: i64) -> i64 {
   }
 }
 
-fn main() -> i64 {
+fn main(): i64 {
   ret nth_prime(10001)
 }

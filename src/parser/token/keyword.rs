@@ -12,6 +12,11 @@ pub enum Keyword {
   Type,
   Mut,
   Unit,
+  Bool,
+  I32,
+  I64,
+  F32,
+  F64,
 }
 
 impl Keyword {
@@ -27,6 +32,11 @@ impl Keyword {
       "type" => Some(Self::Type),
       "mut" => Some(Self::Mut),
       "unit" => Some(Self::Unit),
+      "bool" => Some(Self::Bool),
+      "i32" => Some(Self::I32),
+      "i64" => Some(Self::I64),
+      "f32" => Some(Self::F32),
+      "f64" => Some(Self::F64),
       _ => None,
     }
   }
@@ -48,6 +58,11 @@ impl Display for Keyword {
         Self::Type => "type",
         Self::Mut => "mut",
         Self::Unit => "unit",
+        Self::Bool => "bool",
+        Self::I32 => "i32",
+        Self::I64 => "i64",
+        Self::F32 => "f32",
+        Self::F64 => "f64",
       }
     )
   }

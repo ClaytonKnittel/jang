@@ -25,7 +25,9 @@ use crate::{
       statement::Statement,
       structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
       type_decl::{TypeDecl, TypeDeclVariant},
-      type_expr::{TypeExpression, TypeExpressionList, TypeExpressionListBuilder},
+      type_expr::{
+        TypeExpression, TypeExpressionList, TypeExpressionListBuilder, primitive::PrimitiveType,
+      },
       unary_experssion::{UnaryExpression, UnaryOp},
     },
     token::{
@@ -66,6 +68,7 @@ pub_grammar!(
 
   <type_decl_variant>: TypeDeclVariant => <structured_type_decl>;
   <type_decl_variant>: TypeDeclVariant => <enum_type_decl>;
+  <type_decl_variant>: TypeDeclVariant => <type_expr>;
 
   <structured_type_decl>: StructuredTypeDecl =>
     <open_bracket> <structured_type_decl_builder> <close_bracket>
@@ -106,8 +109,8 @@ pub_grammar!(
   <enum_variant_type>: EnumVariantType => ! {
     EnumVariantType::Empty
   };
-  <enum_variant_type>: EnumVariantType => <ident> {
-    EnumVariantType::TypeRef(#ident)
+  <enum_variant_type>: EnumVariantType => <type_expr> {
+    EnumVariantType::TypeExpression(#type_expr)
   };
   <enum_variant_type>: EnumVariantType => <structured_type_decl> {
     EnumVariantType::Structured(#structured_type_decl)
@@ -144,6 +147,9 @@ pub_grammar!(
   };
 
   <type_expr>: TypeExpression => Keyword(Keyword::Unit) { TypeExpression::new_unit() };
+  <type_expr>: TypeExpression => <primitive_type> {
+    TypeExpression::new_primitive(#primitive_type)
+  };
   <type_expr>: TypeExpression => <ident> { TypeExpression::new_named(#ident) };
   <type_expr>: TypeExpression =>
     <open_paren> <type_expr_list> <close_paren>
@@ -152,6 +158,12 @@ pub_grammar!(
   {
     TypeExpression::new_inline_fn(#type_expr_list, #type_expr)
   };
+
+  <primitive_type>: PrimitiveType => Keyword(Keyword::Bool) { PrimitiveType::Bool };
+  <primitive_type>: PrimitiveType => Keyword(Keyword::I32) { PrimitiveType::I32 };
+  <primitive_type>: PrimitiveType => Keyword(Keyword::I64) { PrimitiveType::I64 };
+  <primitive_type>: PrimitiveType => Keyword(Keyword::F32) { PrimitiveType::F32 };
+  <primitive_type>: PrimitiveType => Keyword(Keyword::F64) { PrimitiveType::F64 };
 
   <type_expr_list>: TypeExpressionList => ! { TypeExpressionList::empty() };
   <type_expr_list>: TypeExpressionList => <nonempty_type_expr_list_builder>;
@@ -436,7 +448,7 @@ mod tests {
         },
         dot_expression::matchers::{dot_expr_base, dot_expr_member},
         enum_type_decl::matchers::{
-          enum_ref_type, enum_structured_type, enum_variant, enum_variant_with,
+          enum_expr_type, enum_structured_type, enum_variant, enum_variant_with,
         },
         expression::Expression,
         function_decl::matchers::{
@@ -447,15 +459,20 @@ mod tests {
         if_statement::matchers::{
           if_else_clause, if_else_if_statement, if_else_statement, if_statement,
         },
-        jang_file::matchers::{jang_file_functions, jang_file_with_fn, jang_file_with_type},
+        jang_file::matchers::{
+          jang_file_functions, jang_file_with_fn, jang_file_with_type, jang_file_with_types,
+        },
         literal_expression::matchers::literal_expression as lit_exp,
         loop_statement::matchers::loop_statement,
         rebind_statement::matchers::rebind_stmt,
         ret_statement::matchers::ret_statement as ret_stmt,
         statement::{Statement, matchers::break_statement},
         structured_type_decl::matchers::type_field,
-        type_decl::matchers::{enum_type, structured_type},
-        type_expr::matchers::{fn_type_expr, named_type_expr, unit_type_expr},
+        type_decl::matchers::{enum_type, structured_type, type_alias},
+        type_expr::{
+          matchers::{fn_type_expr, named_type_expr, primitive_type_expr, unit_type_expr},
+          primitive::PrimitiveType,
+        },
         unary_experssion::matchers::logical_not_exp,
         var::var_ref::matchers::{any_var_ref_expr, global_var_ref_expr, local_var_ref_expr},
       },
@@ -496,7 +513,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 359);
+    expect_eq!(JangGrammar::TABLE_SIZE, 405);
   }
 
   #[gtest]
@@ -515,7 +532,7 @@ mod tests {
       ast,
       jang_file_with_fn(all![
         fn_name(ident("function_name")),
-        fn_return_type(named_type_expr(ident("i32"))),
+        fn_return_type(primitive_type_expr(&PrimitiveType::I32)),
         fn_body(block(elements_are![ret_stmt(lit_exp(integral("123")))])),
         fn_parameters(is_empty())
       ])
@@ -565,7 +582,7 @@ mod tests {
       ast,
       jang_file_with_fn(fn_return_type(fn_type_expr(
         is_empty(),
-        named_type_expr(ident("i32"))
+        primitive_type_expr(&PrimitiveType::I32)
       )))
     );
   }
@@ -602,7 +619,10 @@ mod tests {
       ast,
       jang_file_with_type(structured_type(
         ident("X"),
-        elements_are![type_field(ident("field1"), named_type_expr(ident("i32")))]
+        elements_are![type_field(
+          ident("field1"),
+          primitive_type_expr(&PrimitiveType::I32)
+        )]
       ))
     );
   }
@@ -626,7 +646,7 @@ mod tests {
       jang_file_with_type(structured_type(
         ident("X"),
         elements_are![
-          type_field(ident("a"), named_type_expr(ident("i32"))),
+          type_field(ident("a"), primitive_type_expr(&PrimitiveType::I32)),
           type_field(ident("b"), named_type_expr(ident("String"))),
           type_field(ident("c"), fn_type_expr(is_empty(), unit_type_expr())),
         ]
@@ -635,12 +655,10 @@ mod tests {
   }
 
   #[gtest]
-  fn fn_type_expr_right_associative() {
+  fn unit_type_alias() {
     let ast = lex_and_parse_jang_file(
       r#"
-        type X = {
-          f: () -> () -> unit
-        }
+        type X = unit
         "#
       .chars(),
     )
@@ -648,12 +666,51 @@ mod tests {
 
     expect_that!(
       ast,
-      jang_file_with_type(structured_type(
+      jang_file_with_type(type_alias(ident("X"), unit_type_expr()))
+    );
+  }
+
+  #[gtest]
+  fn all_primitive_types() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        type A = bool
+        type B = i32
+        type C = i64
+        type D = f32
+        type E = f64
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_types(elements_are![
+        type_alias(ident("A"), primitive_type_expr(&PrimitiveType::Bool)),
+        type_alias(ident("B"), primitive_type_expr(&PrimitiveType::I32)),
+        type_alias(ident("C"), primitive_type_expr(&PrimitiveType::I64)),
+        type_alias(ident("D"), primitive_type_expr(&PrimitiveType::F32)),
+        type_alias(ident("E"), primitive_type_expr(&PrimitiveType::F64)),
+      ])
+    );
+  }
+
+  #[gtest]
+  fn fn_type_expr_right_associative() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        type X = () -> () -> unit
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(type_alias(
         ident("X"),
-        elements_are![type_field(
-          ident("f"),
-          fn_type_expr(is_empty(), fn_type_expr(is_empty(), unit_type_expr()))
-        ),]
+        fn_type_expr(is_empty(), fn_type_expr(is_empty(), unit_type_expr()))
       ))
     );
   }
@@ -679,14 +736,17 @@ mod tests {
           type_field(
             ident("f"),
             fn_type_expr(
-              elements_are![named_type_expr(ident("i32"))],
-              named_type_expr(ident("i64"))
+              elements_are![primitive_type_expr(&PrimitiveType::I32)],
+              primitive_type_expr(&PrimitiveType::I64)
             )
           ),
           type_field(
             ident("g"),
             fn_type_expr(
-              elements_are![named_type_expr(ident("i32")), named_type_expr(ident("i64"))],
+              elements_are![
+                primitive_type_expr(&PrimitiveType::I32),
+                primitive_type_expr(&PrimitiveType::I64)
+              ],
               named_type_expr(ident("String"))
             )
           )
@@ -730,7 +790,10 @@ mod tests {
       ast,
       jang_file_with_type(enum_type(
         ident("E"),
-        elements_are![enum_variant_with(ident("V1"), enum_ref_type(ident("i32")))]
+        elements_are![enum_variant_with(
+          ident("V1"),
+          enum_expr_type(primitive_type_expr(&PrimitiveType::I32))
+        )]
       ))
     );
   }
@@ -754,7 +817,7 @@ mod tests {
           ident("V1"),
           enum_structured_type(elements_are![type_field(
             ident("field1"),
-            named_type_expr(ident("i32"))
+            primitive_type_expr(&PrimitiveType::I32)
           )])
         )]
       ))
@@ -772,6 +835,8 @@ mod tests {
               f2: String
             }
           | V3 String
+          | V4 unit
+          | V5 () -> i32
         "#
       .chars(),
     )
@@ -786,11 +851,22 @@ mod tests {
           enum_variant_with(
             ident("V2"),
             enum_structured_type(elements_are![
-              type_field(ident("f1"), named_type_expr(ident("i64"))),
+              type_field(ident("f1"), primitive_type_expr(&PrimitiveType::I64)),
               type_field(ident("f2"), named_type_expr(ident("String"))),
             ])
           ),
-          enum_variant_with(ident("V3"), enum_ref_type(ident("String"))),
+          enum_variant_with(
+            ident("V3"),
+            enum_expr_type(named_type_expr(ident("String")))
+          ),
+          enum_variant_with(ident("V4"), enum_expr_type(unit_type_expr())),
+          enum_variant_with(
+            ident("V5"),
+            enum_expr_type(fn_type_expr(
+              is_empty(),
+              primitive_type_expr(&PrimitiveType::I32)
+            ))
+          ),
         ]
       ))
     );
@@ -1023,7 +1099,7 @@ mod tests {
       ast,
       jang_file_with_fn(fn_parameters(elements_are![all!(
         fn_parameter_name(ident("a")),
-        fn_parameter_type(named_type_expr(ident("i32")))
+        fn_parameter_type(primitive_type_expr(&PrimitiveType::I32))
       )]))
     );
   }
