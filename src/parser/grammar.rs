@@ -755,6 +755,45 @@ mod tests {
   }
 
   #[gtest]
+  fn nested_structured_type() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        type X = {
+          a: {
+            f1: i32
+            f2: ({ z: i32 }) -> unit
+          }
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(type_alias(
+        ident("X"),
+        structured_type(elements_are![type_field(
+          ident("a"),
+          structured_type(elements_are![
+            type_field(ident("f1"), primitive_type_expr(&PrimitiveType::I32)),
+            type_field(
+              ident("f2"),
+              fn_type_expr(
+                elements_are![structured_type(elements_are![type_field(
+                  ident("z"),
+                  primitive_type_expr(&PrimitiveType::I32)
+                )])],
+                unit_type_expr()
+              )
+            ),
+          ])
+        )])
+      ))
+    );
+  }
+
+  #[gtest]
   fn enum_decl_single_variant() {
     let ast = lex_and_parse_jang_file(
       r#"
