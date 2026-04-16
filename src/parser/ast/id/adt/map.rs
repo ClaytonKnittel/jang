@@ -1,10 +1,12 @@
+// Intentionally allow IdMap to depend on the private trait AstIdImpl,
+// so ID types remain entirely opaque to code outside the ast module.
 #![allow(private_bounds)]
 use std::{marker::PhantomData, ops::Index};
 
 use crate::parser::ast::id::AstIdImpl;
 
 #[derive(Clone, Debug)]
-pub struct IdMap<ID: AstIdImpl, T: std::clone::Clone> {
+pub struct IdMap<ID: AstIdImpl, T> {
   data: Vec<Option<T>>,
   phantom_data: PhantomData<ID>,
 }
@@ -30,7 +32,7 @@ impl<ID: AstIdImpl, T: std::clone::Clone> IdMap<ID, T> {
   }
 }
 
-impl<ID: AstIdImpl, T: std::clone::Clone> Index<ID> for IdMap<ID, T> {
+impl<ID: AstIdImpl, T> Index<ID> for IdMap<ID, T> {
   type Output = T;
 
   fn index(&self, id: ID) -> &Self::Output {
@@ -58,7 +60,7 @@ impl<ID: AstIdImpl, T> Iterator for IdMapIterator<ID, T> {
   }
 }
 
-impl<ID: AstIdImpl, T: std::clone::Clone> IntoIterator for IdMap<ID, T> {
+impl<ID: AstIdImpl, T> IntoIterator for IdMap<ID, T> {
   type Item = (ID, T);
   type IntoIter = IdMapIterator<ID, T>;
 
