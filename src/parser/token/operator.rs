@@ -56,6 +56,8 @@ pub enum Op {
   LogicalOr,
   /// "->"
   RightArrow,
+  /// "=>"
+  ThiqqRightArrow,
 }
 
 impl Op {
@@ -73,15 +75,15 @@ impl Op {
         _ => $default:expr
       ) => {
         match peek {
-          $(Some(peek) => {
+          Some(peek) => {
             match *peek {
-              Ok($next_char) => {
+              $(Ok($next_char) => {
                 unsafe { peek.take().unwrap_unchecked() };
                 $op
-              }
+              })+
               _ => $default,
             }
-          })+
+          }
           _ => $default
         }
       };
@@ -90,6 +92,7 @@ impl Op {
     match ch {
       '=' => match_next!(
         '=' => Self::DoubleEqual,
+        '>' => Self::ThiqqRightArrow,
         _ => Self::Equal
       ),
       ',' => Self::Comma,
@@ -171,6 +174,7 @@ impl Display for Op {
         Self::LogicalAnd => "&&",
         Self::LogicalOr => "||",
         Self::RightArrow => "->",
+        Self::ThiqqRightArrow => "=>",
       }
     )
   }

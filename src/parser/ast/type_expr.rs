@@ -12,6 +12,12 @@ pub struct TypeExpressionList {
 }
 
 impl TypeExpressionList {
+  pub fn empty() -> Self {
+    Self {
+      expressions: Vec::new(),
+    }
+  }
+
   pub fn expressions(&self) -> &[TypeExpression] {
     &self.expressions
   }
@@ -75,6 +81,18 @@ impl TypeExpression {
   pub fn new_named(ident: Ident) -> Self {
     Self {
       variant: TypeExpressionVariant::Named(ident),
+    }
+  }
+
+  pub fn new_inline_fn(
+    args: TypeExpressionList,
+    return_type: impl Into<Box<TypeExpression>>,
+  ) -> Self {
+    Self {
+      variant: TypeExpressionVariant::InlineFn(InlineFn {
+        args,
+        return_type: return_type.into(),
+      }),
     }
   }
 }

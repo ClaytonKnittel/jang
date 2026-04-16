@@ -25,7 +25,7 @@ use crate::{
       statement::Statement,
       structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
       type_decl::{TypeDecl, TypeDeclVariant},
-      type_expr::TypeExpression,
+      type_expr::{TypeExpression, TypeExpressionList, TypeExpressionListBuilder},
       unary_experssion::{UnaryExpression, UnaryOp},
     },
     token::{
@@ -144,17 +144,29 @@ pub_grammar!(
   <type_expr>: TypeExpression => <open_paren> <close_paren> { TypeExpression::new_unit() };
   <type_expr>: TypeExpression => <ident> { TypeExpression::new_named(#ident) };
   <type_expr>: TypeExpression =>
-    <open_paren> <type_expr_list> <close_paren>
-    <thiqq_right_arrow>
-    <open_bracket> <close_bracket>
+    <open_paren> <close_paren> <thiqq_right_arrow> <type_expr>
   {
-    TypeExpression::new_named(#ident)
+    TypeExpression::new_inline_fn(TypeExpressionList::empty(), #type_expr)
+  };
+  <type_expr>: TypeExpression =>
+    <open_paren> <nonempty_type_expr_list> <close_paren>
+    <thiqq_right_arrow>
+    <type_expr>
+  {
+    TypeExpression::new_inline_fn(#nonempty_type_expr_list, #type_expr)
   };
 
-  <type_expr_list>: TypeExpressionList => <type_expr_list_builder>;
+  <nonempty_type_expr_list>: TypeExpressionList => <nonempty_type_expr_list_builder>;
 
-  <type_expr_list_builder>: TypeExpressionListBuilder => ! {
-    TypeExpressionListBuilder::default()
+  <nonempty_type_expr_list_builder>: TypeExpressionListBuilder =>
+    <type_expr>
+  {
+    TypeExpressionListBuilder::default().add_expressions(#type_expr)
+  };
+  <nonempty_type_expr_list_builder>: TypeExpressionListBuilder =>
+    <nonempty_type_expr_list_builder> <comma> <type_expr>
+  {
+    #nonempty_type_expr_list_builder.add_expressions(#type_expr)
   };
 
   <block_scope>: Block => <start_block_scope> <statement_list> <end_block_scope> {
@@ -383,10 +395,7 @@ pub_grammar!(
   <logical_and> => Operator(Operator { op: Op::LogicalAnd });
   <logical_or> => Operator(Operator { op: Op::LogicalOr });
   <right_arrow> => Operator(Operator { op: Op::RightArrow });
-  <thiqq_right_arrow> =>
-      Operator(Operator { op: Op::Equal })
-      Joint
-      Operator(Operator { op: Op::GreaterThan });
+  <thiqq_right_arrow> => Operator(Operator { op: Op::ThiqqRightArrow });
 
   <literal>: Literal => Literal(..);
   <ident>: Ident => Ident(..);

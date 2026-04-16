@@ -303,15 +303,23 @@ mod tests {
   }
 
   #[gtest]
-  fn test_joint_arrow() {
+  fn test_arrow() {
     let text = "->";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
-    expect_that!(tokens, ok(elements_are![operator!(RightArrow),]));
+    expect_that!(tokens, ok(elements_are![operator!(RightArrow)]));
   }
 
   #[gtest]
-  fn test_joint_equal_to() {
+  fn test_thiqq_arrow() {
+    let text = "=>";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(tokens, ok(elements_are![operator!(ThiqqRightArrow)]));
+  }
+
+  #[gtest]
+  fn test_equal_to() {
     let text = "==";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
@@ -319,7 +327,7 @@ mod tests {
   }
 
   #[gtest]
-  fn test_joint_not_equal() {
+  fn test_not_equal() {
     let text = "!=";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
@@ -327,7 +335,7 @@ mod tests {
   }
 
   #[gtest]
-  fn test_joint_greater_than_equal() {
+  fn test_greater_than_equal() {
     let text = ">=";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
@@ -335,7 +343,7 @@ mod tests {
   }
 
   #[gtest]
-  fn test_joint_less_than_equal() {
+  fn test_less_than_equal() {
     let text = "<=";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
@@ -343,7 +351,7 @@ mod tests {
   }
 
   #[gtest]
-  fn test_joint_double_ampersand() {
+  fn test_double_ampersand() {
     let text = "&&";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
@@ -351,7 +359,7 @@ mod tests {
   }
 
   #[gtest]
-  fn test_joint_double_bar() {
+  fn test_double_bar() {
     let text = "||";
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
