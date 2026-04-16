@@ -145,9 +145,39 @@ mod tests {
   }
 
   #[gtest]
-  fn roundtrip_empty_fn_with_return_type() -> Result<()> {
+  fn roundtrip_empty_fn_with_unit_return_type() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): unit {
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_empty_fn_with_named_return_type() -> Result<()> {
+    let code = r#"
+      fn function_name(): i32 {
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_empty_fn_with_fn_return_type() -> Result<()> {
+    let code = r#"
+      fn function_name(): () -> unit {
+      }
+    "#;
+
+    check_print_roundtrip(code)
+  }
+
+  #[gtest]
+  fn roundtrip_empty_fn_with_fn_return_type_with_args() -> Result<()> {
+    let code = r#"
+      fn function_name(): (i32) -> i64 {
       }
     "#;
 
@@ -167,7 +197,7 @@ mod tests {
   #[gtest]
   fn roundtrip_ret_fn() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): i32 {
         ret 123
       }
     "#;
@@ -211,7 +241,7 @@ mod tests {
   #[gtest]
   fn roundtrip_complex_expr() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): i32 {
         let x = x.y((3 * f())).z()
         ret (x + (x / x))
       }
@@ -223,7 +253,7 @@ mod tests {
   #[gtest]
   fn roundtrip_negation_expr() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): i32 {
         let x = !a.b()
         let y = !(a + b)
       }
@@ -235,7 +265,7 @@ mod tests {
   #[gtest]
   fn roundtrip_block_scope() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): i32 {
         {
           let y = 100
         }
@@ -256,7 +286,7 @@ mod tests {
   #[gtest]
   fn roundtrip_if() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): i32 {
         if 1 {
         }
       }
@@ -268,7 +298,7 @@ mod tests {
   #[gtest]
   fn roundtrip_if_binary_exp() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): i32 {
         if (x + 3) {
           ret y
         }
@@ -281,7 +311,7 @@ mod tests {
   #[gtest]
   fn roundtrip_if_else() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): i32 {
         if 1 {
           ret y
         } else {
@@ -296,7 +326,7 @@ mod tests {
   #[gtest]
   fn roundtrip_if_else_if() -> Result<()> {
     let code = r#"
-      fn function_name() -> i32 {
+      fn function_name(): i32 {
         if 1 {
           ret y
         } else if 2 {

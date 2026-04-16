@@ -25,7 +25,7 @@ use crate::{
       statement::Statement,
       structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
       type_decl::{TypeDecl, TypeDeclVariant},
-      type_expr::TypeExpression,
+      type_expr::{TypeExpression, TypeExpressionList, TypeExpressionListBuilder},
       unary_experssion::{UnaryExpression, UnaryOp},
     },
     token::{
@@ -92,7 +92,10 @@ pub_grammar!(
   <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_variant> {
     EnumTypeDeclBuilder::default().add_variants(#enum_type_decl_variant)
   };
-  <enum_type_decl_builder>: EnumTypeDeclBuilder => <enum_type_decl_builder> <enum_type_decl_variant> {
+  <enum_type_decl_builder>: EnumTypeDeclBuilder =>
+    <enum_type_decl_builder>
+    <enum_type_decl_variant>
+  {
     #enum_type_decl_builder.add_variants(#enum_type_decl_variant)
   };
 
@@ -136,11 +139,33 @@ pub_grammar!(
   };
 
   <function_ret_type>: Option<TypeExpression> => ! { None };
-  <function_ret_type>: Option<TypeExpression> => <right_arrow> <type_expr> {
+  <function_ret_type>: Option<TypeExpression> => <colon> <type_expr> {
     Some(#type_expr)
   };
 
-  <type_expr>: TypeExpression => <ident> { TypeExpression(#ident) };
+  <type_expr>: TypeExpression => Keyword(Keyword::Unit) { TypeExpression::new_unit() };
+  <type_expr>: TypeExpression => <ident> { TypeExpression::new_named(#ident) };
+  <type_expr>: TypeExpression =>
+    <open_paren> <type_expr_list> <close_paren>
+    <right_arrow>
+    <type_expr>
+  {
+    TypeExpression::new_inline_fn(#type_expr_list, #type_expr)
+  };
+
+  <type_expr_list>: TypeExpressionList => ! { TypeExpressionList::empty() };
+  <type_expr_list>: TypeExpressionList => <nonempty_type_expr_list_builder>;
+
+  <nonempty_type_expr_list_builder>: TypeExpressionListBuilder =>
+    <type_expr>
+  {
+    TypeExpressionListBuilder::default().add_expressions(#type_expr)
+  };
+  <nonempty_type_expr_list_builder>: TypeExpressionListBuilder =>
+    <nonempty_type_expr_list_builder> <comma> <type_expr>
+  {
+    #nonempty_type_expr_list_builder.add_expressions(#type_expr)
+  };
 
   <block_scope>: Block => <start_block_scope> <statement_list> <end_block_scope> {
     #statement_list
@@ -430,7 +455,7 @@ mod tests {
         statement::{Statement, matchers::break_statement},
         structured_type_decl::matchers::type_field,
         type_decl::matchers::{enum_type, structured_type},
-        type_expr::matchers::type_expr_name,
+        type_expr::matchers::{fn_type_expr, named_type_expr, unit_type_expr},
         unary_experssion::matchers::logical_not_exp,
         var::var_ref::matchers::{any_var_ref_expr, global_var_ref_expr, local_var_ref_expr},
       },
@@ -471,14 +496,14 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 334);
+    expect_eq!(JangGrammar::TABLE_SIZE, 359);
   }
 
   #[gtest]
   fn parse_minimal_function() {
     let ast = lex_and_parse_jang_file(
       r#"
-        fn function_name() -> i32 {
+        fn function_name(): i32 {
           ret 123
         }
         "#
@@ -486,18 +511,15 @@ mod tests {
     )
     .unwrap();
 
-    expect_that!(ast, jang_file_with_fn(fn_name(ident("function_name"))));
     expect_that!(
       ast,
-      jang_file_with_fn(fn_return_type(type_expr_name(ident("i32"))))
+      jang_file_with_fn(all![
+        fn_name(ident("function_name")),
+        fn_return_type(named_type_expr(ident("i32"))),
+        fn_body(block(elements_are![ret_stmt(lit_exp(integral("123")))])),
+        fn_parameters(is_empty())
+      ])
     );
-    expect_that!(
-      ast,
-      jang_file_with_fn(fn_body(block(elements_are![ret_stmt(lit_exp(integral(
-        "123"
-      )))])))
-    );
-    expect_that!(ast, jang_file_with_fn(fn_parameters(is_empty())));
   }
 
   #[gtest]
@@ -514,6 +536,38 @@ mod tests {
     expect_that!(ast, jang_file_with_fn(fn_return_type_none()));
     expect_that!(ast, jang_file_with_fn(fn_body(block(is_empty()))));
     expect_that!(ast, jang_file_with_fn(fn_parameters(is_empty())));
+  }
+
+  #[gtest]
+  fn function_with_unit_return_type() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name(): unit {}
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(ast, jang_file_with_fn(fn_return_type(unit_type_expr()),));
+  }
+
+  #[gtest]
+  fn function_with_fn_return_type() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name(): () -> i32 {}
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_return_type(fn_type_expr(
+        is_empty(),
+        named_type_expr(ident("i32"))
+      )))
+    );
   }
 
   #[gtest]
@@ -548,7 +602,7 @@ mod tests {
       ast,
       jang_file_with_type(structured_type(
         ident("X"),
-        elements_are![type_field(ident("field1"), type_expr_name(ident("i32")))]
+        elements_are![type_field(ident("field1"), named_type_expr(ident("i32")))]
       ))
     );
   }
@@ -560,7 +614,7 @@ mod tests {
         type X = {
           a: i32
           b: String
-          c: MyCustomType
+          c: () -> unit
         }
         "#
       .chars(),
@@ -571,10 +625,71 @@ mod tests {
       ast,
       jang_file_with_type(structured_type(
         ident("X"),
-        unordered_elements_are![
-          type_field(ident("a"), type_expr_name(ident("i32"))),
-          type_field(ident("b"), type_expr_name(ident("String"))),
-          type_field(ident("c"), type_expr_name(ident("MyCustomType"))),
+        elements_are![
+          type_field(ident("a"), named_type_expr(ident("i32"))),
+          type_field(ident("b"), named_type_expr(ident("String"))),
+          type_field(ident("c"), fn_type_expr(is_empty(), unit_type_expr())),
+        ]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn fn_type_expr_right_associative() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        type X = {
+          f: () -> () -> unit
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(structured_type(
+        ident("X"),
+        elements_are![type_field(
+          ident("f"),
+          fn_type_expr(is_empty(), fn_type_expr(is_empty(), unit_type_expr()))
+        ),]
+      ))
+    );
+  }
+
+  #[gtest]
+  fn fn_type_expr_with_params() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        type X = {
+          f: (i32) -> i64
+          g: (i32, i64) -> String
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_type(structured_type(
+        ident("X"),
+        elements_are![
+          type_field(
+            ident("f"),
+            fn_type_expr(
+              elements_are![named_type_expr(ident("i32"))],
+              named_type_expr(ident("i64"))
+            )
+          ),
+          type_field(
+            ident("g"),
+            fn_type_expr(
+              elements_are![named_type_expr(ident("i32")), named_type_expr(ident("i64"))],
+              named_type_expr(ident("String"))
+            )
+          )
         ]
       ))
     );
@@ -639,7 +754,7 @@ mod tests {
           ident("V1"),
           enum_structured_type(elements_are![type_field(
             ident("field1"),
-            type_expr_name(ident("i32"))
+            named_type_expr(ident("i32"))
           )])
         )]
       ))
@@ -671,8 +786,8 @@ mod tests {
           enum_variant_with(
             ident("V2"),
             enum_structured_type(elements_are![
-              type_field(ident("f1"), type_expr_name(ident("i64"))),
-              type_field(ident("f2"), type_expr_name(ident("String"))),
+              type_field(ident("f1"), named_type_expr(ident("i64"))),
+              type_field(ident("f2"), named_type_expr(ident("String"))),
             ])
           ),
           enum_variant_with(ident("V3"), enum_ref_type(ident("String"))),
@@ -685,7 +800,7 @@ mod tests {
   fn ret_ident() {
     let ast = lex_and_parse_jang_file(
       r#"
-        fn function_name() -> i32 {
+        fn function_name(): i32 {
           ret x
         }
         "#
@@ -705,7 +820,7 @@ mod tests {
   fn ret_in_block() {
     let ast = lex_and_parse_jang_file(
       r#"
-        fn function_name() -> i32 {
+        fn function_name(): i32 {
           {
             ret x
           }
@@ -908,7 +1023,7 @@ mod tests {
       ast,
       jang_file_with_fn(fn_parameters(elements_are![all!(
         fn_parameter_name(ident("a")),
-        fn_parameter_type(type_expr_name(ident("i32")))
+        fn_parameter_type(named_type_expr(ident("i32")))
       )]))
     );
   }
