@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cknittel-util = { git = "https://github.com/ClaytonKnittel/cknittel-util.git", rev = "ce249396392b99f91fc9b0adb5a4f354d16e34c2", features = [
+cknittel-util = { git = "https://github.com/ClaytonKnittel/cknittel-util.git", rev = "8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b", features = [
   "builder",
   "from-variants",
 ] }

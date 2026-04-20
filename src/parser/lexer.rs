@@ -1,17 +1,23 @@
 use std::{convert::Infallible, error::Error};
 
-use cknittel_util::peekable_stream::{IntoPeekableStream, PeekableStream};
+use cknittel_util::{
+  peekable_stream::{IntoPeekableStream, PeekableStream},
+  tuple::TupleTraits,
+};
 
 use crate::{
   error::{JangError, JangResult},
-  parser::token::{
-    JangToken,
-    ident::Ident,
-    keyword::Keyword,
-    literal::{Literal, NumericLiteral},
-    operator::{Op, Operator},
+  parser::{
+    char_iter::CharIter,
+    token::{
+      JangToken,
+      ident::Ident,
+      keyword::Keyword,
+      literal::{Literal, NumericLiteral},
+      operator::{Op, Operator},
+    },
   },
-  source_location::SourceLocation,
+  source_location::{SourceLocation, SourceSpan},
 };
 
 fn is_ident_char(ch: &char) -> bool {
@@ -23,23 +29,24 @@ fn is_numeric_char(ch: &char) -> bool {
 }
 
 struct TokenIter<E, I: Iterator<Item = Result<char, E>>> {
-  char_iter: PeekableStream<I>,
+  char_iter: PeekableStream<CharIter<E, I>>,
   should_emit_joint: bool,
 }
 
 impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
   fn consume_all_whitespace(&mut self) {
-    while self
-      .char_iter
-      .peek()
-      .as_deref()
-      .is_some_and(|res| res.as_ref().is_ok_and(char::is_ascii_whitespace))
-    {
+    while self.char_iter.peek().as_deref().is_some_and(|res| {
+      res
+        .as_ref()
+        .ok()
+        .map(TupleTraits::first)
+        .is_some_and(char::is_ascii_whitespace)
+    }) {
       self.char_iter.next();
     }
   }
 
-  fn peek_next_token(&mut self) -> Option<char> {
+  fn peek_next_token(&mut self) -> Option<(char, SourceLocation)> {
     self
       .char_iter
       .peek()
@@ -49,37 +56,58 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
       .cloned()
   }
 
-  fn collect_while<F: FnMut(&char) -> bool>(&mut self, first_char: char, mut cond: F) -> String {
+  fn collect_while<F: FnMut(&char) -> bool>(
+    &mut self,
+    first_char: char,
+    source_loc: SourceLocation,
+    mut cond: F,
+  ) -> (String, SourceSpan) {
     let mut string_val = String::from(first_char);
-    while let Some(next_char) = self.peek_next_token() {
+    let mut span = SourceSpan::from(source_loc);
+    while let Some((next_char, next_loc)) = self.peek_next_token() {
       if cond(&next_char) {
         string_val.push(next_char);
+        span.join(next_loc);
         self.next().expect("Cannot fail if `peek` returned `Some`");
       } else {
         break;
       }
     }
-    string_val
+    (string_val, span)
   }
 
-  fn parse_ident_or_keyword(&mut self, first_char: char) -> JangToken {
-    let ident = self.collect_while(first_char, is_ident_char);
+  fn parse_ident_or_keyword(&mut self, first_char: char, source_loc: SourceLocation) -> JangToken {
+    let (ident, span) = self.collect_while(first_char, source_loc, is_ident_char);
     if let Some(keyword) = Keyword::build_from_string(&ident) {
       return keyword.into();
     }
 
-    if matches!(self.peek_next_token(), Some('(')) {
+    if matches!(self.peek_next_token(), Some(('(', _))) {
       // Identifiers join to open parenthesis, to disambiguate function calls
       // from an expression on one line that ends with an ident, followed by
       // an expression on the next line that starts with open parenthesis.
       self.should_emit_joint = true;
     }
-    Ident::new(ident).into()
+    Ident::new(ident, span).into()
   }
 
-  fn parse_numeric(&mut self, first_char: char) -> JangToken {
-    let numeric = self.collect_while(first_char, is_numeric_char);
-    Literal::from(NumericLiteral::from_str(numeric)).into()
+  fn parse_numeric(
+    &mut self,
+    first_char: char,
+    source_loc: SourceLocation,
+  ) -> JangResult<JangToken> {
+    let numeric = self
+      .collect_while(first_char, source_loc, is_numeric_char)
+      .first();
+
+    // Numerics cannot be immediately followed by identifiers.
+    if let Some((ch, loc)) = self.peek_next_token()
+      && is_ident_char(&ch)
+    {
+      return Err(JangError::unexpected_symbol(ch, loc.into()));
+    }
+
+    Ok(Literal::from(NumericLiteral::from_str(numeric)).into())
   }
 
   fn parse_operator(&mut self, first_char: char) -> JangToken {
@@ -87,7 +115,7 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
 
     if self
       .peek_next_token()
-      .is_some_and(|next_char| op.can_join(next_char))
+      .is_some_and(|(next_char, _)| op.can_join(next_char))
     {
       self.should_emit_joint = true;
     }
@@ -95,7 +123,7 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
     Operator::new(op).into()
   }
 
-  fn next(&mut self) -> JangResult<Option<char>> {
+  fn next(&mut self) -> JangResult<Option<(char, SourceLocation)>> {
     self
       .char_iter
       .next()
@@ -105,27 +133,29 @@ impl<E: Error, I: Iterator<Item = Result<char, E>>> TokenIter<E, I> {
 
   fn parse_next(&mut self) -> JangResult<Option<JangToken>> {
     self.consume_all_whitespace();
-    match self.next()? {
-      Some(first_char @ ('a'..='z' | 'A'..='Z' | '_')) => {
-        Ok(Some(self.parse_ident_or_keyword(first_char)))
+
+    let Some((ch, source_loc)) = self.next()? else {
+      return Ok(None);
+    };
+
+    match ch {
+      first_char @ ('a'..='z' | 'A'..='Z' | '_') => {
+        Ok(Some(self.parse_ident_or_keyword(first_char, source_loc)))
       }
-      Some(first_char @ ('0'..='9')) => Ok(Some(self.parse_numeric(first_char))),
-      Some('.') => {
+      first_char @ ('0'..='9') => Ok(Some(self.parse_numeric(first_char, source_loc)?)),
+      '.' => {
         if self
           .peek_next_token()
-          .is_some_and(|token| token.is_ascii_digit())
+          .is_some_and(|(token, _)| token.is_ascii_digit())
         {
-          Ok(Some(self.parse_numeric('.')))
+          Ok(Some(self.parse_numeric('.', source_loc)?))
         } else {
           Ok(Some(self.parse_operator('.')))
         }
       }
-      Some(
-        first_char @ ('=' | ',' | '(' | ')' | '{' | '}' | '-' | '<' | '>' | ':' | '+' | '*' | '/'
-        | '%' | '|' | '!' | '&'),
-      ) => Ok(Some(self.parse_operator(first_char))),
-      Some(ch) => Err(JangError::unexpected_symbol(ch, SourceLocation::new(0))),
-      None => Ok(None),
+      first_char @ ('=' | ',' | '(' | ')' | '{' | '}' | '-' | '<' | '>' | ':' | '+' | '*' | '/'
+      | '%' | '|' | '!' | '&') => Ok(Some(self.parse_operator(first_char))),
+      ch => Err(JangError::unexpected_symbol(ch, source_loc.into())),
     }
   }
 }
@@ -147,7 +177,7 @@ pub fn try_lex_stream<E: Error, I: IntoIterator<Item = Result<char, E>>>(
   stream: I,
 ) -> impl Iterator<Item = JangResult<JangToken>> {
   TokenIter {
-    char_iter: stream.into_iter().peekable_stream(),
+    char_iter: CharIter::new(stream.into_iter()).peekable_stream(),
     should_emit_joint: false,
   }
 }
@@ -156,10 +186,7 @@ pub fn lex_stream<I: IntoIterator<Item = char>>(
   stream: I,
 ) -> impl Iterator<Item = JangResult<JangToken>> {
   TokenIter {
-    char_iter: stream
-      .into_iter()
-      .map(Ok::<_, Infallible>)
-      .peekable_stream(),
+    char_iter: CharIter::new(stream.into_iter().map(Ok::<_, Infallible>)).peekable_stream(),
     should_emit_joint: false,
   }
 }
@@ -170,7 +197,7 @@ mod tests {
   use googletest::prelude::*;
 
   use crate::{
-    error::JangError,
+    error::{JangError, matchers::unexpected_symbol},
     keyword, operator,
     parser::{
       lexer::lex_stream,
@@ -432,5 +459,13 @@ mod tests {
 
     let tokens = lex_stream(text.chars()).collect_result_vec();
     expect_that!(tokens, err(pat![JangError::Parse(anything())]));
+  }
+
+  #[gtest]
+  fn test_numeric_prefixed_ident() {
+    let text = "1e";
+
+    let tokens = lex_stream(text.chars()).collect_result_vec();
+    expect_that!(tokens, err(unexpected_symbol(&'e')));
   }
 }

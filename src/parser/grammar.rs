@@ -440,7 +440,10 @@ mod tests {
   use googletest::prelude::*;
 
   use crate::{
-    error::JangResult,
+    error::{
+      JangResult,
+      matchers::{err_span, grammar_err, unexpected_symbol},
+    },
     parser::{
       ast::{
         binary_expression::{BinaryOp, matchers::binary_expression as bin_exp},
@@ -480,8 +483,13 @@ mod tests {
         var::var_ref::matchers::{any_var_ref_expr, global_var_ref_expr, local_var_ref_expr},
       },
       grammar::{JangGrammar, testing::lex_and_parse_jang_file},
-      token::{ident::matchers::ident, literal::matchers::integral},
+      token::{
+        ident::matchers::ident,
+        literal::matchers::integral,
+        operator::{Op, Operator},
+      },
     },
+    source_location::{SourceLocation, SourceSpan},
   };
   use std::{error::Error, fmt::Debug};
 
@@ -517,6 +525,26 @@ mod tests {
   #[gtest]
   fn grammar_size() {
     expect_eq!(JangGrammar::TABLE_SIZE, 443);
+  }
+
+  #[gtest]
+  fn lex_error() {
+    let result = lex_and_parse_jang_file(
+      r#"
+        fn function_name() {
+          let x = 0 == 1e
+        }
+      "#
+      .chars(),
+    );
+
+    expect_that!(
+      result,
+      err(all![
+        unexpected_symbol(&'e'),
+        err_span(&SourceSpan::new(SourceLocation::new(2, 24), 1))
+      ])
+    );
   }
 
   #[gtest]
@@ -1649,7 +1677,10 @@ mod tests {
 
   #[gtest]
   fn comparison_equal_does_not_parse() {
-    expect_that!(parse_single_exp("1 = 2"), err(anything()));
+    expect_that!(
+      parse_single_exp("1 = 2"),
+      err(grammar_err(&Some(Operator::new(Op::Equal).into())))
+    );
   }
 
   #[gtest]
