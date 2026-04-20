@@ -10,7 +10,7 @@ use parser_generator::{ParserUserError, error::ParserError};
 use crate::{
   interpreter::error::InterpreterError,
   parser::token::{JangToken, ident::Ident},
-  source_location::SourceLocation,
+  source_location::SourceSpan,
 };
 
 #[derive(Clone)]
@@ -41,12 +41,22 @@ impl Debug for ParseErrorKind {
 #[derive(Clone)]
 pub struct ParseError {
   kind: ParseErrorKind,
-  source_location: SourceLocation,
+  span: SourceSpan,
+}
+
+impl ParseError {
+  pub fn kind(&self) -> &ParseErrorKind {
+    &self.kind
+  }
+
+  pub fn span(&self) -> &SourceSpan {
+    &self.span
+  }
 }
 
 impl Display for ParseError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{} (pos: {})", self.kind, self.source_location.pos())
+    write!(f, "{} (span: {})", self.kind, self.span)
   }
 }
 
@@ -66,10 +76,10 @@ pub enum JangError {
 }
 
 impl JangError {
-  pub fn unexpected_symbol(symbol: char, source_location: SourceLocation) -> Self {
+  pub fn unexpected_symbol(symbol: char, span: SourceSpan) -> Self {
     Self::Parse(ParseError {
       kind: ParseErrorKind::UnexpectedSymbol { symbol },
-      source_location,
+      span,
     })
   }
 
@@ -78,7 +88,7 @@ impl JangError {
       kind: ParseErrorKind::DuplicateIdent {
         ident: ident.name().to_owned(),
       },
-      source_location: SourceLocation::new(0),
+      span: ident.span().clone(),
     })
   }
 }
@@ -131,3 +141,26 @@ impl Debug for JangError {
 }
 
 pub type JangResult<T = ()> = Result<T, JangError>;
+
+#[cfg(test)]
+pub(crate) mod matchers {
+  use super::*;
+  use googletest::prelude::*;
+
+  pub fn grammar_err(next_token: &Option<JangToken>) -> impl Matcher<&JangError> {
+    pat!(JangError::Grammar(pat!(ParserError::ParseError {
+      next_token: eq(next_token)
+    })))
+  }
+
+  pub fn unexpected_symbol(symbol: &char) -> impl Matcher<&JangError> {
+    pat!(JangError::Parse(property!(
+      &ParseError.kind(),
+      pat!(ParseErrorKind::UnexpectedSymbol { symbol: eq(symbol) })
+    )))
+  }
+
+  pub fn err_span(span: &SourceSpan) -> impl Matcher<&JangError> {
+    pat!(JangError::Parse(property!(&ParseError.span(), eq(span))))
+  }
+}

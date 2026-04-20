@@ -82,10 +82,10 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "builder"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b#8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b"
 dependencies = [
  "proc-macro-error",
- "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b)",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -112,20 +112,20 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 [[package]]
 name = "cknittel-util"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2#9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b#8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b"
 dependencies = [
- "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2)",
- "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2)",
+ "builder",
+ "from-variants",
+ "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b)",
 ]
 
 [[package]]
 name = "cknittel-util"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2#9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2"
 dependencies = [
- "builder",
- "from-variants",
- "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2)",
+ "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2)",
 ]
 
 [[package]]
@@ -189,14 +189,14 @@ checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
 [[package]]
 name = "from-variants"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b#8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b"
 dependencies = [
  "proc-macro-error",
- "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b)",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
- "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b)",
 ]
 
 [[package]]
@@ -259,7 +259,7 @@ dependencies = [
 name = "jang"
 version = "0.1.0"
 dependencies = [
- "cknittel-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "cknittel-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b)",
  "clap",
  "itertools",
  "parser_generator",
@@ -393,23 +393,23 @@ dependencies = [
 [[package]]
 name = "proc-macro-util"
 version = "0.1.0"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b#8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+ "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b)",
+]
+
+[[package]]
+name = "proc-macro-util"
+version = "0.1.0"
 source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2#9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
  "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2)",
-]
-
-[[package]]
-name = "proc-macro-util"
-version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
- "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
 ]
 
 [[package]]
@@ -528,7 +528,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "util-impl"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2#9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b#8068fb73dcca10fcf92417c6cd2bedfdde1b7e5b"
 dependencies = [
  "num-traits",
 ]
@@ -536,7 +536,7 @@ dependencies = [
 [[package]]
 name = "util-impl"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2#9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2"
 dependencies = [
  "num-traits",
 ]

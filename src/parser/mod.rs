@@ -12,6 +12,7 @@ use crate::{
 };
 
 pub mod ast;
+mod char_iter;
 pub mod grammar;
 pub mod lexer;
 pub(crate) mod token;
