@@ -89,6 +89,27 @@ impl TypeChecker {
       .expect("Expected AST ID to have a populated type")
   }
 
+  fn check_types_match(&self, expected: TypeId, actual: TypeId) -> TypeCheckerResult {
+    let expected = &self.types[expected];
+    self.check_type_matches(expected, actual)
+  }
+
+  fn check_type_matches(&self, expected: &ConcreteType, actual: TypeId) -> TypeCheckerResult {
+    let actual = &self.types[actual];
+    if expected != actual {
+      Err(TypeCheckerError::TypeMismatch {
+        expected: expected.clone(),
+        actual: actual.clone(),
+      })
+    } else {
+      Ok(())
+    }
+  }
+
+  fn check_is_bool(&self, actual: TypeId) -> TypeCheckerResult {
+    self.check_type_matches(&ConcreteType::Primitive(PrimitiveType::Bool), actual)
+  }
+
   fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult {
     for fn_decl in jang_file.function_decls() {
       let fn_type = self.function_decl_type(fn_decl)?;
@@ -138,11 +159,11 @@ impl TypeChecker {
 
   fn check_statement(&mut self, stmt: &Statement) -> TypeCheckerResult {
     match stmt {
-      Statement::Bind(s) => self.check_bind(s),
-      Statement::Rebind(s) => self.check_rebind(s),
-      Statement::Ret(s) => self.check_ret(s),
+      Statement::Bind(s) => self.check_bind_statement(s),
+      Statement::Rebind(s) => self.check_rebind_statement(s),
+      Statement::Ret(s) => self.check_ret_statement(s),
       Statement::CallStatement(s) => self.check_call_expression(s).map(drop),
-      Statement::IfStatement(s) => self.check_if(s),
+      Statement::IfStatement(s) => self.check_if_statement(s),
       Statement::LoopStatement(s) => self.check_block(s.body()),
       Statement::Block(s) => self.check_block(s),
       Statement::Break => Ok(()),
@@ -156,7 +177,7 @@ impl TypeChecker {
     Ok(())
   }
 
-  fn check_bind(&mut self, s: &BindStatement) -> TypeCheckerResult {
+  fn check_bind_statement(&mut self, s: &BindStatement) -> TypeCheckerResult {
     let expr_type_id = self.check_expression(s.expr())?;
 
     let Some(var_type_expr) = s.var_type() else {
@@ -169,34 +190,13 @@ impl TypeChecker {
     Ok(())
   }
 
-  fn check_types_match(&self, expected: TypeId, actual: TypeId) -> TypeCheckerResult {
-    let expected = &self.types[expected];
-    self.check_type_matches(expected, actual)
-  }
-
-  fn check_type_matches(&self, expected: &ConcreteType, actual: TypeId) -> TypeCheckerResult {
-    let actual = &self.types[actual];
-    if expected != actual {
-      Err(TypeCheckerError::TypeMismatch {
-        expected: expected.clone(),
-        actual: actual.clone(),
-      })
-    } else {
-      Ok(())
-    }
-  }
-
-  fn check_is_bool(&self, actual: TypeId) -> TypeCheckerResult {
-    self.check_type_matches(&ConcreteType::Primitive(PrimitiveType::Bool), actual)
-  }
-
-  fn check_rebind(&mut self, s: &RebindStatement) -> TypeCheckerResult {
+  fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult {
     let var_type_id = self.get_ast_type_id(s.var());
     let expr_type_id = self.check_expression(s.expr())?;
     self.check_types_match(var_type_id, expr_type_id)
   }
 
-  fn check_ret(&mut self, s: &RetStatement) -> TypeCheckerResult {
+  fn check_ret_statement(&mut self, s: &RetStatement) -> TypeCheckerResult {
     let expr_type_id = self.check_expression(s.expr())?;
 
     let current_fn_type_id =
@@ -209,7 +209,7 @@ impl TypeChecker {
     self.check_type_matches(f.return_type(), expr_type_id)
   }
 
-  fn check_if(&mut self, s: &IfStatement) -> TypeCheckerResult {
+  fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult {
     let cond_type_id = self.check_expression(s.condition())?;
     self.check_is_bool(cond_type_id)?;
 
@@ -218,7 +218,7 @@ impl TypeChecker {
     match s.else_clause() {
       ElseClause::None => Ok(()),
       ElseClause::Else(block) => self.check_block(block),
-      ElseClause::ElseIf(nested) => self.check_if(nested),
+      ElseClause::ElseIf(nested) => self.check_if_statement(nested),
     }
   }
 
@@ -253,6 +253,7 @@ impl TypeChecker {
     self.check_types_match(lhs, rhs)?;
 
     let expected_type = |expected: &'static str| TypeCheckerError::InvalidOperand {
+      op: expr.op(),
       expected: expected.to_owned(),
       actual: self.types[lhs].clone(),
     };
@@ -299,9 +300,7 @@ impl TypeChecker {
       });
     };
 
-    // TODO: Remove this clone, possibly by letting "FunctionType" contain TypeIDs instead
-    // of pointers to ConcreteType values as its parameters. Or make `add_type` check if the
-    // type already exists and only clone if not yet added.
+    // TODO: Remove this clone.
     let return_type_id = self.add_type(f.return_type().clone());
 
     let args = expr.argument_list();
@@ -404,8 +403,8 @@ mod tests {
     analysis: JangTypeAnalysis,
   }
 
-  // GoogleTest needs Debug, but annotating the AST with types in a debug-friendly way requires
-  // a fair bit of code.
+  // GoogleTest needs Debug, but annotating the AST with
+  // types in a debug-friendly way requires is probably a fair bit of code.
   impl std::fmt::Debug for TypeCheckedFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
       f.debug_struct("TypeCheckedFile").finish()

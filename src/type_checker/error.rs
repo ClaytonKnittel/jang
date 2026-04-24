@@ -1,6 +1,8 @@
 use std::fmt::Display;
 
-use crate::type_checker::types::concrete::ConcreteType;
+use crate::{
+  parser::ast::binary_expression::BinaryOp, type_checker::types::concrete::ConcreteType,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeCheckerError {
@@ -11,6 +13,7 @@ pub enum TypeCheckerError {
   },
   /// Type mismatch.
   InvalidOperand {
+    op: BinaryOp,
     expected: String,
     actual: ConcreteType,
   },
@@ -18,25 +21,26 @@ pub enum TypeCheckerError {
   NotCallable { target: ConcreteType },
   /// A call passed the wrong number of arguments.
   ArityMismatch { expected: usize, actual: usize },
-  /// A type was never resolved.
-  UnresolvedType,
 }
 
 impl Display for TypeCheckerError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::TypeMismatch { expected, actual } => {
-        write!(f, "expected `{expected}`, found `{actual}`")
+        write!(f, "expected `{expected}`, but found `{actual}`")
       }
-      Self::InvalidOperand { expected, actual } => {
-        write!(f, "expected `{expected}`, found `{actual}`")
+      Self::InvalidOperand {
+        op,
+        expected,
+        actual,
+      } => {
+        write!(f, "in `{op}` required {expected}, but found `{actual}`")
       }
       Self::NotCallable { target } => write!(f, "cannot call a value of type `{target}`"),
       Self::ArityMismatch { expected, actual } => write!(
         f,
-        "wrong number of arguments: expected {expected}, found {actual}"
+        "wrong number of arguments: expected {expected}, but found {actual}"
       ),
-      Self::UnresolvedType => f.write_str("reference to an undeclared name"),
     }
   }
 }
@@ -83,7 +87,8 @@ pub(crate) mod matchers {
   ) -> impl Matcher<&'a TypeCheckerError> {
     pat!(TypeCheckerError::InvalidOperand {
       expected: expected,
-      actual: actual
+      actual: actual,
+      ..
     })
   }
 }

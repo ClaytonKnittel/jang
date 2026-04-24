@@ -52,7 +52,7 @@ pub struct InlineFn {
 
 impl InlineFn {
   pub fn args(&self) -> &[TypeExpression] {
-    &self.args.expressions()
+    self.args.expressions()
   }
 
   pub fn return_type(&self) -> &TypeExpression {
