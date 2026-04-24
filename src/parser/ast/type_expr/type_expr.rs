@@ -45,9 +45,19 @@ impl Display for TypeExpressionList {
 }
 
 #[derive(Clone, Debug)]
-struct InlineFn {
+pub struct InlineFn {
   args: TypeExpressionList,
   return_type: Box<TypeExpression>,
+}
+
+impl InlineFn {
+  pub fn args(&self) -> &[TypeExpression] {
+    &self.args.expressions()
+  }
+
+  pub fn return_type(&self) -> &TypeExpression {
+    &self.return_type
+  }
 }
 
 impl Display for InlineFn {
@@ -57,7 +67,7 @@ impl Display for InlineFn {
 }
 
 #[derive(Clone, Debug)]
-enum TypeExpressionVariant {
+pub enum TypeExpressionVariant {
   Unit,
   Primitive(PrimitiveType),
   Named(Ident),
@@ -117,6 +127,10 @@ impl TypeExpression {
         return_type: return_type.into(),
       }),
     }
+  }
+
+  pub fn variant(&self) -> &TypeExpressionVariant {
+    &self.variant
   }
 }
 
