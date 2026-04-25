@@ -1,24 +1,24 @@
 use std::fmt::Display;
 
 use crate::{
-  parser::ast::binary_expression::BinaryOp, type_checker::types::concrete::ConcreteType,
+  parser::ast::binary_expression::BinaryOp, type_checker::type_inference_table::InferredType,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeCheckerError {
   /// Type mismatch.
   TypeMismatch {
-    expected: ConcreteType,
-    actual: ConcreteType,
+    expected: InferredType,
+    actual: InferredType,
   },
   /// Type mismatch.
   InvalidOperand {
     op: BinaryOp,
     expected: String,
-    actual: ConcreteType,
+    actual: InferredType,
   },
   /// Call target is not a function type.
-  NotCallable { target: ConcreteType },
+  NotCallable { target: InferredType },
   /// A call passed the wrong number of arguments.
   ArityMismatch { expected: usize, actual: usize },
 }
@@ -51,16 +51,32 @@ pub type TypeCheckerResult<T = ()> = Result<T, TypeCheckerError>;
 
 #[cfg(test)]
 pub(crate) mod matchers {
+  use crate::type_checker::{
+    type_inference_table::matchers::concrete, types::concrete::ConcreteType,
+  };
+
   use super::*;
   use googletest::prelude::*;
 
   pub fn type_mismatch_error<'a>(
-    expected: impl Matcher<&'a ConcreteType>,
-    actual: impl Matcher<&'a ConcreteType>,
+    expected: impl Matcher<&'a InferredType>,
+    actual: impl Matcher<&'a InferredType>,
   ) -> impl Matcher<&'a TypeCheckerError> {
     pat!(TypeCheckerError::TypeMismatch {
       expected: expected,
       actual: actual,
+      ..
+    })
+  }
+
+  // Type mismatch between two concrete types.
+  pub fn concrete_type_mismatch_error<'a>(
+    expected: impl Matcher<&'a ConcreteType>,
+    actual: impl Matcher<&'a ConcreteType>,
+  ) -> impl Matcher<&'a TypeCheckerError> {
+    pat!(TypeCheckerError::TypeMismatch {
+      expected: concrete(expected),
+      actual: concrete(actual),
       ..
     })
   }
@@ -78,7 +94,9 @@ pub(crate) mod matchers {
   pub fn not_callable_error<'a>(
     target: impl Matcher<&'a ConcreteType>,
   ) -> impl Matcher<&'a TypeCheckerError> {
-    pat!(TypeCheckerError::NotCallable { target: target })
+    pat!(TypeCheckerError::NotCallable {
+      target: pat!(InferredType::Concrete(target))
+    })
   }
 
   pub fn invalid_operand<'a>(
@@ -87,7 +105,7 @@ pub(crate) mod matchers {
   ) -> impl Matcher<&'a TypeCheckerError> {
     pat!(TypeCheckerError::InvalidOperand {
       expected: expected,
-      actual: actual,
+      actual: pat!(InferredType::Concrete(actual)),
       ..
     })
   }

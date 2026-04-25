@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::type_checker::types::concrete::ConcreteType;
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug, Hash)]
 pub struct FunctionType {
   parameters: Vec<ConcreteType>,
   return_type: Box<ConcreteType>,

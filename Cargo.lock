@@ -76,13 +76,23 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 [[package]]
 name = "builder"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
+source = "git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2#24cf7d11facd1b9762f05918d3604f87502573e2"
 dependencies = [
  "proc-macro-error",
- "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "proc-macro-util 0.1.0 (git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2)",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "cknittel-util"
+version = "0.1.0"
+source = "git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2#24cf7d11facd1b9762f05918d3604f87502573e2"
+dependencies = [
+ "builder",
+ "from-variants",
+ "util-impl 0.1.0 (git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2)",
 ]
 
 [[package]]
@@ -92,16 +102,6 @@ source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bb
 dependencies = [
  "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2)",
  "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2)",
-]
-
-[[package]]
-name = "cknittel-util"
-version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
-dependencies = [
- "builder",
- "from-variants",
- "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
 ]
 
 [[package]]
@@ -159,14 +159,14 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 [[package]]
 name = "from-variants"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
+source = "git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2#24cf7d11facd1b9762f05918d3604f87502573e2"
 dependencies = [
  "proc-macro-error",
- "proc-macro-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "proc-macro-util 0.1.0 (git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2)",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
- "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "util-impl 0.1.0 (git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2)",
 ]
 
 [[package]]
@@ -217,7 +217,7 @@ dependencies = [
 name = "jang"
 version = "0.1.0"
 dependencies = [
- "cknittel-util 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
+ "cknittel-util 0.1.0 (git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2)",
  "clap",
  "googletest",
  "itertools",
@@ -318,23 +318,23 @@ dependencies = [
 [[package]]
 name = "proc-macro-util"
 version = "0.1.0"
+source = "git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2#24cf7d11facd1b9762f05918d3604f87502573e2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+ "util-impl 0.1.0 (git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2)",
+]
+
+[[package]]
+name = "proc-macro-util"
+version = "0.1.0"
 source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2#9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
  "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2)",
-]
-
-[[package]]
-name = "proc-macro-util"
-version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
- "util-impl 0.1.0 (git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2)",
 ]
 
 [[package]]
@@ -441,7 +441,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "util-impl"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2#9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2"
+source = "git+https://github.com/jtstogel/cknittel-util.git?rev=24cf7d11facd1b9762f05918d3604f87502573e2#24cf7d11facd1b9762f05918d3604f87502573e2"
 dependencies = [
  "num-traits",
 ]
@@ -449,7 +449,7 @@ dependencies = [
 [[package]]
 name = "util-impl"
 version = "0.1.0"
-source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=ce249396392b99f91fc9b0adb5a4f354d16e34c2#ce249396392b99f91fc9b0adb5a4f354d16e34c2"
+source = "git+https://github.com/ClaytonKnittel/cknittel-util.git?rev=9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2#9fcb8c19bbc5e21e0c947d5c7674a1cdfbb158c2"
 dependencies = [
  "num-traits",
 ]

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::type_checker::types::{function::FunctionType, primitive::PrimitiveType};
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Eq, PartialEq, Clone, Debug, Hash)]
 pub enum ConcreteType {
   Unit,
   Function(FunctionType),
