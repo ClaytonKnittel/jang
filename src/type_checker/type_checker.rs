@@ -533,6 +533,34 @@ mod tests {
   }
 
   #[gtest]
+  fn unconstrained_integer_literal_is_i32() {
+    let file = type_check_ok(
+      r#"
+        fn foo(): bool {
+          ret 1 == 1
+        }
+        "#,
+    );
+    let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
+    let bin_expr = ret_stmt.expr().variant().as_binary_expr();
+    expect_that!(file.analysis.get(bin_expr.lhs().id()), i32_type())
+  }
+
+  #[gtest]
+  fn unconstrained_float_literal_is_f32() {
+    let file = type_check_ok(
+      r#"
+        fn foo(): bool {
+          ret 1. < 2.
+        }
+        "#,
+    );
+    let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
+    let bin_expr = ret_stmt.expr().variant().as_binary_expr();
+    expect_that!(file.analysis.get(bin_expr.lhs().id()), f32_type())
+  }
+
+  #[gtest]
   fn bind_statement_without_type_ok() {
     type_check_ok(
       r#"
@@ -579,6 +607,19 @@ mod tests {
       ),
       err(type_mismatch_error(f64_type(), i32_type()))
     );
+  }
+
+  #[gtest]
+  fn bind_variable_has_type_of_rhs() {
+    let file = type_check_ok(
+      r#"
+        fn foo(x: i32) {
+          let y = x
+        }
+        "#,
+    );
+    let bind_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_bind();
+    expect_that!(file.analysis.get(bind_stmt.var().id()), i32_type())
   }
 
   #[gtest]

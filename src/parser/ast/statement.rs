@@ -37,10 +37,29 @@ impl Display for Statement {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::ast::statement::Statement;
+  use crate::parser::ast::{
+    bind_statement::BindStatement, rebind_statement::RebindStatement, ret_statement::RetStatement,
+    statement::Statement,
+  };
   use googletest::prelude::*;
 
   pub fn break_statement<'a>() -> impl Matcher<&'a Statement> {
     pat!(Statement::Break)
+  }
+
+  impl Statement {
+    pub fn as_ret(&self) -> &RetStatement {
+      match self {
+        Self::Ret(s) => s,
+        _ => panic!("Expected RetStatement, got {:?}", self),
+      }
+    }
+
+    pub fn as_bind(&self) -> &BindStatement {
+      match self {
+        Self::Bind(s) => s,
+        _ => panic!("Expected BindStatement, got {:?}", self),
+      }
+    }
   }
 }
