@@ -390,14 +390,6 @@ mod tests {
     type_check_file(source).unwrap()
   }
 
-  pub fn default_int_type<'a>() -> impl Matcher<&'a ConcreteType> {
-    i64_type()
-  }
-
-  pub fn default_float_type<'a>() -> impl Matcher<&'a ConcreteType> {
-    f64_type()
-  }
-
   struct TypeCheckedFile {
     ast: JangFile,
     analysis: JangTypeAnalysis,
@@ -616,14 +608,11 @@ mod tests {
 
   #[gtest]
   fn comparison_requires_same_type() {
-    type_check_ok("fn f(): bool { ret 1 < 1 }");
+    type_check_ok("fn f(x: i32, y: i32): bool { ret x < y }");
 
     expect_that!(
-      type_check_file("fn f(): bool { ret 1. < 1 }"),
-      err(type_mismatch_error(
-        default_float_type(),
-        default_int_type()
-      ))
+      type_check_file("fn f(x: i32, y: f32): bool { ret x < y }"),
+      err(type_mismatch_error(i32_type(), f32_type()))
     );
   }
 
@@ -637,24 +626,21 @@ mod tests {
 
   #[gtest]
   fn arithmetic_expression_requires_same_type() {
-    type_check_ok("fn f() { let x = 1 - 1 }");
+    type_check_ok("fn f(x: f32, y: f32) { let x = x - y }");
 
     expect_that!(
-      type_check_file("fn f() { let x = 1. - 1 }"),
-      err(type_mismatch_error(
-        default_float_type(),
-        default_int_type()
-      ))
+      type_check_file("fn f(x: f32, y: i32) { let x = x - y }"),
+      err(type_mismatch_error(f32_type(), i32_type()))
     );
   }
 
   #[gtest]
-  fn arithmetic_expression_has_same_type_as_operands() {
-    type_check_ok("fn f(): i64 { ret 1 - 1 }");
+  fn arithmetic_expression_preserves_operand_types() {
+    type_check_ok("fn f(x: i32, y: i32): i32 { ret x - y }");
 
     expect_that!(
-      type_check_file("fn f(): i64 { ret 1. - 1.0 }"),
-      err(type_mismatch_error(i64_type(), default_float_type()))
+      type_check_file("fn f(x: i32, y: i32): f32 { ret x - y }"),
+      err(type_mismatch_error(f32_type(), i32_type()))
     );
   }
 
@@ -663,11 +649,8 @@ mod tests {
     type_check_ok("fn f(): bool { ret 1 == 1 && 2 == 2 }");
 
     expect_that!(
-      type_check_file("fn f(): bool { ret 1 && 2 }"),
-      err(invalid_operand(
-        contains_substring("bool"),
-        default_int_type()
-      ))
+      type_check_file("fn f(x: i32): bool { ret x && x }"),
+      err(invalid_operand(contains_substring("bool"), i32_type()))
     );
   }
 
@@ -683,34 +666,31 @@ mod tests {
 
   #[gtest]
   fn equality_requires_same_type() {
-    type_check_ok("fn f(): bool { ret 1 == 1 }");
+    type_check_ok("fn f(x: i32, y: i32): bool { ret x == y }");
 
     expect_that!(
-      type_check_file("fn f(): bool { ret 1 == 1. }"),
-      err(type_mismatch_error(
-        default_int_type(),
-        default_float_type()
-      ))
+      type_check_file("fn f(x: i32, y: f32): bool { ret x == y }"),
+      err(type_mismatch_error(i32_type(), f32_type()))
     );
   }
 
   #[gtest]
   fn equality_not_defined_on_floats() {
     expect_that!(
-      type_check_file("fn f(): bool { ret 1. == 1. }"),
+      type_check_file("fn f(x: f64): bool { ret x == x }"),
       err(invalid_operand(
         contains_substring("integer or bool"),
-        default_float_type()
+        f64_type()
       ))
     );
   }
 
   #[gtest]
   fn if_condition_requires_bool() {
-    type_check_ok("fn f() { if 1 == 1 {} }");
+    type_check_ok("fn f(x: bool) { if x {} }");
     expect_that!(
-      type_check_file("fn f() { if 1 {} }",),
-      err(type_mismatch_error(bool_type(), default_int_type()))
+      type_check_file("fn f(x: i32) { if x {} }",),
+      err(type_mismatch_error(bool_type(), i32_type()))
     );
   }
 
