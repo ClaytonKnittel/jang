@@ -396,7 +396,7 @@ mod tests {
   }
 
   // GoogleTest needs Debug, but annotating the AST with
-  // types in a debug-friendly way requires is probably a fair bit of code.
+  // types in a debug-friendly way is probably a fair bit of code.
   impl std::fmt::Debug for TypeCheckedFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
       f.debug_struct("TypeCheckedFile").finish()
