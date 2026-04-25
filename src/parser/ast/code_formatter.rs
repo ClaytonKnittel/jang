@@ -31,7 +31,7 @@ impl<'a, F: std::fmt::Write> CodeFormatter<'a, F> {
 
   fn increment_indentation(&mut self) {
     if self.spaces.len() == self.cur_indentation_spaces_len() {
-      self.spaces.extend([b' ', b' ']);
+      self.spaces.extend(*b"  ");
     }
 
     self.indentation_level += 1;
