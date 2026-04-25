@@ -37,23 +37,23 @@ struct TypeChecker {
   ast_types: TypedAstIdTable<TypeId>,
   current_fn: Option<AstGlobalDeclId>,
 
-  i64_type_id: TypeId,
-  f64_type_id: TypeId,
+  i32_type_id: TypeId,
+  f32_type_id: TypeId,
   bool_type_id: TypeId,
 }
 
 impl TypeChecker {
   fn check(jang_file: &JangFile) -> TypeCheckerResult<JangTypeAnalysis> {
     let mut types = TypeVec::default();
-    let i64_type_id = types.push(ConcreteType::Primitive(PrimitiveType::I64));
-    let f64_type_id = types.push(ConcreteType::Primitive(PrimitiveType::F64));
+    let i32_type_id = types.push(ConcreteType::Primitive(PrimitiveType::I32));
+    let f32_type_id = types.push(ConcreteType::Primitive(PrimitiveType::F32));
     let bool_type_id = types.push(ConcreteType::Primitive(PrimitiveType::Bool));
     let mut checker = Self {
       types,
       ast_types: TypedAstIdTable::new(jang_file),
       current_fn: None,
-      i64_type_id,
-      f64_type_id,
+      i32_type_id,
+      f32_type_id,
       bool_type_id,
     };
 
@@ -238,8 +238,8 @@ impl TypeChecker {
 
   fn check_literal_expression(&mut self, expr: &LiteralExpression) -> TypeId {
     match expr.literal() {
-      Literal::Numeric(NumericLiteral::Integral(_)) => self.i64_type_id,
-      Literal::Numeric(NumericLiteral::Float(_)) => self.f64_type_id,
+      Literal::Numeric(NumericLiteral::Integral(_)) => self.i32_type_id,
+      Literal::Numeric(NumericLiteral::Float(_)) => self.f32_type_id,
     }
   }
 
@@ -513,18 +513,6 @@ mod tests {
   }
 
   #[gtest]
-  fn fn_call_expression_return_type_ok() {
-    type_check_ok(
-      r#"
-        fn foo(): f64 { ret 0. }
-        fn bar() {
-          let x: f64 = foo()
-        }
-        "#,
-    );
-  }
-
-  #[gtest]
   fn fn_with_return_value_ok() {
     let file = type_check_file(
       r#"
@@ -597,13 +585,13 @@ mod tests {
   fn call_expression_return_type_used() {
     let file = type_check_file(
       r#"
-        fn foo(): f64 { ret 0. }
+        fn foo(): f32 { ret 0. }
         fn bar() {
           let x: bool = foo()
         }
         "#,
     );
-    expect_that!(file, err(type_mismatch_error(bool_type(), f64_type())));
+    expect_that!(file, err(type_mismatch_error(bool_type(), f32_type())));
   }
 
   #[gtest]
@@ -756,9 +744,9 @@ mod tests {
   fn function_type_in_local_binding_maintains_type() {
     type_check_ok(
       r#"
-        fn f(): i64 { ret 0 }
+        fn f(): i32 { ret 0 }
 
-        fn foo(): i64 {
+        fn foo(): i32 {
           let func = f
           ret func()
         }
@@ -770,9 +758,9 @@ mod tests {
   fn function_parameter_accepts_function_arg() {
     type_check_ok(
       r#"
-        fn f(x: () -> i64): i64 { ret x() }
-        fn g(): i64 { ret 0 }
-        fn h(): i64 { ret f(g) }
+        fn f(x: () -> i32): i32 { ret x() }
+        fn g(): i32 { ret 0 }
+        fn h(): i32 { ret f(g) }
         "#,
     );
   }
@@ -782,9 +770,9 @@ mod tests {
     expect_that!(
       type_check_file(
         r#"
-        fn f(x: () -> i64): i64 { ret x() }
-        fn g(y: bool): i64 { ret 0 }
-        fn h(): i64 { ret f(g) }
+        fn f(x: () -> i32): i32 { ret x() }
+        fn g(y: bool): i32 { ret 0 }
+        fn h(): i32 { ret f(g) }
         "#,
       ),
       err(type_mismatch_error(
