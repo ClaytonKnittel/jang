@@ -11,7 +11,7 @@ pub enum TypeCheckerError {
     expected: ConcreteType,
     actual: ConcreteType,
   },
-  /// Type mismatch.
+  /// Type mismatch in a binary operation.
   InvalidOperand {
     op: BinaryOp,
     expected: String,
