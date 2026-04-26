@@ -38,8 +38,7 @@ impl Display for Statement {
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::ast::{
-    bind_statement::BindStatement, rebind_statement::RebindStatement, ret_statement::RetStatement,
-    statement::Statement,
+    bind_statement::BindStatement, ret_statement::RetStatement, statement::Statement,
   };
   use googletest::prelude::*;
 

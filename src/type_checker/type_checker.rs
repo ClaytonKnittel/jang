@@ -26,35 +26,27 @@ use crate::{
   type_checker::{
     error::{TypeCheckerError, TypeCheckerResult},
     type_analysis::JangTypeAnalysis,
-    type_vec::{TypeId, TypeVec},
     typed_ast_id::{TypedAstId, TypedAstIdTable},
-    types::{concrete::ConcreteType, function::FunctionType, primitive::PrimitiveType},
+    types::{
+      concrete::ConcreteType,
+      function::FunctionType,
+      registry::{TypeId, TypeRegistry},
+    },
   },
 };
 
 struct TypeChecker {
-  types: TypeVec,
+  types: TypeRegistry,
   ast_types: TypedAstIdTable<TypeId>,
   current_fn: Option<AstGlobalDeclId>,
-
-  i32_type_id: TypeId,
-  f32_type_id: TypeId,
-  bool_type_id: TypeId,
 }
 
 impl TypeChecker {
   fn check(jang_file: &JangFile) -> TypeCheckerResult<JangTypeAnalysis> {
-    let mut types = TypeVec::default();
-    let i32_type_id = types.push(ConcreteType::Primitive(PrimitiveType::I32));
-    let f32_type_id = types.push(ConcreteType::Primitive(PrimitiveType::F32));
-    let bool_type_id = types.push(ConcreteType::Primitive(PrimitiveType::Bool));
     let mut checker = Self {
-      types,
+      types: TypeRegistry::default(),
       ast_types: TypedAstIdTable::new(jang_file),
       current_fn: None,
-      i32_type_id,
-      f32_type_id,
-      bool_type_id,
     };
 
     checker.register_global_types(jang_file)?;
@@ -62,18 +54,14 @@ impl TypeChecker {
 
     let mut resolved_types = TypedAstIdTable::new(jang_file);
     for (ast_id, type_id) in checker.ast_types.into_iter() {
-      resolved_types.insert(ast_id, checker.types[type_id].clone());
+      resolved_types.insert(ast_id, type_id);
     }
 
-    Ok(JangTypeAnalysis::new(resolved_types))
-  }
-
-  fn add_type(&mut self, ty: ConcreteType) -> TypeId {
-    self.types.push(ty)
+    Ok(JangTypeAnalysis::new(checker.types, resolved_types))
   }
 
   fn set_ast_type(&mut self, ast_id: impl Into<TypedAstId>, ty: ConcreteType) -> TypeId {
-    let type_id = self.types.push(ty);
+    let type_id = self.types.add(ty);
     self.ast_types.insert(ast_id, type_id);
     type_id
   }
@@ -90,16 +78,10 @@ impl TypeChecker {
   }
 
   fn check_types_match(&self, expected: TypeId, actual: TypeId) -> TypeCheckerResult {
-    let expected = &self.types[expected];
-    self.check_type_matches(expected, actual)
-  }
-
-  fn check_type_matches(&self, expected: &ConcreteType, actual: TypeId) -> TypeCheckerResult {
-    let actual = &self.types[actual];
     if expected != actual {
       Err(TypeCheckerError::TypeMismatch {
-        expected: expected.clone(),
-        actual: actual.clone(),
+        expected: self.types.display(expected).to_string(),
+        actual: self.types.display(actual).to_string(),
       })
     } else {
       Ok(())
@@ -107,7 +89,7 @@ impl TypeChecker {
   }
 
   fn check_is_bool(&self, actual: TypeId) -> TypeCheckerResult {
-    self.check_type_matches(&ConcreteType::Primitive(PrimitiveType::Bool), actual)
+    self.check_types_match(self.types.bool_type(), actual)
   }
 
   fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult {
@@ -124,17 +106,15 @@ impl TypeChecker {
       .iter()
       .map(|param| {
         let concrete = self.eval_type_expression(param.ty())?;
-        self.set_ast_type(param.var().id(), concrete.clone());
+        self.set_ast_type_id(param.var().id(), concrete);
         Ok(concrete)
       })
       .collect_result_vec()?;
 
-    let return_type = Box::new(
-      fn_decl
-        .return_type()
-        .map(|ty| self.eval_type_expression(ty))
-        .unwrap_or(Ok(ConcreteType::Unit))?,
-    );
+    let return_type = fn_decl
+      .return_type()
+      .map(|ty| self.eval_type_expression(ty))
+      .unwrap_or(Ok(self.types.unit_type()))?;
 
     Ok(ConcreteType::Function(FunctionType::new(
       parameters,
@@ -186,7 +166,7 @@ impl TypeChecker {
     };
 
     let var_type = self.eval_type_expression(var_type_expr)?;
-    self.check_type_matches(&var_type, expr_type_id)?;
+    self.check_types_match(var_type, expr_type_id)?;
     Ok(())
   }
 
@@ -206,7 +186,7 @@ impl TypeChecker {
       panic!("Expected current function to have FunctionType")
     };
 
-    self.check_type_matches(f.return_type(), expr_type_id)
+    self.check_types_match(f.return_type(), expr_type_id)
   }
 
   fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult {
@@ -238,8 +218,8 @@ impl TypeChecker {
 
   fn check_literal_expression(&mut self, expr: &LiteralExpression) -> TypeId {
     match expr.literal() {
-      Literal::Numeric(NumericLiteral::Integral(_)) => self.i32_type_id,
-      Literal::Numeric(NumericLiteral::Float(_)) => self.f32_type_id,
+      Literal::Numeric(NumericLiteral::Integral(_)) => self.types.i32_type(),
+      Literal::Numeric(NumericLiteral::Float(_)) => self.types.f32_type(),
     }
   }
 
@@ -255,7 +235,7 @@ impl TypeChecker {
     let expected_type = |expected: &'static str| TypeCheckerError::InvalidOperand {
       op: expr.op(),
       expected: expected.to_owned(),
-      actual: self.types[lhs].clone(),
+      actual: self.types.display(lhs).to_string(),
     };
 
     let ConcreteType::Primitive(primitive) = &self.types[lhs] else {
@@ -269,15 +249,15 @@ impl TypeChecker {
         .then_some(lhs)
         .ok_or_else(|| expected_type("numeric")),
       Equal | NotEqual => (primitive.is_integer() || primitive.is_bool())
-        .then_some(self.bool_type_id)
+        .then_some(self.types.bool_type())
         .ok_or_else(|| expected_type("integer or bool")),
       GreaterThan | GreaterThanEqual | LessThan | LessThanEqual => primitive
         .is_numeric()
-        .then_some(self.bool_type_id)
+        .then_some(self.types.bool_type())
         .ok_or_else(|| expected_type("numeric")),
       LogicalAnd | LogicalOr => primitive
         .is_bool()
-        .then_some(self.bool_type_id)
+        .then_some(self.types.bool_type())
         .ok_or_else(|| expected_type("bool")),
     }
   }
@@ -287,21 +267,20 @@ impl TypeChecker {
     match expr.op() {
       UnaryOp::LogicalNot => {
         self.check_is_bool(expr_type_id)?;
-        Ok(self.bool_type_id)
+        Ok(self.types.bool_type())
       }
     }
   }
 
   fn check_call_expression(&mut self, expr: &CallExpression) -> TypeCheckerResult<TypeId> {
     let target_type_id = self.check_expression(expr.target())?;
-    let ConcreteType::Function(f) = self.types[target_type_id].clone() else {
+    let ConcreteType::Function(f) = &self.types[target_type_id] else {
       return Err(TypeCheckerError::NotCallable {
-        target: self.types[target_type_id].clone(),
+        target: self.types.display(target_type_id).to_string(),
       });
     };
 
-    // TODO: Remove this clone.
-    let return_type_id = self.add_type(f.return_type().clone());
+    let return_type_id = f.return_type();
 
     let args = expr.argument_list();
     if args.len() != f.parameters().len() {
@@ -311,9 +290,9 @@ impl TypeChecker {
       });
     }
 
-    for (arg, param_type) in args.iter().zip(f.parameters()) {
+    for (arg, param_type) in args.iter().zip(f.parameters().to_vec()) {
       let arg_type = self.check_expression(arg)?;
-      self.check_type_matches(param_type, arg_type)?;
+      self.check_types_match(param_type, arg_type)?;
     }
 
     Ok(return_type_id)
@@ -326,18 +305,19 @@ impl TypeChecker {
   fn eval_type_expression(
     &mut self,
     type_expression: &TypeExpression,
-  ) -> TypeCheckerResult<ConcreteType> {
-    match type_expression.variant() {
+  ) -> TypeCheckerResult<TypeId> {
+    let concrete = match type_expression.variant() {
       TypeExpressionVariant::Unit => Ok(ConcreteType::Unit),
       TypeExpressionVariant::InlineFn(inline_fn) => self.eval_inline_fn(inline_fn),
       TypeExpressionVariant::Primitive(p) => Ok(ConcreteType::Primitive(p.into())),
       TypeExpressionVariant::Named(_) => todo!("Look up struct in global type decls"),
       TypeExpressionVariant::AnonymousStruct(_) => todo!("Handle structs"),
-    }
+    }?;
+    Ok(self.types.add(concrete))
   }
 
   fn eval_inline_fn(&mut self, inline_fn: &InlineFn) -> TypeCheckerResult<ConcreteType> {
-    let return_type = Box::new(self.eval_type_expression(inline_fn.return_type())?);
+    let return_type = self.eval_type_expression(inline_fn.return_type())?;
     let parameters = inline_fn
       .args()
       .iter()
@@ -375,7 +355,11 @@ mod tests {
       types::{
         concrete::{ConcreteType, matchers::unit_type},
         function::matchers::{fn_param_types, fn_return_type},
-        primitive::matchers::{bool_type, f32_type, f64_type, i32_type, i64_type},
+        primitive::matchers::{
+          bool_type, bool_type_name, f32_type, f32_type_name, f64_type, f64_type_name, i32_type,
+          i32_type_name, i64_type, i64_type_name,
+        },
+        registry::TypeId,
       },
     },
   };
@@ -413,10 +397,14 @@ mod tests {
         .unwrap_or_else(|| panic!("function `{name}` not found"))
     }
 
-    fn fn_type(&self, name: &str) -> &ConcreteType {
+    fn fn_type_id(&self, name: &str) -> TypeId {
       self
         .analysis
         .get(self.fn_decl_by_name(name).name_decl().id())
+    }
+
+    fn type_id<'a>(&'a self, matcher: impl Matcher<&'a ConcreteType>) -> impl Matcher<&'a TypeId> {
+      self.analysis.registry().type_id(matcher)
     }
   }
 
@@ -424,15 +412,21 @@ mod tests {
   fn empty_fn() {
     let file = type_check_ok("fn foo() { }");
     expect_that!(
-      file.fn_type("foo"),
-      all![fn_param_types(is_empty()), fn_return_type(unit_type())]
+      &file.fn_type_id("foo"),
+      file.type_id(all![
+        fn_param_types(is_empty()),
+        fn_return_type(file.type_id(unit_type())),
+      ]),
     );
   }
 
   #[gtest]
   fn fn_with_return_value() {
     let file = type_check_ok("fn foo(): i32 { }");
-    expect_that!(file.fn_type("foo"), fn_return_type(i32_type()));
+    expect_that!(
+      &file.fn_type_id("foo"),
+      file.type_id(fn_return_type(file.type_id(i32_type())))
+    );
   }
 
   #[gtest]
@@ -450,14 +444,14 @@ mod tests {
     );
 
     expect_that!(
-      file.fn_type("foo"),
-      fn_param_types(elements_are![
-        i32_type(),
-        i64_type(),
-        f32_type(),
-        f64_type(),
-        bool_type()
-      ])
+      &file.fn_type_id("foo"),
+      file.type_id(fn_param_types(elements_are![
+        file.type_id(i32_type()),
+        file.type_id(i64_type()),
+        file.type_id(f32_type()),
+        file.type_id(f64_type()),
+        file.type_id(bool_type())
+      ]))
     );
   }
 
@@ -472,11 +466,14 @@ mod tests {
     );
 
     expect_that!(
-      file.fn_type("foo"),
-      fn_param_types(elements_are![all![
-        fn_param_types(elements_are![i32_type(), f32_type()]),
-        fn_return_type(bool_type()),
-      ]])
+      &file.fn_type_id("foo"),
+      file.type_id(fn_param_types(elements_are![all![
+        file.type_id(fn_param_types(elements_are![
+          file.type_id(i32_type()),
+          file.type_id(f32_type())
+        ])),
+        file.type_id(fn_return_type(file.type_id(bool_type()))),
+      ]]))
     );
   }
 
@@ -498,7 +495,7 @@ mod tests {
         fn foo(x: i32) { x() }
         "#,
     );
-    expect_that!(file, err(not_callable_error(i32_type())));
+    expect_that!(file, err(not_callable_error(i32_type_name())));
   }
 
   #[gtest]
@@ -509,7 +506,10 @@ mod tests {
         fn bar(x: f32) { foo(x) }
         "#,
     );
-    expect_that!(file, err(type_mismatch_error(i32_type(), f32_type())));
+    expect_that!(
+      file,
+      err(type_mismatch_error(i32_type_name(), f32_type_name()))
+    );
   }
 
   #[gtest]
@@ -529,7 +529,10 @@ mod tests {
         fn foo(x: i64): i32 { ret x }
         "#,
     );
-    expect_that!(file, err(type_mismatch_error(i32_type(), i64_type())));
+    expect_that!(
+      file,
+      err(type_mismatch_error(i32_type_name(), i64_type_name()))
+    );
   }
 
   #[gtest]
@@ -543,7 +546,10 @@ mod tests {
     );
     let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
     let bin_expr = ret_stmt.expr().variant().as_binary_expr();
-    expect_that!(file.analysis.get(bin_expr.lhs().id()), i32_type())
+    expect_that!(
+      &file.analysis.get(bin_expr.lhs().id()),
+      file.type_id(i32_type())
+    )
   }
 
   #[gtest]
@@ -557,7 +563,10 @@ mod tests {
     );
     let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
     let bin_expr = ret_stmt.expr().variant().as_binary_expr();
-    expect_that!(file.analysis.get(bin_expr.lhs().id()), f32_type())
+    expect_that!(
+      &file.analysis.get(bin_expr.lhs().id()),
+      file.type_id(f32_type())
+    )
   }
 
   #[gtest]
@@ -581,7 +590,10 @@ mod tests {
         }
         "#,
     );
-    expect_that!(f, err(type_mismatch_error(f64_type(), i32_type())))
+    expect_that!(
+      f,
+      err(type_mismatch_error(f64_type_name(), i32_type_name()))
+    )
   }
 
   #[gtest]
@@ -605,7 +617,7 @@ mod tests {
         }
         "#,
       ),
-      err(type_mismatch_error(f64_type(), i32_type()))
+      err(type_mismatch_error(f64_type_name(), i32_type_name()))
     );
   }
 
@@ -619,7 +631,10 @@ mod tests {
         "#,
     );
     let bind_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_bind();
-    expect_that!(file.analysis.get(bind_stmt.var().id()), i32_type())
+    expect_that!(
+      &file.analysis.get(bind_stmt.var().id()),
+      file.type_id(i32_type())
+    )
   }
 
   #[gtest]
@@ -632,7 +647,10 @@ mod tests {
         }
         "#,
     );
-    expect_that!(file, err(type_mismatch_error(bool_type(), f32_type())));
+    expect_that!(
+      file,
+      err(type_mismatch_error(bool_type_name(), f32_type_name()))
+    );
   }
 
   #[gtest]
@@ -641,7 +659,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32, y: f32): bool { ret x < y }"),
-      err(type_mismatch_error(i32_type(), f32_type()))
+      err(type_mismatch_error(i32_type_name(), f32_type_name()))
     );
   }
 
@@ -649,7 +667,10 @@ mod tests {
   fn comparison_requires_numeric_type() {
     expect_that!(
       type_check_file("fn f(x: bool): bool { ret x < x }"),
-      err(invalid_operand(contains_substring("numeric"), bool_type()))
+      err(invalid_operand(
+        contains_substring("numeric"),
+        bool_type_name()
+      ))
     );
   }
 
@@ -659,7 +680,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: f32, y: i32) { let x = x - y }"),
-      err(type_mismatch_error(f32_type(), i32_type()))
+      err(type_mismatch_error(f32_type_name(), i32_type_name()))
     );
   }
 
@@ -669,7 +690,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32, y: i32): f32 { ret x - y }"),
-      err(type_mismatch_error(f32_type(), i32_type()))
+      err(type_mismatch_error(f32_type_name(), i32_type_name()))
     );
   }
 
@@ -679,7 +700,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32): bool { ret x && x }"),
-      err(invalid_operand(contains_substring("bool"), i32_type()))
+      err(invalid_operand(contains_substring("bool"), i32_type_name()))
     );
   }
 
@@ -689,7 +710,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32): bool { ret !x }"),
-      err(type_mismatch_error(bool_type(), i32_type()))
+      err(type_mismatch_error(bool_type_name(), i32_type_name()))
     );
   }
 
@@ -699,7 +720,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32, y: f32): bool { ret x == y }"),
-      err(type_mismatch_error(i32_type(), f32_type()))
+      err(type_mismatch_error(i32_type_name(), f32_type_name()))
     );
   }
 
@@ -709,7 +730,7 @@ mod tests {
       type_check_file("fn f(x: f64): bool { ret x == x }"),
       err(invalid_operand(
         contains_substring("integer or bool"),
-        f64_type()
+        f64_type_name()
       ))
     );
   }
@@ -719,7 +740,7 @@ mod tests {
     type_check_ok("fn f(x: bool) { if x {} }");
     expect_that!(
       type_check_file("fn f(x: i32) { if x {} }",),
-      err(type_mismatch_error(bool_type(), i32_type()))
+      err(type_mismatch_error(bool_type_name(), i32_type_name()))
     );
   }
 
@@ -734,7 +755,10 @@ mod tests {
         }
         "#,
     );
-    expect_that!(file, err(type_mismatch_error(i32_type(), bool_type())));
+    expect_that!(
+      file,
+      err(type_mismatch_error(i32_type_name(), bool_type_name()))
+    );
   }
 
   #[gtest]
@@ -749,7 +773,10 @@ mod tests {
         }
         "#,
     );
-    expect_that!(file, err(type_mismatch_error(i32_type(), bool_type())));
+    expect_that!(
+      file,
+      err(type_mismatch_error(i32_type_name(), bool_type_name()))
+    );
   }
 
   #[gtest]
@@ -764,7 +791,10 @@ mod tests {
         }
         "#,
     );
-    expect_that!(file, err(type_mismatch_error(i32_type(), bool_type())));
+    expect_that!(
+      file,
+      err(type_mismatch_error(i32_type_name(), bool_type_name()))
+    );
   }
 
   #[gtest]
@@ -778,7 +808,10 @@ mod tests {
         }
         "#,
     );
-    expect_that!(file, err(type_mismatch_error(i32_type(), bool_type())));
+    expect_that!(
+      file,
+      err(type_mismatch_error(i32_type_name(), bool_type_name()))
+    );
   }
 
   #[gtest]
@@ -817,8 +850,8 @@ mod tests {
         "#,
       ),
       err(type_mismatch_error(
-        fn_param_types(is_empty()),
-        fn_param_types(elements_are![bool_type()]),
+        contains_substring("() -> i32"),
+        contains_substring("(bool) -> i32"),
       ))
     )
   }

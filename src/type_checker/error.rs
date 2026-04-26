@@ -1,24 +1,19 @@
 use std::fmt::Display;
 
-use crate::{
-  parser::ast::binary_expression::BinaryOp, type_checker::types::concrete::ConcreteType,
-};
+use crate::parser::ast::binary_expression::BinaryOp;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeCheckerError {
   /// Type mismatch.
-  TypeMismatch {
-    expected: ConcreteType,
-    actual: ConcreteType,
-  },
-  /// Type mismatch.
+  TypeMismatch { expected: String, actual: String },
+  /// Type mismatch in binary operation.
   InvalidOperand {
     op: BinaryOp,
     expected: String,
-    actual: ConcreteType,
+    actual: String,
   },
   /// Call target is not a function type.
-  NotCallable { target: ConcreteType },
+  NotCallable { target: String },
   /// A call passed the wrong number of arguments.
   ArityMismatch { expected: usize, actual: usize },
 }
@@ -55,12 +50,12 @@ pub(crate) mod matchers {
   use googletest::prelude::*;
 
   pub fn type_mismatch_error<'a>(
-    expected: impl Matcher<&'a ConcreteType>,
-    actual: impl Matcher<&'a ConcreteType>,
+    expected: impl Matcher<&'a str>,
+    actual: impl Matcher<&'a str>,
   ) -> impl Matcher<&'a TypeCheckerError> {
     pat!(TypeCheckerError::TypeMismatch {
-      expected: expected,
-      actual: actual,
+      expected: result_of!(&String::as_str, expected),
+      actual: result_of!(&String::as_str, actual),
       ..
     })
   }
@@ -76,18 +71,20 @@ pub(crate) mod matchers {
   }
 
   pub fn not_callable_error<'a>(
-    target: impl Matcher<&'a ConcreteType>,
+    target: impl Matcher<&'a str>,
   ) -> impl Matcher<&'a TypeCheckerError> {
-    pat!(TypeCheckerError::NotCallable { target: target })
+    pat!(TypeCheckerError::NotCallable {
+      target: result_of!(&String::as_str, target)
+    })
   }
 
   pub fn invalid_operand<'a>(
-    expected: impl Matcher<&'a String>,
-    actual: impl Matcher<&'a ConcreteType>,
+    expected: impl Matcher<&'a str>,
+    actual: impl Matcher<&'a str>,
   ) -> impl Matcher<&'a TypeCheckerError> {
     pat!(TypeCheckerError::InvalidOperand {
-      expected: expected,
-      actual: actual,
+      expected: result_of!(&String::as_str, expected),
+      actual: result_of!(&String::as_str, actual),
       ..
     })
   }
