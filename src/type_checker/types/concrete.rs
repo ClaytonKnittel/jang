@@ -1,20 +1,22 @@
-use std::fmt::Display;
+use crate::type_checker::types::{
+  function::FunctionType,
+  primitive::PrimitiveType,
+  registry::{DisplayType, TypeRegistry},
+};
 
-use crate::type_checker::types::{function::FunctionType, primitive::PrimitiveType};
-
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ConcreteType {
   Unit,
   Function(FunctionType),
   Primitive(PrimitiveType),
 }
 
-impl Display for ConcreteType {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl DisplayType for ConcreteType {
+  fn fmt_type(&self, f: &mut std::fmt::Formatter<'_>, r: &TypeRegistry) -> std::fmt::Result {
     match self {
       Self::Unit => f.write_str("unit"),
       Self::Primitive(p) => write!(f, "{p}"),
-      Self::Function(func) => write!(f, "{func}"),
+      Self::Function(func) => func.fmt_type(f, r),
     }
   }
 }

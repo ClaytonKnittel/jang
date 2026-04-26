@@ -1,62 +1,59 @@
-use std::fmt::Display;
+use crate::type_checker::types::registry::{DisplayType, TypeRegistry, TypeId};
 
-use crate::type_checker::types::concrete::ConcreteType;
-
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct FunctionType {
-  parameters: Vec<ConcreteType>,
-  return_type: Box<ConcreteType>,
+  parameters: Vec<TypeId>,
+  return_type: TypeId,
 }
 
 impl FunctionType {
-  pub fn new(parameters: Vec<ConcreteType>, return_type: Box<ConcreteType>) -> Self {
+  pub fn new(parameters: Vec<TypeId>, return_type: TypeId) -> Self {
     FunctionType {
       parameters,
       return_type,
     }
   }
 
-  pub fn parameters(&self) -> &[ConcreteType] {
+  pub fn parameters(&self) -> &[TypeId] {
     &self.parameters
   }
 
-  pub fn return_type(&self) -> &ConcreteType {
-    &self.return_type
+  pub fn return_type(&self) -> TypeId {
+    self.return_type
   }
 }
 
-impl Display for FunctionType {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl DisplayType for FunctionType {
+  fn fmt_type(&self, f: &mut std::fmt::Formatter<'_>, r: &TypeRegistry) -> std::fmt::Result {
     f.write_str("(")?;
     for (i, param) in self.parameters.iter().enumerate() {
       if i > 0 {
         f.write_str(", ")?;
       }
-      write!(f, "{param}")?;
+      param.fmt_type(f, r)?;
     }
-    write!(f, ") -> {}", self.return_type)
+    write!(f, ") -> ")?;
+    self.return_type.fmt_type(f, r)
   }
 }
 
 #[cfg(test)]
 pub(crate) mod matchers {
   use super::*;
-  use crate::type_checker::types::concrete::matchers::concrete_fn_type;
+  use crate::type_checker::types::concrete::{ConcreteType, matchers::concrete_fn_type};
   use googletest::prelude::*;
-  use std::ops::Deref;
 
   pub fn fn_param_types<'a>(
-    params: impl Matcher<&'a Vec<ConcreteType>>,
+    params: impl Matcher<&'a [TypeId]>,
   ) -> impl Matcher<&'a ConcreteType> {
-    concrete_fn_type(pat!(FunctionType {
-      parameters: params,
-      ..
-    }))
+    concrete_fn_type(result_of!(&FunctionType::parameters, params))
   }
 
-  pub fn fn_return_type<'a>(ret: impl Matcher<&'a ConcreteType>) -> impl Matcher<&'a ConcreteType> {
+  pub fn fn_return_type<'a>(
+    ret: impl Matcher<&'a TypeId>,
+  ) -> impl Matcher<&'a ConcreteType> {
     concrete_fn_type(pat!(FunctionType {
-      return_type: result_of!(&Box::deref, ret),
+      return_type: ret,
       ..
     }))
   }

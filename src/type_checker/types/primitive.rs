@@ -80,4 +80,24 @@ pub(crate) mod matchers {
   pub fn bool_type<'a>() -> impl Matcher<&'a ConcreteType> {
     concrete_primitive_type(pat!(PrimitiveType::Bool))
   }
+
+  pub fn i32_type_name<'a>() -> impl Matcher<&'a str> {
+    eq(PrimitiveType::I32.to_string())
+  }
+
+  pub fn i64_type_name<'a>() -> impl Matcher<&'a str> {
+    eq(PrimitiveType::I64.to_string())
+  }
+
+  pub fn f32_type_name<'a>() -> impl Matcher<&'a str> {
+    eq(PrimitiveType::F32.to_string())
+  }
+
+  pub fn f64_type_name<'a>() -> impl Matcher<&'a str> {
+    eq(PrimitiveType::F64.to_string())
+  }
+
+  pub fn bool_type_name<'a>() -> impl Matcher<&'a str> {
+    eq(PrimitiveType::Bool.to_string())
+  }
 }
