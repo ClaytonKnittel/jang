@@ -6,7 +6,7 @@ use crate::parser::ast::binary_expression::BinaryOp;
 pub enum TypeCheckerError {
   /// Type mismatch.
   TypeMismatch { expected: String, actual: String },
-  /// Type mismatch in binary operation.
+  /// Type mismatch.
   InvalidOperand {
     op: BinaryOp,
     expected: String,
