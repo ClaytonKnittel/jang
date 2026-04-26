@@ -59,7 +59,10 @@ impl Display for Expression {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::parser::ast::expression::{Expression, ExpressionVariant};
+  use crate::parser::ast::{
+    binary_expression::BinaryExpression,
+    expression::{Expression, ExpressionVariant},
+  };
   use googletest::prelude::*;
 
   pub fn expr_variant<'a>(
@@ -69,5 +72,14 @@ pub(crate) mod matchers {
       id: anything(),
       variant: variant_matcher
     })
+  }
+
+  impl ExpressionVariant {
+    pub fn as_binary_expr(&self) -> &BinaryExpression {
+      match self {
+        Self::BinaryExpression(e) => e,
+        _ => panic!("Expected BinaryExpression, got {:?}", self),
+      }
+    }
   }
 }
