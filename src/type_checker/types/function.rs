@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use itertools::Itertools;
+
 use crate::type_checker::types::concrete::ConcreteType;
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -27,14 +29,12 @@ impl FunctionType {
 
 impl Display for FunctionType {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    f.write_str("(")?;
-    for (i, param) in self.parameters.iter().enumerate() {
-      if i > 0 {
-        f.write_str(", ")?;
-      }
-      write!(f, "{param}")?;
-    }
-    write!(f, ") -> {}", self.return_type)
+    write!(
+      f,
+      "({}) -> {}",
+      self.parameters.iter().format(", "),
+      self.return_type
+    )
   }
 }
 
