@@ -5,3 +5,4 @@ pub mod error;
 pub mod interpreter;
 pub mod parser;
 mod source_location;
+pub mod type_checker;
