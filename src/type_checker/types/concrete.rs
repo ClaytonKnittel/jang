@@ -1,22 +1,20 @@
-use crate::type_checker::types::{
-  function::FunctionType,
-  primitive::PrimitiveType,
-  registry::{DisplayType, TypeRegistry},
-};
+use std::fmt::Display;
+
+use crate::type_checker::types::{function::FunctionType, primitive::PrimitiveType};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ConcreteType {
+pub enum ConcreteType<'a> {
   Unit,
-  Function(FunctionType),
+  Function(FunctionType<'a>),
   Primitive(PrimitiveType),
 }
 
-impl DisplayType for ConcreteType {
-  fn fmt_type(&self, f: &mut std::fmt::Formatter<'_>, r: &TypeRegistry) -> std::fmt::Result {
+impl<'a> Display for ConcreteType<'a> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Unit => f.write_str("unit"),
       Self::Primitive(p) => write!(f, "{p}"),
-      Self::Function(func) => func.fmt_type(f, r),
+      Self::Function(func) => write!(f, "{func}"),
     }
   }
 }
@@ -29,17 +27,17 @@ pub(crate) mod matchers {
 
   pub fn concrete_primitive_type<'a>(
     primitive_matcher: impl Matcher<&'a PrimitiveType>,
-  ) -> impl Matcher<&'a ConcreteType> {
+  ) -> impl Matcher<&'a ConcreteType<'a>> {
     pat!(ConcreteType::Primitive(primitive_matcher))
   }
 
   pub fn concrete_fn_type<'a>(
-    function_matcher: impl Matcher<&'a FunctionType>,
-  ) -> impl Matcher<&'a ConcreteType> {
+    function_matcher: impl Matcher<&'a FunctionType<'a>>,
+  ) -> impl Matcher<&'a ConcreteType<'a>> {
     pat!(ConcreteType::Function(function_matcher))
   }
 
-  pub fn unit_type<'a>() -> impl Matcher<&'a ConcreteType> {
+  pub fn unit_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
     pat!(ConcreteType::Unit)
   }
 }

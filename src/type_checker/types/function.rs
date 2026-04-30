@@ -1,39 +1,38 @@
-use crate::type_checker::types::registry::{DisplayType, TypeRegistry, TypeId};
+use crate::type_checker::types::registry::Ty;
+use itertools::Itertools;
+use std::fmt::Display;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct FunctionType {
-  parameters: Vec<TypeId>,
-  return_type: TypeId,
+pub struct FunctionType<'a> {
+  parameters: Vec<Ty<'a>>,
+  return_type: Ty<'a>,
 }
 
-impl FunctionType {
-  pub fn new(parameters: Vec<TypeId>, return_type: TypeId) -> Self {
+impl<'a> FunctionType<'a> {
+  pub fn new(parameters: Vec<Ty<'a>>, return_type: Ty<'a>) -> Self {
     FunctionType {
       parameters,
       return_type,
     }
   }
 
-  pub fn parameters(&self) -> &[TypeId] {
+  pub fn parameters(&self) -> &[Ty<'a>] {
     &self.parameters
   }
 
-  pub fn return_type(&self) -> TypeId {
+  pub fn return_type(&self) -> Ty<'a> {
     self.return_type
   }
 }
 
-impl DisplayType for FunctionType {
-  fn fmt_type(&self, f: &mut std::fmt::Formatter<'_>, r: &TypeRegistry) -> std::fmt::Result {
-    f.write_str("(")?;
-    for (i, param) in self.parameters.iter().enumerate() {
-      if i > 0 {
-        f.write_str(", ")?;
-      }
-      param.fmt_type(f, r)?;
-    }
-    write!(f, ") -> ")?;
-    self.return_type.fmt_type(f, r)
+impl<'a> Display for FunctionType<'a> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "({}) -> {}",
+      self.parameters.iter().format(", "),
+      self.return_type
+    )
   }
 }
 
@@ -44,14 +43,12 @@ pub(crate) mod matchers {
   use googletest::prelude::*;
 
   pub fn fn_param_types<'a>(
-    params: impl Matcher<&'a [TypeId]>,
-  ) -> impl Matcher<&'a ConcreteType> {
+    params: impl Matcher<&'a [Ty<'a>]>,
+  ) -> impl Matcher<&'a ConcreteType<'a>> {
     concrete_fn_type(result_of!(&FunctionType::parameters, params))
   }
 
-  pub fn fn_return_type<'a>(
-    ret: impl Matcher<&'a TypeId>,
-  ) -> impl Matcher<&'a ConcreteType> {
+  pub fn fn_return_type<'a>(ret: impl Matcher<&'a Ty<'a>>) -> impl Matcher<&'a ConcreteType<'a>> {
     concrete_fn_type(pat!(FunctionType {
       return_type: ret,
       ..

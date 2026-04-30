@@ -1,24 +1,24 @@
 use std::fmt::Display;
 
-use crate::parser::ast::binary_expression::BinaryOp;
+use crate::{parser::ast::binary_expression::BinaryOp, type_checker::types::registry::Ty};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TypeCheckerError {
+pub enum TypeCheckerError<'a> {
   /// Type mismatch.
-  TypeMismatch { expected: String, actual: String },
+  TypeMismatch { expected: Ty<'a>, actual: Ty<'a> },
   /// Type mismatch in a binary operation.
   InvalidOperand {
     op: BinaryOp,
     expected: String,
-    actual: String,
+    actual: Ty<'a>,
   },
   /// Call target is not a function type.
-  NotCallable { target: String },
+  NotCallable { target: Ty<'a> },
   /// A call passed the wrong number of arguments.
   ArityMismatch { expected: usize, actual: usize },
 }
 
-impl Display for TypeCheckerError {
+impl<'a> Display for TypeCheckerError<'a> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::TypeMismatch { expected, actual } => {
@@ -40,9 +40,9 @@ impl Display for TypeCheckerError {
   }
 }
 
-impl std::error::Error for TypeCheckerError {}
+impl<'a> std::error::Error for TypeCheckerError<'a> {}
 
-pub type TypeCheckerResult<T = ()> = Result<T, TypeCheckerError>;
+pub type TypeCheckerResult<'a, T = ()> = Result<T, TypeCheckerError<'a>>;
 
 #[cfg(test)]
 pub(crate) mod matchers {
@@ -50,12 +50,12 @@ pub(crate) mod matchers {
   use googletest::prelude::*;
 
   pub fn type_mismatch_error<'a>(
-    expected: impl Matcher<&'a str>,
-    actual: impl Matcher<&'a str>,
-  ) -> impl Matcher<&'a TypeCheckerError> {
+    expected: impl Matcher<&'a Ty<'a>>,
+    actual: impl Matcher<&'a Ty<'a>>,
+  ) -> impl Matcher<&'a TypeCheckerError<'a>> {
     pat!(TypeCheckerError::TypeMismatch {
-      expected: result_of!(&String::as_str, expected),
-      actual: result_of!(&String::as_str, actual),
+      expected: expected,
+      actual: actual,
       ..
     })
   }
@@ -63,7 +63,7 @@ pub(crate) mod matchers {
   pub fn arity_mismatch_error<'a>(
     expected: impl Matcher<&'a usize>,
     actual: impl Matcher<&'a usize>,
-  ) -> impl Matcher<&'a TypeCheckerError> {
+  ) -> impl Matcher<&'a TypeCheckerError<'a>> {
     pat!(TypeCheckerError::ArityMismatch {
       expected: expected,
       actual: actual,
@@ -71,20 +71,18 @@ pub(crate) mod matchers {
   }
 
   pub fn not_callable_error<'a>(
-    target: impl Matcher<&'a str>,
-  ) -> impl Matcher<&'a TypeCheckerError> {
-    pat!(TypeCheckerError::NotCallable {
-      target: result_of!(&String::as_str, target)
-    })
+    target: impl Matcher<&'a Ty<'a>>,
+  ) -> impl Matcher<&'a TypeCheckerError<'a>> {
+    pat!(TypeCheckerError::NotCallable { target: target })
   }
 
   pub fn invalid_operand<'a>(
-    expected: impl Matcher<&'a str>,
-    actual: impl Matcher<&'a str>,
-  ) -> impl Matcher<&'a TypeCheckerError> {
+    expected: impl Matcher<&'a String>,
+    actual: impl Matcher<&'a Ty<'a>>,
+  ) -> impl Matcher<&'a TypeCheckerError<'a>> {
     pat!(TypeCheckerError::InvalidOperand {
-      expected: result_of!(&String::as_str, expected),
-      actual: result_of!(&String::as_str, actual),
+      expected: expected,
+      actual: actual,
       ..
     })
   }

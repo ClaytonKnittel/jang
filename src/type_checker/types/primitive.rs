@@ -1,8 +1,10 @@
 use std::fmt::Display;
 
+use enum_map::Enum;
+
 use crate::parser::ast::type_expr::primitive::PrimitiveType as AstPrimitiveType;
 
-#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+#[derive(Hash, Eq, PartialEq, Clone, Copy, Debug, Enum)]
 pub enum PrimitiveType {
   I32,
   I64,
@@ -61,43 +63,23 @@ pub(crate) mod matchers {
   use super::*;
   use googletest::prelude::*;
 
-  pub fn i32_type<'a>() -> impl Matcher<&'a ConcreteType> {
+  pub fn i32_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::I32))
   }
 
-  pub fn i64_type<'a>() -> impl Matcher<&'a ConcreteType> {
+  pub fn i64_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::I64))
   }
 
-  pub fn f32_type<'a>() -> impl Matcher<&'a ConcreteType> {
+  pub fn f32_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::F32))
   }
 
-  pub fn f64_type<'a>() -> impl Matcher<&'a ConcreteType> {
+  pub fn f64_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::F64))
   }
 
-  pub fn bool_type<'a>() -> impl Matcher<&'a ConcreteType> {
+  pub fn bool_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::Bool))
-  }
-
-  pub fn i32_type_name<'a>() -> impl Matcher<&'a str> {
-    eq(PrimitiveType::I32.to_string())
-  }
-
-  pub fn i64_type_name<'a>() -> impl Matcher<&'a str> {
-    eq(PrimitiveType::I64.to_string())
-  }
-
-  pub fn f32_type_name<'a>() -> impl Matcher<&'a str> {
-    eq(PrimitiveType::F32.to_string())
-  }
-
-  pub fn f64_type_name<'a>() -> impl Matcher<&'a str> {
-    eq(PrimitiveType::F64.to_string())
-  }
-
-  pub fn bool_type_name<'a>() -> impl Matcher<&'a str> {
-    eq(PrimitiveType::Bool.to_string())
   }
 }

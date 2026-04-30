@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use cknittel_util::iter::CollectResult;
 
 use crate::{
@@ -24,27 +26,31 @@ use crate::{
     token::literal::{Literal, NumericLiteral},
   },
   type_checker::{
+    context::TypeCheckerCtx,
     error::{TypeCheckerError, TypeCheckerResult},
     type_analysis::JangTypeAnalysis,
     typed_ast_id::{TypedAstId, TypedAstIdTable},
     types::{
       concrete::ConcreteType,
-      function::FunctionType,
-      registry::{TypeId, TypeRegistry},
+      primitive::PrimitiveType,
+      registry::{Ty, TypeRegistry},
     },
   },
 };
 
-struct TypeChecker {
-  types: TypeRegistry,
-  ast_types: TypedAstIdTable<TypeId>,
+struct TypeChecker<'a> {
+  types: TypeRegistry<'a>,
+  ast_types: TypedAstIdTable<Ty<'a>>,
   current_fn: Option<AstGlobalDeclId>,
 }
 
-impl TypeChecker {
-  fn check(jang_file: &JangFile) -> TypeCheckerResult<JangTypeAnalysis> {
+impl<'a> TypeChecker<'a> {
+  fn check(
+    jang_file: &JangFile,
+    ctx: &'a TypeCheckerCtx<'a>,
+  ) -> TypeCheckerResult<'a, JangTypeAnalysis<'a>> {
     let mut checker = Self {
-      types: TypeRegistry::default(),
+      types: TypeRegistry::new(ctx),
       ast_types: TypedAstIdTable::new(jang_file),
       current_fn: None,
     };
@@ -53,46 +59,37 @@ impl TypeChecker {
     checker.check_jang_file(jang_file)?;
 
     let mut resolved_types = TypedAstIdTable::new(jang_file);
-    for (ast_id, type_id) in checker.ast_types.into_iter() {
-      resolved_types.insert(ast_id, type_id);
+    for (ast_id, ty) in checker.ast_types.into_iter() {
+      resolved_types.insert(ast_id, ty);
     }
 
     Ok(JangTypeAnalysis::new(checker.types, resolved_types))
   }
 
-  fn set_ast_type(&mut self, ast_id: impl Into<TypedAstId>, ty: ConcreteType) -> TypeId {
-    let type_id = self.types.add(ty);
-    self.ast_types.insert(ast_id, type_id);
-    type_id
+  fn set_ast_type(&mut self, ast_id: impl Into<TypedAstId>, ty: Ty<'a>) {
+    self.ast_types.insert(ast_id, ty);
   }
 
-  fn set_ast_type_id(&mut self, ast_id: impl Into<TypedAstId>, type_id: TypeId) {
-    self.ast_types.insert(ast_id, type_id);
-  }
-
-  fn get_ast_type_id(&mut self, id: impl Into<TypedAstId>) -> TypeId {
+  fn get_ast_type(&mut self, id: impl Into<TypedAstId>) -> Ty<'a> {
     *self
       .ast_types
       .get(id)
       .expect("Expected AST ID to have a populated type")
   }
 
-  fn check_types_match(&self, expected: TypeId, actual: TypeId) -> TypeCheckerResult {
+  fn check_types_match(&self, expected: Ty<'a>, actual: Ty<'a>) -> TypeCheckerResult<'a> {
     if expected != actual {
-      Err(TypeCheckerError::TypeMismatch {
-        expected: self.types.display(expected).to_string(),
-        actual: self.types.display(actual).to_string(),
-      })
+      Err(TypeCheckerError::TypeMismatch { expected, actual })
     } else {
       Ok(())
     }
   }
 
-  fn check_is_bool(&self, actual: TypeId) -> TypeCheckerResult {
-    self.check_types_match(self.types.bool_type(), actual)
+  fn check_is_bool(&self, actual: Ty<'a>) -> TypeCheckerResult<'a> {
+    self.check_types_match(self.types.primitive_type(PrimitiveType::Bool), actual)
   }
 
-  fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult {
+  fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'a> {
     for fn_decl in jang_file.function_decls() {
       let fn_type = self.function_decl_type(fn_decl)?;
       self.set_ast_type(fn_decl.name_decl().id(), fn_type);
@@ -100,14 +97,14 @@ impl TypeChecker {
     Ok(())
   }
 
-  fn function_decl_type(&mut self, fn_decl: &FunctionDecl) -> TypeCheckerResult<ConcreteType> {
+  fn function_decl_type(&mut self, fn_decl: &FunctionDecl) -> TypeCheckerResult<'a, Ty<'a>> {
     let parameters = fn_decl
       .parameters()
       .iter()
       .map(|param| {
-        let concrete = self.eval_type_expression(param.ty())?;
-        self.set_ast_type_id(param.var().id(), concrete);
-        Ok(concrete)
+        let ty = self.eval_type_expression(param.ty())?;
+        self.set_ast_type(param.var().id(), ty);
+        Ok(ty)
       })
       .collect_result_vec()?;
 
@@ -116,20 +113,17 @@ impl TypeChecker {
       .map(|ty| self.eval_type_expression(ty))
       .unwrap_or(Ok(self.types.unit_type()))?;
 
-    Ok(ConcreteType::Function(FunctionType::new(
-      parameters,
-      return_type,
-    )))
+    Ok(self.types.function_type(parameters, return_type))
   }
 
-  fn check_jang_file(&mut self, jang_file: &JangFile) -> TypeCheckerResult {
+  fn check_jang_file(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'a> {
     for fn_decl in jang_file.function_decls() {
       self.check_function_body(fn_decl)?;
     }
     Ok(())
   }
 
-  fn check_function_body(&mut self, fn_decl: &FunctionDecl) -> TypeCheckerResult {
+  fn check_function_body(&mut self, fn_decl: &FunctionDecl) -> TypeCheckerResult<'a> {
     let prev = self.current_fn.replace(fn_decl.name_decl().id());
     let result = self.check_block(fn_decl.body());
     self.current_fn = prev;
@@ -137,7 +131,7 @@ impl TypeChecker {
     result
   }
 
-  fn check_statement(&mut self, stmt: &Statement) -> TypeCheckerResult {
+  fn check_statement(&mut self, stmt: &Statement) -> TypeCheckerResult<'a> {
     match stmt {
       Statement::Bind(s) => self.check_bind_statement(s),
       Statement::Rebind(s) => self.check_rebind_statement(s),
@@ -150,48 +144,48 @@ impl TypeChecker {
     }
   }
 
-  fn check_block(&mut self, block: &Block) -> TypeCheckerResult {
+  fn check_block(&mut self, block: &Block) -> TypeCheckerResult<'a> {
     for stmt in block.statements() {
       self.check_statement(stmt)?;
     }
     Ok(())
   }
 
-  fn check_bind_statement(&mut self, s: &BindStatement) -> TypeCheckerResult {
-    let expr_type_id = self.check_expression(s.expr())?;
+  fn check_bind_statement(&mut self, s: &BindStatement) -> TypeCheckerResult<'a> {
+    let expr_type = self.check_expression(s.expr())?;
 
     let Some(var_type_expr) = s.var_type() else {
-      self.set_ast_type_id(s.var().id(), expr_type_id);
+      self.set_ast_type(s.var().id(), expr_type);
       return Ok(());
     };
 
     let var_type = self.eval_type_expression(var_type_expr)?;
-    self.check_types_match(var_type, expr_type_id)?;
+    self.check_types_match(var_type, expr_type)?;
     Ok(())
   }
 
-  fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult {
-    let var_type_id = self.get_ast_type_id(s.var());
-    let expr_type_id = self.check_expression(s.expr())?;
-    self.check_types_match(var_type_id, expr_type_id)
+  fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult<'a> {
+    let var_type = self.get_ast_type(s.var());
+    let expr_type = self.check_expression(s.expr())?;
+    self.check_types_match(var_type, expr_type)
   }
 
-  fn check_ret_statement(&mut self, s: &RetStatement) -> TypeCheckerResult {
-    let expr_type_id = self.check_expression(s.expr())?;
+  fn check_ret_statement(&mut self, s: &RetStatement) -> TypeCheckerResult<'a> {
+    let expr_type = self.check_expression(s.expr())?;
 
-    let current_fn_type_id =
-      self.get_ast_type_id(self.current_fn.expect("Unexpected ret outside a function"));
+    let current_fn_type =
+      self.get_ast_type(self.current_fn.expect("Unexpected ret outside a function"));
 
-    let ConcreteType::Function(f) = &self.types[current_fn_type_id] else {
+    let ConcreteType::Function(f) = current_fn_type.deref() else {
       panic!("Expected current function to have FunctionType")
     };
 
-    self.check_types_match(f.return_type(), expr_type_id)
+    self.check_types_match(f.return_type(), expr_type)
   }
 
-  fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult {
-    let cond_type_id = self.check_expression(s.condition())?;
-    self.check_is_bool(cond_type_id)?;
+  fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult<'a> {
+    let cond_type = self.check_expression(s.condition())?;
+    self.check_is_bool(cond_type)?;
 
     self.check_block(s.body())?;
 
@@ -202,8 +196,8 @@ impl TypeChecker {
     }
   }
 
-  fn check_expression(&mut self, expr: &Expression) -> TypeCheckerResult<TypeId> {
-    let type_id = match expr.variant() {
+  fn check_expression(&mut self, expr: &Expression) -> TypeCheckerResult<'a, Ty<'a>> {
+    let ty = match expr.variant() {
       ExpressionVariant::Literal(e) => self.check_literal_expression(e),
       ExpressionVariant::VarRef(e) => self.check_var_ref_expression(e),
       ExpressionVariant::BinaryExpression(e) => self.check_binary_expression(e)?,
@@ -212,22 +206,24 @@ impl TypeChecker {
       ExpressionVariant::DotExpression(e) => self.check_dot_expression(e)?,
     };
 
-    self.set_ast_type_id(expr.id(), type_id);
-    Ok(type_id)
+    self.set_ast_type(expr.id(), ty);
+    Ok(ty)
   }
 
-  fn check_literal_expression(&mut self, expr: &LiteralExpression) -> TypeId {
+  fn check_literal_expression(&mut self, expr: &LiteralExpression) -> Ty<'a> {
     match expr.literal() {
-      Literal::Numeric(NumericLiteral::Integral(_)) => self.types.i32_type(),
-      Literal::Numeric(NumericLiteral::Float(_)) => self.types.f32_type(),
+      Literal::Numeric(NumericLiteral::Integral(_)) => {
+        self.types.primitive_type(PrimitiveType::I32)
+      }
+      Literal::Numeric(NumericLiteral::Float(_)) => self.types.primitive_type(PrimitiveType::F32),
     }
   }
 
-  fn check_var_ref_expression(&mut self, var_ref: &VarRef) -> TypeId {
-    self.get_ast_type_id(var_ref)
+  fn check_var_ref_expression(&mut self, var_ref: &VarRef) -> Ty<'a> {
+    self.get_ast_type(var_ref)
   }
 
-  fn check_binary_expression(&mut self, expr: &BinaryExpression) -> TypeCheckerResult<TypeId> {
+  fn check_binary_expression(&mut self, expr: &BinaryExpression) -> TypeCheckerResult<'a, Ty<'a>> {
     let lhs = self.check_expression(expr.lhs())?;
     let rhs = self.check_expression(expr.rhs())?;
     self.check_types_match(lhs, rhs)?;
@@ -235,10 +231,10 @@ impl TypeChecker {
     let expected_type = |expected: &'static str| TypeCheckerError::InvalidOperand {
       op: expr.op(),
       expected: expected.to_owned(),
-      actual: self.types.display(lhs).to_string(),
+      actual: lhs,
     };
 
-    let ConcreteType::Primitive(primitive) = &self.types[lhs] else {
+    let ConcreteType::Primitive(primitive) = *lhs else {
       return Err(expected_type("primitive"));
     };
 
@@ -249,38 +245,38 @@ impl TypeChecker {
         .then_some(lhs)
         .ok_or_else(|| expected_type("numeric")),
       Equal | NotEqual => (primitive.is_integer() || primitive.is_bool())
-        .then_some(self.types.bool_type())
+        .then_some(self.types.primitive_type(PrimitiveType::Bool))
         .ok_or_else(|| expected_type("integer or bool")),
       GreaterThan | GreaterThanEqual | LessThan | LessThanEqual => primitive
         .is_numeric()
-        .then_some(self.types.bool_type())
+        .then_some(self.types.primitive_type(PrimitiveType::Bool))
         .ok_or_else(|| expected_type("numeric")),
       LogicalAnd | LogicalOr => primitive
         .is_bool()
-        .then_some(self.types.bool_type())
+        .then_some(self.types.primitive_type(PrimitiveType::Bool))
         .ok_or_else(|| expected_type("bool")),
     }
   }
 
-  fn check_unary_expression(&mut self, expr: &UnaryExpression) -> TypeCheckerResult<TypeId> {
-    let expr_type_id = self.check_expression(expr.expr())?;
+  fn check_unary_expression(&mut self, expr: &UnaryExpression) -> TypeCheckerResult<'a, Ty<'a>> {
+    let expr_type = self.check_expression(expr.expr())?;
     match expr.op() {
       UnaryOp::LogicalNot => {
-        self.check_is_bool(expr_type_id)?;
-        Ok(self.types.bool_type())
+        self.check_is_bool(expr_type)?;
+        Ok(self.types.primitive_type(PrimitiveType::Bool))
       }
     }
   }
 
-  fn check_call_expression(&mut self, expr: &CallExpression) -> TypeCheckerResult<TypeId> {
-    let target_type_id = self.check_expression(expr.target())?;
-    let ConcreteType::Function(f) = &self.types[target_type_id] else {
+  fn check_call_expression(&mut self, expr: &CallExpression) -> TypeCheckerResult<'a, Ty<'a>> {
+    let target_type = self.check_expression(expr.target())?;
+    let ConcreteType::Function(f) = target_type.deref() else {
       return Err(TypeCheckerError::NotCallable {
-        target: self.types.display(target_type_id).to_string(),
+        target: target_type,
       });
     };
 
-    let return_type_id = f.return_type();
+    let return_type = f.return_type();
 
     let args = expr.argument_list();
     if args.len() != f.parameters().len() {
@@ -290,48 +286,47 @@ impl TypeChecker {
       });
     }
 
-    for (arg, param_type) in args.iter().zip(f.parameters().to_vec()) {
+    for (arg, &param_type) in args.iter().zip(f.parameters()) {
       let arg_type = self.check_expression(arg)?;
       self.check_types_match(param_type, arg_type)?;
     }
 
-    Ok(return_type_id)
+    Ok(return_type)
   }
 
-  fn check_dot_expression(&mut self, _: &DotExpression) -> TypeCheckerResult<TypeId> {
+  fn check_dot_expression(&mut self, _: &DotExpression) -> TypeCheckerResult<'a, Ty<'a>> {
     todo!("Look up struct in global type decls")
   }
 
   fn eval_type_expression(
     &mut self,
     type_expression: &TypeExpression,
-  ) -> TypeCheckerResult<TypeId> {
-    let concrete = match type_expression.variant() {
-      TypeExpressionVariant::Unit => Ok(ConcreteType::Unit),
+  ) -> TypeCheckerResult<'a, Ty<'a>> {
+    match type_expression.variant() {
+      TypeExpressionVariant::Unit => Ok(self.types.unit_type()),
       TypeExpressionVariant::InlineFn(inline_fn) => self.eval_inline_fn(inline_fn),
-      TypeExpressionVariant::Primitive(p) => Ok(ConcreteType::Primitive(p.into())),
+      TypeExpressionVariant::Primitive(p) => Ok(self.types.primitive_type(p.into())),
       TypeExpressionVariant::Named(_) => todo!("Look up struct in global type decls"),
       TypeExpressionVariant::AnonymousStruct(_) => todo!("Handle structs"),
-    }?;
-    Ok(self.types.add(concrete))
+    }
   }
 
-  fn eval_inline_fn(&mut self, inline_fn: &InlineFn) -> TypeCheckerResult<ConcreteType> {
+  fn eval_inline_fn(&mut self, inline_fn: &InlineFn) -> TypeCheckerResult<'a, Ty<'a>> {
     let return_type = self.eval_type_expression(inline_fn.return_type())?;
     let parameters = inline_fn
       .args()
       .iter()
       .map(|arg| self.eval_type_expression(arg))
       .collect_result_vec()?;
-    Ok(ConcreteType::Function(FunctionType::new(
-      parameters,
-      return_type,
-    )))
+    Ok(self.types.function_type(parameters, return_type))
   }
 }
 
-pub fn check(jang_file: &JangFile) -> TypeCheckerResult<JangTypeAnalysis> {
-  TypeChecker::check(jang_file)
+pub fn check<'a>(
+  jang_file: &JangFile,
+  ctx: &'a TypeCheckerCtx<'a>,
+) -> TypeCheckerResult<'a, JangTypeAnalysis<'a>> {
+  TypeChecker::check(jang_file, ctx)
 }
 
 #[cfg(test)]
@@ -345,6 +340,7 @@ mod tests {
     },
     type_checker::{
       check,
+      context::TypeCheckerCtx,
       error::{
         TypeCheckerResult,
         matchers::{
@@ -353,41 +349,41 @@ mod tests {
       },
       type_analysis::JangTypeAnalysis,
       types::{
-        concrete::{ConcreteType, matchers::unit_type},
+        concrete::matchers::unit_type,
         function::matchers::{fn_param_types, fn_return_type},
-        primitive::matchers::{
-          bool_type, bool_type_name, f32_type, f32_type_name, f64_type, f64_type_name, i32_type,
-          i32_type_name, i64_type, i64_type_name,
-        },
-        registry::TypeId,
+        primitive::matchers::{bool_type, f32_type, f64_type, i32_type, i64_type},
+        registry::{Ty, matchers::ty},
       },
     },
   };
 
-  fn type_check_file(source: &str) -> TypeCheckerResult<TypeCheckedFile> {
+  fn type_check_file<'a>(
+    source: &str,
+    ctx: &'a TypeCheckerCtx<'a>,
+  ) -> TypeCheckerResult<'a, TypeCheckedFile<'a>> {
     let ast = lex_and_parse_jang_file(source.chars()).expect("parse should succeed");
-    let analysis = check(&ast)?;
+    let analysis = check(&ast, ctx)?;
     Ok(TypeCheckedFile { ast, analysis })
   }
 
-  fn type_check_ok(source: &str) -> TypeCheckedFile {
-    type_check_file(source).unwrap()
+  fn type_check_ok<'a>(source: &str, ctx: &'a TypeCheckerCtx<'a>) -> TypeCheckedFile<'a> {
+    type_check_file(source, ctx).unwrap()
   }
 
-  struct TypeCheckedFile {
+  struct TypeCheckedFile<'a> {
     ast: JangFile,
-    analysis: JangTypeAnalysis,
+    analysis: JangTypeAnalysis<'a>,
   }
 
   // GoogleTest needs Debug, but annotating the AST with
   // types in a debug-friendly way is probably a fair bit of code.
-  impl std::fmt::Debug for TypeCheckedFile {
+  impl<'a> std::fmt::Debug for TypeCheckedFile<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
       f.debug_struct("TypeCheckedFile").finish()
     }
   }
 
-  impl TypeCheckedFile {
+  impl<'a> TypeCheckedFile<'a> {
     fn fn_decl_by_name(&self, name: &str) -> &FunctionDecl {
       self
         .ast
@@ -397,40 +393,36 @@ mod tests {
         .unwrap_or_else(|| panic!("function `{name}` not found"))
     }
 
-    fn fn_type_id(&self, name: &str) -> TypeId {
+    fn fn_ty(&self, name: &str) -> Ty<'a> {
       self
         .analysis
         .get(self.fn_decl_by_name(name).name_decl().id())
-    }
-
-    fn type_id<'a>(&'a self, matcher: impl Matcher<&'a ConcreteType>) -> impl Matcher<&'a TypeId> {
-      self.analysis.registry().type_id(matcher)
     }
   }
 
   #[gtest]
   fn empty_fn() {
-    let file = type_check_ok("fn foo() { }");
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo() { }", &ctx);
     expect_that!(
-      &file.fn_type_id("foo"),
-      file.type_id(all![
+      &file.fn_ty("foo"),
+      ty(all![
         fn_param_types(is_empty()),
-        fn_return_type(file.type_id(unit_type())),
+        fn_return_type(ty(unit_type())),
       ]),
     );
   }
 
   #[gtest]
   fn fn_with_return_value() {
-    let file = type_check_ok("fn foo(): i32 { }");
-    expect_that!(
-      &file.fn_type_id("foo"),
-      file.type_id(fn_return_type(file.type_id(i32_type())))
-    );
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo(): i32 { }", &ctx);
+    expect_that!(&file.fn_ty("foo"), ty(fn_return_type(ty(i32_type()))));
   }
 
   #[gtest]
   fn fn_with_primitive_params() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_ok(
       r#"
         fn foo(
@@ -441,136 +433,148 @@ mod tests {
           p4: bool
         ) { }
         "#,
+      &ctx,
     );
 
     expect_that!(
-      &file.fn_type_id("foo"),
-      file.type_id(fn_param_types(elements_are![
-        file.type_id(i32_type()),
-        file.type_id(i64_type()),
-        file.type_id(f32_type()),
-        file.type_id(f64_type()),
-        file.type_id(bool_type())
+      &file.fn_ty("foo"),
+      ty(fn_param_types(elements_are![
+        ty(i32_type()),
+        ty(i64_type()),
+        ty(f32_type()),
+        ty(f64_type()),
+        ty(bool_type())
       ]))
     );
   }
 
   #[gtest]
   fn fn_with_inline_param() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_ok(
       r#"
         fn foo(
           p: (i32, f32) -> bool
         ) { }
         "#,
+      &ctx,
     );
 
     expect_that!(
-      &file.fn_type_id("foo"),
-      file.type_id(fn_param_types(elements_are![all![
-        file.type_id(fn_param_types(elements_are![
-          file.type_id(i32_type()),
-          file.type_id(f32_type())
+      &file.fn_ty("foo"),
+      ty(fn_param_types(elements_are![all![
+        ty(fn_param_types(elements_are![
+          ty(i32_type()),
+          ty(f32_type())
         ])),
-        file.type_id(fn_return_type(file.type_id(bool_type()))),
+        ty(fn_return_type(ty(bool_type()))),
       ]]))
     );
   }
 
   #[gtest]
   fn fn_call_with_arity_mismatch() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i32) { }
         fn bar() { foo() }
         "#,
+      &ctx,
     );
     expect_that!(file, err(arity_mismatch_error(eq(&1), eq(&0))));
   }
 
   #[gtest]
   fn fn_call_of_non_callable_value() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i32) { x() }
         "#,
+      &ctx,
     );
-    expect_that!(file, err(not_callable_error(i32_type_name())));
+    expect_that!(file, err(not_callable_error(ty(i32_type()))));
   }
 
   #[gtest]
   fn fn_call_with_parameter_type_mismatch() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i32) { }
         fn bar(x: f32) { foo(x) }
         "#,
+      &ctx,
     );
     expect_that!(
       file,
-      err(type_mismatch_error(i32_type_name(), f32_type_name()))
+      err(type_mismatch_error(ty(i32_type()), ty(f32_type())))
     );
   }
 
   #[gtest]
   fn fn_with_return_value_ok() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i32): i32 { ret x }
         "#,
+      &ctx,
     );
     expect_that!(file, ok(anything()));
   }
 
   #[gtest]
   fn fn_return_value_type_mismatch() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i64): i32 { ret x }
         "#,
+      &ctx,
     );
     expect_that!(
       file,
-      err(type_mismatch_error(i32_type_name(), i64_type_name()))
+      err(type_mismatch_error(ty(i32_type()), ty(i64_type())))
     );
   }
 
   #[gtest]
   fn unconstrained_integer_literal_is_i32() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_ok(
       r#"
         fn foo(): bool {
           ret 1 == 1
         }
         "#,
+      &ctx,
     );
     let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
     let bin_expr = ret_stmt.expr().variant().as_binary_expr();
-    expect_that!(
-      &file.analysis.get(bin_expr.lhs().id()),
-      file.type_id(i32_type())
-    )
+    expect_that!(&file.analysis.get(bin_expr.lhs().id()), ty(i32_type()))
   }
 
   #[gtest]
   fn unconstrained_float_literal_is_f32() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_ok(
       r#"
         fn foo(): bool {
           ret 1. < 2.
         }
         "#,
+      &ctx,
     );
     let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
     let bin_expr = ret_stmt.expr().variant().as_binary_expr();
-    expect_that!(
-      &file.analysis.get(bin_expr.lhs().id()),
-      file.type_id(f32_type())
-    )
+    expect_that!(&file.analysis.get(bin_expr.lhs().id()), ty(f32_type()))
   }
 
   #[gtest]
   fn bind_statement_without_type_ok() {
+    let ctx = TypeCheckerCtx::default();
     type_check_ok(
       r#"
         fn foo(x: i32): i32 {
@@ -578,37 +582,40 @@ mod tests {
           ret y
         }
         "#,
+      &ctx,
     );
   }
 
   #[gtest]
   fn bind_statement_type_mismatch() {
+    let ctx = TypeCheckerCtx::default();
     let f = type_check_file(
       r#"
         fn foo(x: i32): i32 {
           let y: f64 = x
         }
         "#,
+      &ctx,
     );
-    expect_that!(
-      f,
-      err(type_mismatch_error(f64_type_name(), i32_type_name()))
-    )
+    expect_that!(f, err(type_mismatch_error(ty(f64_type()), ty(i32_type()))))
   }
 
   #[gtest]
   fn bind_shadowing_name_ok() {
+    let ctx = TypeCheckerCtx::default();
     type_check_ok(
       r#"
         fn foo(x: i32, y: f64) {
           let y = x
         }
         "#,
+      &ctx,
     );
   }
 
   #[gtest]
   fn rebind_type_mismatch() {
+    let ctx = TypeCheckerCtx::default();
     expect_that!(
       type_check_file(
         r#"
@@ -616,29 +623,30 @@ mod tests {
           y = x
         }
         "#,
+        &ctx
       ),
-      err(type_mismatch_error(f64_type_name(), i32_type_name()))
+      err(type_mismatch_error(ty(f64_type()), ty(i32_type())))
     );
   }
 
   #[gtest]
   fn bind_variable_has_type_of_rhs() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_ok(
       r#"
         fn foo(x: i32) {
           let y = x
         }
         "#,
+      &ctx,
     );
     let bind_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_bind();
-    expect_that!(
-      &file.analysis.get(bind_stmt.var().id()),
-      file.type_id(i32_type())
-    )
+    expect_that!(&file.analysis.get(bind_stmt.var().id()), ty(i32_type()))
   }
 
   #[gtest]
   fn call_expression_return_type_used() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(): f32 { ret 0. }
@@ -646,106 +654,117 @@ mod tests {
           let x: bool = foo()
         }
         "#,
+      &ctx,
     );
     expect_that!(
       file,
-      err(type_mismatch_error(bool_type_name(), f32_type_name()))
+      err(type_mismatch_error(ty(bool_type()), ty(f32_type())))
     );
   }
 
   #[gtest]
   fn comparison_requires_same_type() {
-    type_check_ok("fn f(x: i32, y: i32): bool { ret x < y }");
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok("fn f(x: i32, y: i32): bool { ret x < y }", &ctx);
 
     expect_that!(
-      type_check_file("fn f(x: i32, y: f32): bool { ret x < y }"),
-      err(type_mismatch_error(i32_type_name(), f32_type_name()))
+      type_check_file("fn f(x: i32, y: f32): bool { ret x < y }", &ctx),
+      err(type_mismatch_error(ty(i32_type()), ty(f32_type())))
     );
   }
 
   #[gtest]
   fn comparison_requires_numeric_type() {
+    let ctx = TypeCheckerCtx::default();
     expect_that!(
-      type_check_file("fn f(x: bool): bool { ret x < x }"),
+      type_check_file("fn f(x: bool): bool { ret x < x }", &ctx),
       err(invalid_operand(
         contains_substring("numeric"),
-        bool_type_name()
+        ty(bool_type())
       ))
     );
   }
 
   #[gtest]
   fn arithmetic_expression_requires_same_type() {
-    type_check_ok("fn f(x: f32, y: f32) { let x = x - y }");
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok("fn f(x: f32, y: f32) { let x = x - y }", &ctx);
 
     expect_that!(
-      type_check_file("fn f(x: f32, y: i32) { let x = x - y }"),
-      err(type_mismatch_error(f32_type_name(), i32_type_name()))
+      type_check_file("fn f(x: f32, y: i32) { let x = x - y }", &ctx),
+      err(type_mismatch_error(ty(f32_type()), ty(i32_type())))
     );
   }
 
   #[gtest]
   fn arithmetic_expression_preserves_operand_types() {
-    type_check_ok("fn f(x: i32, y: i32): i32 { ret x - y }");
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok("fn f(x: i32, y: i32): i32 { ret x - y }", &ctx);
 
     expect_that!(
-      type_check_file("fn f(x: i32, y: i32): f32 { ret x - y }"),
-      err(type_mismatch_error(f32_type_name(), i32_type_name()))
+      type_check_file("fn f(x: i32, y: i32): f32 { ret x - y }", &ctx),
+      err(type_mismatch_error(ty(f32_type()), ty(i32_type())))
     );
   }
 
   #[gtest]
   fn logical_and_requires_bools() {
-    type_check_ok("fn f(): bool { ret 1 == 1 && 2 == 2 }");
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok("fn f(): bool { ret 1 == 1 && 2 == 2 }", &ctx);
 
     expect_that!(
-      type_check_file("fn f(x: i32): bool { ret x && x }"),
-      err(invalid_operand(contains_substring("bool"), i32_type_name()))
+      type_check_file("fn f(x: i32): bool { ret x && x }", &ctx),
+      err(invalid_operand(contains_substring("bool"), ty(i32_type())))
     );
   }
 
   #[gtest]
   fn logical_not_requires_bools() {
-    type_check_ok("fn f(x: bool): bool { ret !x }");
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok("fn f(x: bool): bool { ret !x }", &ctx);
 
     expect_that!(
-      type_check_file("fn f(x: i32): bool { ret !x }"),
-      err(type_mismatch_error(bool_type_name(), i32_type_name()))
+      type_check_file("fn f(x: i32): bool { ret !x }", &ctx),
+      err(type_mismatch_error(ty(bool_type()), ty(i32_type())))
     );
   }
 
   #[gtest]
   fn equality_requires_same_type() {
-    type_check_ok("fn f(x: i32, y: i32): bool { ret x == y }");
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok("fn f(x: i32, y: i32): bool { ret x == y }", &ctx);
 
     expect_that!(
-      type_check_file("fn f(x: i32, y: f32): bool { ret x == y }"),
-      err(type_mismatch_error(i32_type_name(), f32_type_name()))
+      type_check_file("fn f(x: i32, y: f32): bool { ret x == y }", &ctx),
+      err(type_mismatch_error(ty(i32_type()), ty(f32_type())))
     );
   }
 
   #[gtest]
   fn equality_not_defined_on_floats() {
+    let ctx = TypeCheckerCtx::default();
     expect_that!(
-      type_check_file("fn f(x: f64): bool { ret x == x }"),
+      type_check_file("fn f(x: f64): bool { ret x == x }", &ctx),
       err(invalid_operand(
         contains_substring("integer or bool"),
-        f64_type_name()
+        ty(f64_type())
       ))
     );
   }
 
   #[gtest]
   fn if_condition_requires_bool() {
-    type_check_ok("fn f(x: bool) { if x {} }");
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok("fn f(x: bool) { if x {} }", &ctx);
     expect_that!(
-      type_check_file("fn f(x: i32) { if x {} }",),
-      err(type_mismatch_error(bool_type_name(), i32_type_name()))
+      type_check_file("fn f(x: i32) { if x {} }", &ctx),
+      err(type_mismatch_error(ty(bool_type()), ty(i32_type())))
     );
   }
 
   #[gtest]
   fn checks_inside_if_block() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i32, y: bool) {
@@ -754,15 +773,17 @@ mod tests {
           }
         }
         "#,
+      &ctx,
     );
     expect_that!(
       file,
-      err(type_mismatch_error(i32_type_name(), bool_type_name()))
+      err(type_mismatch_error(ty(i32_type()), ty(bool_type())))
     );
   }
 
   #[gtest]
   fn checks_inside_else_block() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i32, y: bool) {
@@ -772,15 +793,17 @@ mod tests {
           }
         }
         "#,
+      &ctx,
     );
     expect_that!(
       file,
-      err(type_mismatch_error(i32_type_name(), bool_type_name()))
+      err(type_mismatch_error(ty(i32_type()), ty(bool_type())))
     );
   }
 
   #[gtest]
   fn checks_inside_if_else_block() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i32, y: bool) {
@@ -790,15 +813,17 @@ mod tests {
           }
         }
         "#,
+      &ctx,
     );
     expect_that!(
       file,
-      err(type_mismatch_error(i32_type_name(), bool_type_name()))
+      err(type_mismatch_error(ty(i32_type()), ty(bool_type())))
     );
   }
 
   #[gtest]
   fn checks_inside_loop_block() {
+    let ctx = TypeCheckerCtx::default();
     let file = type_check_file(
       r#"
         fn foo(x: i32, y: bool) {
@@ -807,15 +832,17 @@ mod tests {
           }
         }
         "#,
+      &ctx,
     );
     expect_that!(
       file,
-      err(type_mismatch_error(i32_type_name(), bool_type_name()))
+      err(type_mismatch_error(ty(i32_type()), ty(bool_type())))
     );
   }
 
   #[gtest]
   fn function_type_in_local_binding_maintains_type() {
+    let ctx = TypeCheckerCtx::default();
     type_check_ok(
       r#"
         fn f(): i32 { ret 0 }
@@ -825,22 +852,26 @@ mod tests {
           ret func()
         }
         "#,
+      &ctx,
     );
   }
 
   #[gtest]
   fn function_parameter_accepts_function_arg() {
+    let ctx = TypeCheckerCtx::default();
     type_check_ok(
       r#"
         fn f(x: () -> i32): i32 { ret x() }
         fn g(): i32 { ret 0 }
         fn h(): i32 { ret f(g) }
         "#,
+      &ctx,
     );
   }
 
   #[gtest]
   fn function_parameter_rejects_incorrect_function_arg() {
+    let ctx = TypeCheckerCtx::default();
     expect_that!(
       type_check_file(
         r#"
@@ -848,10 +879,17 @@ mod tests {
         fn g(y: bool): i32 { ret 0 }
         fn h(): i32 { ret f(g) }
         "#,
+        &ctx
       ),
       err(type_mismatch_error(
-        contains_substring("() -> i32"),
-        contains_substring("(bool) -> i32"),
+        ty(all![
+          fn_param_types(is_empty()),
+          fn_return_type(ty(i32_type())),
+        ]),
+        ty(all![
+          fn_param_types(elements_are![ty(bool_type())]),
+          fn_return_type(ty(i32_type())),
+        ]),
       ))
     )
   }
