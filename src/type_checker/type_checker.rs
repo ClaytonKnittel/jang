@@ -63,7 +63,7 @@ impl<'a> TypeChecker<'a> {
       resolved_types.insert(ast_id, ty);
     }
 
-    Ok(JangTypeAnalysis::new(checker.types, resolved_types))
+    Ok(JangTypeAnalysis::new(resolved_types))
   }
 
   fn set_ast_type(&mut self, ast_id: impl Into<TypedAstId>, ty: Ty<'a>) {
