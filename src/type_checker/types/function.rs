@@ -39,16 +39,14 @@ impl<'a> Display for FunctionType<'a> {
 #[cfg(test)]
 pub(crate) mod matchers {
   use super::*;
-  use crate::type_checker::types::concrete::{ConcreteType, matchers::concrete_fn_type};
+  use crate::type_checker::types::concrete::matchers::concrete_fn_type;
   use googletest::prelude::*;
 
-  pub fn fn_param_types<'a>(
-    params: impl Matcher<&'a [Ty<'a>]>,
-  ) -> impl Matcher<&'a ConcreteType<'a>> {
+  pub fn fn_param_types<'a>(params: impl Matcher<&'a [Ty<'a>]>) -> impl Matcher<&'a Ty<'a>> {
     concrete_fn_type(result_of!(&FunctionType::parameters, params))
   }
 
-  pub fn fn_return_type<'a>(ret: impl Matcher<&'a Ty<'a>>) -> impl Matcher<&'a ConcreteType<'a>> {
+  pub fn fn_return_type<'a>(ret: impl Matcher<&'a Ty<'a>>) -> impl Matcher<&'a Ty<'a>> {
     concrete_fn_type(pat!(FunctionType {
       return_type: ret,
       ..

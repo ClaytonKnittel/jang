@@ -58,28 +58,28 @@ impl PrimitiveType {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::type_checker::types::concrete::{ConcreteType, matchers::concrete_primitive_type};
+  use crate::type_checker::types::{concrete::matchers::concrete_primitive_type, registry::Ty};
 
   use super::*;
   use googletest::prelude::*;
 
-  pub fn i32_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
+  pub fn i32_type<'a>() -> impl Matcher<&'a Ty<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::I32))
   }
 
-  pub fn i64_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
+  pub fn i64_type<'a>() -> impl Matcher<&'a Ty<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::I64))
   }
 
-  pub fn f32_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
+  pub fn f32_type<'a>() -> impl Matcher<&'a Ty<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::F32))
   }
 
-  pub fn f64_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
+  pub fn f64_type<'a>() -> impl Matcher<&'a Ty<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::F64))
   }
 
-  pub fn bool_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
+  pub fn bool_type<'a>() -> impl Matcher<&'a Ty<'a>> {
     concrete_primitive_type(pat!(PrimitiveType::Bool))
   }
 }

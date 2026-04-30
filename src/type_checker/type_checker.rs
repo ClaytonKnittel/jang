@@ -352,7 +352,7 @@ mod tests {
         concrete::matchers::unit_type,
         function::matchers::{fn_param_types, fn_return_type},
         primitive::matchers::{bool_type, f32_type, f64_type, i32_type, i64_type},
-        registry::{Ty, matchers::ty},
+        registry::Ty,
       },
     },
   };
@@ -393,7 +393,7 @@ mod tests {
         .unwrap_or_else(|| panic!("function `{name}` not found"))
     }
 
-    fn fn_ty(&self, name: &str) -> Ty<'a> {
+    fn fn_type(&self, name: &str) -> Ty<'a> {
       self
         .analysis
         .get(self.fn_decl_by_name(name).name_decl().id())
@@ -405,11 +405,8 @@ mod tests {
     let ctx = TypeCheckerCtx::default();
     let file = type_check_ok("fn foo() { }", &ctx);
     expect_that!(
-      &file.fn_ty("foo"),
-      ty(all![
-        fn_param_types(is_empty()),
-        fn_return_type(ty(unit_type())),
-      ]),
+      &file.fn_type("foo"),
+      all![fn_param_types(is_empty()), fn_return_type(unit_type()),],
     );
   }
 
@@ -417,7 +414,7 @@ mod tests {
   fn fn_with_return_value() {
     let ctx = TypeCheckerCtx::default();
     let file = type_check_ok("fn foo(): i32 { }", &ctx);
-    expect_that!(&file.fn_ty("foo"), ty(fn_return_type(ty(i32_type()))));
+    expect_that!(&file.fn_type("foo"), fn_return_type(i32_type()));
   }
 
   #[gtest]
@@ -437,14 +434,14 @@ mod tests {
     );
 
     expect_that!(
-      &file.fn_ty("foo"),
-      ty(fn_param_types(elements_are![
-        ty(i32_type()),
-        ty(i64_type()),
-        ty(f32_type()),
-        ty(f64_type()),
-        ty(bool_type())
-      ]))
+      &file.fn_type("foo"),
+      fn_param_types(elements_are![
+        i32_type(),
+        i64_type(),
+        f32_type(),
+        f64_type(),
+        bool_type()
+      ])
     );
   }
 
@@ -461,14 +458,11 @@ mod tests {
     );
 
     expect_that!(
-      &file.fn_ty("foo"),
-      ty(fn_param_types(elements_are![all![
-        ty(fn_param_types(elements_are![
-          ty(i32_type()),
-          ty(f32_type())
-        ])),
-        ty(fn_return_type(ty(bool_type()))),
-      ]]))
+      &file.fn_type("foo"),
+      fn_param_types(elements_are![all![
+        fn_param_types(elements_are![i32_type(), f32_type()]),
+        fn_return_type(bool_type()),
+      ]])
     );
   }
 
@@ -494,7 +488,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(file, err(not_callable_error(ty(i32_type()))));
+    expect_that!(file, err(not_callable_error(i32_type())));
   }
 
   #[gtest]
@@ -507,10 +501,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(
-      file,
-      err(type_mismatch_error(ty(i32_type()), ty(f32_type())))
-    );
+    expect_that!(file, err(type_mismatch_error(i32_type(), f32_type())));
   }
 
   #[gtest]
@@ -534,10 +525,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(
-      file,
-      err(type_mismatch_error(ty(i32_type()), ty(i64_type())))
-    );
+    expect_that!(file, err(type_mismatch_error(i32_type(), i64_type())));
   }
 
   #[gtest]
@@ -553,7 +541,7 @@ mod tests {
     );
     let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
     let bin_expr = ret_stmt.expr().variant().as_binary_expr();
-    expect_that!(&file.analysis.get(bin_expr.lhs().id()), ty(i32_type()))
+    expect_that!(&file.analysis.get(bin_expr.lhs().id()), i32_type())
   }
 
   #[gtest]
@@ -569,7 +557,7 @@ mod tests {
     );
     let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
     let bin_expr = ret_stmt.expr().variant().as_binary_expr();
-    expect_that!(&file.analysis.get(bin_expr.lhs().id()), ty(f32_type()))
+    expect_that!(&file.analysis.get(bin_expr.lhs().id()), f32_type())
   }
 
   #[gtest]
@@ -597,7 +585,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(f, err(type_mismatch_error(ty(f64_type()), ty(i32_type()))))
+    expect_that!(f, err(type_mismatch_error(f64_type(), i32_type())))
   }
 
   #[gtest]
@@ -625,7 +613,7 @@ mod tests {
         "#,
         &ctx
       ),
-      err(type_mismatch_error(ty(f64_type()), ty(i32_type())))
+      err(type_mismatch_error(f64_type(), i32_type()))
     );
   }
 
@@ -641,7 +629,7 @@ mod tests {
       &ctx,
     );
     let bind_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_bind();
-    expect_that!(&file.analysis.get(bind_stmt.var().id()), ty(i32_type()))
+    expect_that!(&file.analysis.get(bind_stmt.var().id()), i32_type())
   }
 
   #[gtest]
@@ -656,10 +644,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(
-      file,
-      err(type_mismatch_error(ty(bool_type()), ty(f32_type())))
-    );
+    expect_that!(file, err(type_mismatch_error(bool_type(), f32_type())));
   }
 
   #[gtest]
@@ -669,7 +654,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32, y: f32): bool { ret x < y }", &ctx),
-      err(type_mismatch_error(ty(i32_type()), ty(f32_type())))
+      err(type_mismatch_error(i32_type(), f32_type()))
     );
   }
 
@@ -678,10 +663,7 @@ mod tests {
     let ctx = TypeCheckerCtx::default();
     expect_that!(
       type_check_file("fn f(x: bool): bool { ret x < x }", &ctx),
-      err(invalid_operand(
-        contains_substring("numeric"),
-        ty(bool_type())
-      ))
+      err(invalid_operand(contains_substring("numeric"), bool_type()))
     );
   }
 
@@ -692,7 +674,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: f32, y: i32) { let x = x - y }", &ctx),
-      err(type_mismatch_error(ty(f32_type()), ty(i32_type())))
+      err(type_mismatch_error(f32_type(), i32_type()))
     );
   }
 
@@ -703,7 +685,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32, y: i32): f32 { ret x - y }", &ctx),
-      err(type_mismatch_error(ty(f32_type()), ty(i32_type())))
+      err(type_mismatch_error(f32_type(), i32_type()))
     );
   }
 
@@ -714,7 +696,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32): bool { ret x && x }", &ctx),
-      err(invalid_operand(contains_substring("bool"), ty(i32_type())))
+      err(invalid_operand(contains_substring("bool"), i32_type()))
     );
   }
 
@@ -725,7 +707,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32): bool { ret !x }", &ctx),
-      err(type_mismatch_error(ty(bool_type()), ty(i32_type())))
+      err(type_mismatch_error(bool_type(), i32_type()))
     );
   }
 
@@ -736,7 +718,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32, y: f32): bool { ret x == y }", &ctx),
-      err(type_mismatch_error(ty(i32_type()), ty(f32_type())))
+      err(type_mismatch_error(i32_type(), f32_type()))
     );
   }
 
@@ -747,7 +729,7 @@ mod tests {
       type_check_file("fn f(x: f64): bool { ret x == x }", &ctx),
       err(invalid_operand(
         contains_substring("integer or bool"),
-        ty(f64_type())
+        f64_type()
       ))
     );
   }
@@ -758,7 +740,7 @@ mod tests {
     type_check_ok("fn f(x: bool) { if x {} }", &ctx);
     expect_that!(
       type_check_file("fn f(x: i32) { if x {} }", &ctx),
-      err(type_mismatch_error(ty(bool_type()), ty(i32_type())))
+      err(type_mismatch_error(bool_type(), i32_type()))
     );
   }
 
@@ -775,10 +757,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(
-      file,
-      err(type_mismatch_error(ty(i32_type()), ty(bool_type())))
-    );
+    expect_that!(file, err(type_mismatch_error(i32_type(), bool_type())));
   }
 
   #[gtest]
@@ -795,10 +774,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(
-      file,
-      err(type_mismatch_error(ty(i32_type()), ty(bool_type())))
-    );
+    expect_that!(file, err(type_mismatch_error(i32_type(), bool_type())));
   }
 
   #[gtest]
@@ -815,10 +791,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(
-      file,
-      err(type_mismatch_error(ty(i32_type()), ty(bool_type())))
-    );
+    expect_that!(file, err(type_mismatch_error(i32_type(), bool_type())));
   }
 
   #[gtest]
@@ -834,10 +807,7 @@ mod tests {
         "#,
       &ctx,
     );
-    expect_that!(
-      file,
-      err(type_mismatch_error(ty(i32_type()), ty(bool_type())))
-    );
+    expect_that!(file, err(type_mismatch_error(i32_type(), bool_type())));
   }
 
   #[gtest]
@@ -882,14 +852,11 @@ mod tests {
         &ctx
       ),
       err(type_mismatch_error(
-        ty(all![
-          fn_param_types(is_empty()),
-          fn_return_type(ty(i32_type())),
-        ]),
-        ty(all![
-          fn_param_types(elements_are![ty(bool_type())]),
-          fn_return_type(ty(i32_type())),
-        ]),
+        all![fn_param_types(is_empty()), fn_return_type(i32_type()),],
+        all![
+          fn_param_types(elements_are![bool_type()]),
+          fn_return_type(i32_type()),
+        ],
       ))
     )
   }

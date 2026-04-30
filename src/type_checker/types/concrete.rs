@@ -22,22 +22,25 @@ impl<'a> Display for ConcreteType<'a> {
 #[cfg(test)]
 pub(crate) mod matchers {
   use super::*;
-  use crate::type_checker::types::concrete::ConcreteType;
+  use crate::type_checker::types::{
+    concrete::ConcreteType,
+    registry::{Ty, matchers::ty},
+  };
   use googletest::prelude::*;
 
   pub fn concrete_primitive_type<'a>(
     primitive_matcher: impl Matcher<&'a PrimitiveType>,
-  ) -> impl Matcher<&'a ConcreteType<'a>> {
-    pat!(ConcreteType::Primitive(primitive_matcher))
+  ) -> impl Matcher<&'a Ty<'a>> {
+    ty(pat!(ConcreteType::Primitive(primitive_matcher)))
   }
 
   pub fn concrete_fn_type<'a>(
     function_matcher: impl Matcher<&'a FunctionType<'a>>,
-  ) -> impl Matcher<&'a ConcreteType<'a>> {
-    pat!(ConcreteType::Function(function_matcher))
+  ) -> impl Matcher<&'a Ty<'a>> {
+    ty(pat!(ConcreteType::Function(function_matcher)))
   }
 
-  pub fn unit_type<'a>() -> impl Matcher<&'a ConcreteType<'a>> {
-    pat!(ConcreteType::Unit)
+  pub fn unit_type<'a>() -> impl Matcher<&'a Ty<'a>> {
+    ty(pat!(ConcreteType::Unit))
   }
 }
