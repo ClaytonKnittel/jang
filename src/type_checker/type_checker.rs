@@ -406,7 +406,7 @@ mod tests {
     let file = type_check_ok("fn foo() { }", &ctx);
     expect_that!(
       &file.fn_type("foo"),
-      all![fn_param_types(is_empty()), fn_return_type(unit_type()),],
+      all![fn_param_types(is_empty()), fn_return_type(unit_type())],
     );
   }
 
@@ -852,11 +852,8 @@ mod tests {
         &ctx
       ),
       err(type_mismatch_error(
-        all![fn_param_types(is_empty()), fn_return_type(i32_type()),],
-        all![
-          fn_param_types(elements_are![bool_type()]),
-          fn_return_type(i32_type()),
-        ],
+        fn_param_types(is_empty()),
+        fn_param_types(elements_are![bool_type()]),
       ))
     )
   }

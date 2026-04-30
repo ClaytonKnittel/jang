@@ -45,6 +45,45 @@ impl<'a> Display for Ty<'a> {
   }
 }
 
+/// A registry of unique types.
+///
+/// Responsible for creating new [`Ty`] objects for Jang's types.
+pub struct TypeRegistry<'a> {
+  type_set: TypeSet<'a>,
+  unit_type: Ty<'a>,
+  primitives: EnumMap<PrimitiveType, Ty<'a>>,
+}
+
+impl<'a> TypeRegistry<'a> {
+  pub fn new(ctx: &'a TypeCheckerCtx<'a>) -> Self {
+    let mut type_set = TypeSet::new(ctx);
+    let unit_type = type_set.add(ConcreteType::Unit);
+    let primitives = enum_map::enum_map! { p => type_set.add(ConcreteType::Primitive(p)) };
+    Self {
+      type_set,
+      unit_type,
+      primitives,
+    }
+  }
+
+  pub fn unit_type(&self) -> Ty<'a> {
+    self.unit_type
+  }
+
+  pub fn primitive_type(&self, primitive: PrimitiveType) -> Ty<'a> {
+    self.primitives[primitive]
+  }
+
+  /// Adds a function type to the registry and returns its handle,
+  /// deduplicating if the function already exists.
+  pub fn function_type(&mut self, parameters: Vec<Ty<'a>>, return_type: Ty<'a>) -> Ty<'a> {
+    self.type_set.add(ConcreteType::Function(FunctionType::new(
+      parameters,
+      return_type,
+    )))
+  }
+}
+
 /// A set of unique types.
 /// Facilitates allocation and deduplication of [`Ty`] values.
 struct TypeSet<'a> {
@@ -71,43 +110,6 @@ impl<'a> TypeSet<'a> {
     let ty = Ty(allocated);
     self.type_refs.insert(allocated, ty);
     ty
-  }
-}
-
-/// A registry of unique types, backed by a [`TypeCheckerCtx`].
-pub struct TypeRegistry<'a> {
-  types: TypeSet<'a>,
-  unit_type: Ty<'a>,
-  primitives: EnumMap<PrimitiveType, Ty<'a>>,
-}
-
-impl<'a> TypeRegistry<'a> {
-  pub fn new(ctx: &'a TypeCheckerCtx<'a>) -> Self {
-    let mut types = TypeSet::new(ctx);
-    let unit_type = types.add(ConcreteType::Unit);
-    let primitives = EnumMap::from_fn(|p| types.add(ConcreteType::Primitive(p)));
-    Self {
-      types,
-      unit_type,
-      primitives,
-    }
-  }
-
-  pub fn unit_type(&self) -> Ty<'a> {
-    self.unit_type
-  }
-
-  pub fn primitive_type(&self, primitive: PrimitiveType) -> Ty<'a> {
-    self.primitives[primitive]
-  }
-
-  /// Adds a function type to the registry and returns its handle,
-  /// deduplicating if the function already exists.
-  pub fn function_type(&mut self, parameters: Vec<Ty<'a>>, return_type: Ty<'a>) -> Ty<'a> {
-    self.types.add(ConcreteType::Function(FunctionType::new(
-      parameters,
-      return_type,
-    )))
   }
 }
 
