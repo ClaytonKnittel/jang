@@ -3,6 +3,9 @@ use std::cell::UnsafeCell;
 const CHUNK_CAPACITY: usize = 512;
 
 /// A basic arena that provides stable references to stored items.
+///
+/// We may want to replace this with `typed-arena` or similar
+/// in the future. But making something like this is fun.
 pub struct Arena<T> {
   chunks: UnsafeCell<Vec<Chunk<T>>>,
 }
