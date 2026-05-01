@@ -1,5 +1,5 @@
 use std::{
-  collections::HashMap,
+  collections::HashSet,
   fmt::Display,
   hash::{Hash, Hasher},
   ops::Deref,
@@ -103,28 +103,25 @@ struct TypeSet<'ctx> {
   ctx: &'ctx TypeCheckerCtx<'ctx>,
 
   /// For deduplication.
-  /// We store reference to [`ConcreteType`] as key,
-  /// since equality on [`Ty`] is redefined as ptr equality.
-  ty_by_concrete: HashMap<&'ctx ConcreteType<'ctx>, Ty<'ctx>>,
+  type_set: HashSet<&'ctx ConcreteType<'ctx>>,
 }
 
 impl<'ctx> TypeSet<'ctx> {
   fn new(ctx: &'ctx TypeCheckerCtx<'ctx>) -> Self {
     Self {
       ctx,
-      ty_by_concrete: HashMap::new(),
+      type_set: HashSet::new(),
     }
   }
 
   /// Adds a new type to the set, deduplicating against existing entries.
   fn add(&mut self, concrete: ConcreteType<'ctx>) -> Ty<'ctx> {
-    if let Some(&ty) = self.ty_by_concrete.get(&concrete) {
-      return ty;
+    if let Some(ty) = self.type_set.get(&concrete) {
+      return Ty(ty);
     }
     let allocated: &'ctx ConcreteType<'ctx> = self.ctx.types().alloc(concrete);
-    let ty = Ty(allocated);
-    self.ty_by_concrete.insert(allocated, ty);
-    ty
+    self.type_set.insert(allocated);
+    Ty(allocated)
   }
 }
 
