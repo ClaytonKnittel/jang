@@ -2,6 +2,8 @@ use std::{fmt::Display, hint::unreachable_unchecked};
 
 use cknittel_util::peekable_stream::ItemProxy;
 
+use crate::source_location::SourceLocation;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Op {
   /// '='
@@ -61,7 +63,7 @@ pub enum Op {
 }
 
 impl Op {
-  pub fn from_char_with_peek<I: Iterator<Item = Result<char, E>>, E>(
+  pub fn from_char_with_peek<I: Iterator<Item = Result<(char, SourceLocation), E>>, E>(
     ch: char,
     peek: Option<ItemProxy<'_, I>>,
   ) -> Self {
@@ -77,7 +79,7 @@ impl Op {
         match peek {
           Some(peek) => {
             match *peek {
-              $(Ok($next_char) => {
+              $(Ok(($next_char, _)) => {
                 unsafe { peek.take().unwrap_unchecked() };
                 $op
               })+

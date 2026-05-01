@@ -369,7 +369,7 @@ mod tests {
 
   #[gtest]
   fn global_not_found() {
-    let global = Ident::new("x");
+    let global = Ident::new_isolated("x");
     let code = function_bytecode(vec![block(
       vec![JitInstruction::LoadGlobal(&global)],
       JitTerminalInstruction::Return,
@@ -434,7 +434,7 @@ mod tests {
       vec![JitInstruction::BinaryOp(BinaryOp::Sub)],
       JitTerminalInstruction::Return,
     )]);
-    let sub_function_name = Ident::new("sub");
+    let sub_function_name = Ident::new_isolated("sub");
     let context = ConstContext {
       vals: HashMap::from([(
         sub_function_name.clone(),

@@ -1,17 +1,55 @@
-use std::fmt::Display;
+use std::{borrow::Borrow, fmt::Display, hash::Hash};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+use crate::source_location::SourceSpan;
+
+#[derive(Clone, Debug)]
 pub struct Ident {
   name: String,
+  span: SourceSpan,
 }
 
 impl Ident {
-  pub fn new(name: impl Into<String>) -> Self {
-    Self { name: name.into() }
+  pub fn new(name: impl Into<String>, span: SourceSpan) -> Self {
+    Self {
+      name: name.into(),
+      span,
+    }
+  }
+
+  #[cfg(test)]
+  pub fn new_isolated(name: impl Into<String>) -> Self {
+    Self {
+      name: name.into(),
+      span: crate::source_location::SourceLocation::file_start().into(),
+    }
   }
 
   pub fn name(&self) -> &str {
     &self.name
+  }
+
+  pub fn span(&self) -> &SourceSpan {
+    &self.span
+  }
+}
+
+impl Borrow<str> for Ident {
+  fn borrow(&self) -> &str {
+    &self.name
+  }
+}
+
+impl PartialEq for Ident {
+  fn eq(&self, other: &Self) -> bool {
+    self.name.eq(&other.name)
+  }
+}
+
+impl Eq for Ident {}
+
+impl Hash for Ident {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    self.name.hash(state);
   }
 }
 
@@ -29,6 +67,7 @@ pub(crate) mod matchers {
   pub fn ident(expected_name: &str) -> impl Matcher<&Ident> {
     pat!(Ident {
       name: eq(expected_name),
+      span: anything(),
     })
   }
 

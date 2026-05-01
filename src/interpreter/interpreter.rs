@@ -55,7 +55,7 @@ impl<'a> Interpreter<'a> {
   }
 
   pub fn run_main(&self) -> InterpreterResult<i64> {
-    let Some(main_fn) = self.program.functions.get(&Ident::new(MAIN_FN_NAME)) else {
+    let Some(main_fn) = self.program.functions.get(MAIN_FN_NAME) else {
       return Err(InterpreterError::generic_err("main function not found"));
     };
 
