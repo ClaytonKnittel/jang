@@ -26,6 +26,16 @@ impl<T> Arena<T> {
     //   so it cannot outlive the chunk holding its data.
     // - A chunk's underlying Vec is never expanded beyond its capacity,
     //   so it is guarenteed to never reallocate.
+    //
+    // Vec actually makes quite a few guarentees about how and where
+    // its elements are allocated. From the docs:
+    //  - Vec is and always will be a (pointer, capacity, length) triplet.
+    //  - The memory it points to is on the heap.
+    //  - `push` and `insert` will never (re)allocate if the reported
+    //    capacity is sufficient.
+    //  - Vec will never perform a "small optimization" where elements are
+    //    actually stored on the stack... [because] the contents of a Vec
+    //    wouldn’t have a stable address if it were only moved.
     unsafe { std::mem::transmute(entry) }
   }
 
