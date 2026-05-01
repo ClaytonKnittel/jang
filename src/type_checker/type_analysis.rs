@@ -3,16 +3,16 @@ use crate::type_checker::{
   types::registry::Ty,
 };
 
-pub struct JangTypeAnalysis<'a> {
-  ast_types: TypedAstIdTable<Ty<'a>>,
+pub struct JangTypeAnalysis<'ctx> {
+  ast_types: TypedAstIdTable<Ty<'ctx>>,
 }
 
-impl<'a> JangTypeAnalysis<'a> {
-  pub fn new(ast_types: TypedAstIdTable<Ty<'a>>) -> Self {
+impl<'ctx> JangTypeAnalysis<'ctx> {
+  pub fn new(ast_types: TypedAstIdTable<Ty<'ctx>>) -> Self {
     Self { ast_types }
   }
 
-  pub fn get(&self, id: impl Into<TypedAstId>) -> Ty<'a> {
+  pub fn get(&self, id: impl Into<TypedAstId>) -> Ty<'ctx> {
     *self
       .ast_types
       .get(id)

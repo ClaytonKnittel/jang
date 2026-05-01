@@ -3,13 +3,13 @@ use std::fmt::Display;
 use crate::type_checker::types::{function::FunctionType, primitive::PrimitiveType};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ConcreteType<'a> {
+pub enum ConcreteType<'ctx> {
   Unit,
-  Function(FunctionType<'a>),
+  Function(FunctionType<'ctx>),
   Primitive(PrimitiveType),
 }
 
-impl<'a> Display for ConcreteType<'a> {
+impl<'ctx> Display for ConcreteType<'ctx> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Unit => f.write_str("unit"),

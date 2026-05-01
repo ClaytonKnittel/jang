@@ -1,13 +1,13 @@
 use crate::{adt::arena::Arena, type_checker::types::concrete::ConcreteType};
 
-/// Context needed for the type checking process.
+/// Context needed for a type checking pass.
 #[derive(Default)]
-pub struct TypeCheckerCtx<'a> {
-  types: Arena<ConcreteType<'a>>,
+pub struct TypeCheckerCtx<'ctx> {
+  types: Arena<ConcreteType<'ctx>>,
 }
 
-impl<'a> TypeCheckerCtx<'a> {
-  pub(super) fn types(&self) -> &Arena<ConcreteType<'a>> {
+impl<'ctx> TypeCheckerCtx<'ctx> {
+  pub(super) fn types(&self) -> &Arena<ConcreteType<'ctx>> {
     &self.types
   }
 }

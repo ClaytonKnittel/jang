@@ -38,17 +38,17 @@ use crate::{
   },
 };
 
-struct TypeChecker<'a> {
-  types: TypeRegistry<'a>,
-  ast_types: TypedAstIdTable<Ty<'a>>,
+struct TypeChecker<'ctx> {
+  types: TypeRegistry<'ctx>,
+  ast_types: TypedAstIdTable<Ty<'ctx>>,
   current_fn: Option<AstGlobalDeclId>,
 }
 
-impl<'a> TypeChecker<'a> {
+impl<'ctx> TypeChecker<'ctx> {
   fn check(
     jang_file: &JangFile,
-    ctx: &'a TypeCheckerCtx<'a>,
-  ) -> TypeCheckerResult<'a, JangTypeAnalysis<'a>> {
+    ctx: &'ctx TypeCheckerCtx<'ctx>,
+  ) -> TypeCheckerResult<'ctx, JangTypeAnalysis<'ctx>> {
     let mut checker = Self {
       types: TypeRegistry::new(ctx),
       ast_types: TypedAstIdTable::new(jang_file),
@@ -66,18 +66,18 @@ impl<'a> TypeChecker<'a> {
     Ok(JangTypeAnalysis::new(resolved_types))
   }
 
-  fn set_ast_type(&mut self, ast_id: impl Into<TypedAstId>, ty: Ty<'a>) {
+  fn set_ast_type(&mut self, ast_id: impl Into<TypedAstId>, ty: Ty<'ctx>) {
     self.ast_types.insert(ast_id, ty);
   }
 
-  fn get_ast_type(&mut self, id: impl Into<TypedAstId>) -> Ty<'a> {
+  fn get_ast_type(&mut self, id: impl Into<TypedAstId>) -> Ty<'ctx> {
     *self
       .ast_types
       .get(id)
       .expect("Expected AST ID to have a populated type")
   }
 
-  fn check_types_match(&self, expected: Ty<'a>, actual: Ty<'a>) -> TypeCheckerResult<'a> {
+  fn check_types_match(&self, expected: Ty<'ctx>, actual: Ty<'ctx>) -> TypeCheckerResult<'ctx> {
     if expected != actual {
       Err(TypeCheckerError::TypeMismatch { expected, actual })
     } else {
@@ -85,11 +85,11 @@ impl<'a> TypeChecker<'a> {
     }
   }
 
-  fn check_is_bool(&self, actual: Ty<'a>) -> TypeCheckerResult<'a> {
+  fn check_is_bool(&self, actual: Ty<'ctx>) -> TypeCheckerResult<'ctx> {
     self.check_types_match(self.types.primitive_type(PrimitiveType::Bool), actual)
   }
 
-  fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'a> {
+  fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'ctx> {
     for fn_decl in jang_file.function_decls() {
       let fn_type = self.function_decl_type(fn_decl)?;
       self.set_ast_type(fn_decl.name_decl().id(), fn_type);
@@ -97,7 +97,7 @@ impl<'a> TypeChecker<'a> {
     Ok(())
   }
 
-  fn function_decl_type(&mut self, fn_decl: &FunctionDecl) -> TypeCheckerResult<'a, Ty<'a>> {
+  fn function_decl_type(&mut self, fn_decl: &FunctionDecl) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
     let parameters = fn_decl
       .parameters()
       .iter()
@@ -116,14 +116,14 @@ impl<'a> TypeChecker<'a> {
     Ok(self.types.function_type(parameters, return_type))
   }
 
-  fn check_jang_file(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'a> {
+  fn check_jang_file(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'ctx> {
     for fn_decl in jang_file.function_decls() {
       self.check_function_body(fn_decl)?;
     }
     Ok(())
   }
 
-  fn check_function_body(&mut self, fn_decl: &FunctionDecl) -> TypeCheckerResult<'a> {
+  fn check_function_body(&mut self, fn_decl: &FunctionDecl) -> TypeCheckerResult<'ctx> {
     let prev = self.current_fn.replace(fn_decl.name_decl().id());
     let result = self.check_block(fn_decl.body());
     self.current_fn = prev;
@@ -131,7 +131,7 @@ impl<'a> TypeChecker<'a> {
     result
   }
 
-  fn check_statement(&mut self, stmt: &Statement) -> TypeCheckerResult<'a> {
+  fn check_statement(&mut self, stmt: &Statement) -> TypeCheckerResult<'ctx> {
     match stmt {
       Statement::Bind(s) => self.check_bind_statement(s),
       Statement::Rebind(s) => self.check_rebind_statement(s),
@@ -144,14 +144,14 @@ impl<'a> TypeChecker<'a> {
     }
   }
 
-  fn check_block(&mut self, block: &Block) -> TypeCheckerResult<'a> {
+  fn check_block(&mut self, block: &Block) -> TypeCheckerResult<'ctx> {
     for stmt in block.statements() {
       self.check_statement(stmt)?;
     }
     Ok(())
   }
 
-  fn check_bind_statement(&mut self, s: &BindStatement) -> TypeCheckerResult<'a> {
+  fn check_bind_statement(&mut self, s: &BindStatement) -> TypeCheckerResult<'ctx> {
     let expr_type = self.check_expression(s.expr())?;
 
     let Some(var_type_expr) = s.var_type() else {
@@ -164,13 +164,13 @@ impl<'a> TypeChecker<'a> {
     Ok(())
   }
 
-  fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult<'a> {
+  fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult<'ctx> {
     let var_type = self.get_ast_type(s.var());
     let expr_type = self.check_expression(s.expr())?;
     self.check_types_match(var_type, expr_type)
   }
 
-  fn check_ret_statement(&mut self, s: &RetStatement) -> TypeCheckerResult<'a> {
+  fn check_ret_statement(&mut self, s: &RetStatement) -> TypeCheckerResult<'ctx> {
     let expr_type = self.check_expression(s.expr())?;
 
     let current_fn_type =
@@ -183,7 +183,7 @@ impl<'a> TypeChecker<'a> {
     self.check_types_match(f.return_type(), expr_type)
   }
 
-  fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult<'a> {
+  fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult<'ctx> {
     let cond_type = self.check_expression(s.condition())?;
     self.check_is_bool(cond_type)?;
 
@@ -196,7 +196,7 @@ impl<'a> TypeChecker<'a> {
     }
   }
 
-  fn check_expression(&mut self, expr: &Expression) -> TypeCheckerResult<'a, Ty<'a>> {
+  fn check_expression(&mut self, expr: &Expression) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
     let ty = match expr.variant() {
       ExpressionVariant::Literal(e) => self.check_literal_expression(e),
       ExpressionVariant::VarRef(e) => self.check_var_ref_expression(e),
@@ -210,7 +210,7 @@ impl<'a> TypeChecker<'a> {
     Ok(ty)
   }
 
-  fn check_literal_expression(&mut self, expr: &LiteralExpression) -> Ty<'a> {
+  fn check_literal_expression(&mut self, expr: &LiteralExpression) -> Ty<'ctx> {
     match expr.literal() {
       Literal::Numeric(NumericLiteral::Integral(_)) => {
         self.types.primitive_type(PrimitiveType::I32)
@@ -219,11 +219,14 @@ impl<'a> TypeChecker<'a> {
     }
   }
 
-  fn check_var_ref_expression(&mut self, var_ref: &VarRef) -> Ty<'a> {
+  fn check_var_ref_expression(&mut self, var_ref: &VarRef) -> Ty<'ctx> {
     self.get_ast_type(var_ref)
   }
 
-  fn check_binary_expression(&mut self, expr: &BinaryExpression) -> TypeCheckerResult<'a, Ty<'a>> {
+  fn check_binary_expression(
+    &mut self,
+    expr: &BinaryExpression,
+  ) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
     let lhs = self.check_expression(expr.lhs())?;
     let rhs = self.check_expression(expr.rhs())?;
     self.check_types_match(lhs, rhs)?;
@@ -258,7 +261,10 @@ impl<'a> TypeChecker<'a> {
     }
   }
 
-  fn check_unary_expression(&mut self, expr: &UnaryExpression) -> TypeCheckerResult<'a, Ty<'a>> {
+  fn check_unary_expression(
+    &mut self,
+    expr: &UnaryExpression,
+  ) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
     let expr_type = self.check_expression(expr.expr())?;
     match expr.op() {
       UnaryOp::LogicalNot => {
@@ -268,7 +274,7 @@ impl<'a> TypeChecker<'a> {
     }
   }
 
-  fn check_call_expression(&mut self, expr: &CallExpression) -> TypeCheckerResult<'a, Ty<'a>> {
+  fn check_call_expression(&mut self, expr: &CallExpression) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
     let target_type = self.check_expression(expr.target())?;
     let ConcreteType::Function(f) = target_type.deref() else {
       return Err(TypeCheckerError::NotCallable {
@@ -294,14 +300,14 @@ impl<'a> TypeChecker<'a> {
     Ok(return_type)
   }
 
-  fn check_dot_expression(&mut self, _: &DotExpression) -> TypeCheckerResult<'a, Ty<'a>> {
+  fn check_dot_expression(&mut self, _: &DotExpression) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
     todo!("Look up struct in global type decls")
   }
 
   fn eval_type_expression(
     &mut self,
     type_expression: &TypeExpression,
-  ) -> TypeCheckerResult<'a, Ty<'a>> {
+  ) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
     match type_expression.variant() {
       TypeExpressionVariant::Unit => Ok(self.types.unit_type()),
       TypeExpressionVariant::InlineFn(inline_fn) => self.eval_inline_fn(inline_fn),
@@ -311,7 +317,7 @@ impl<'a> TypeChecker<'a> {
     }
   }
 
-  fn eval_inline_fn(&mut self, inline_fn: &InlineFn) -> TypeCheckerResult<'a, Ty<'a>> {
+  fn eval_inline_fn(&mut self, inline_fn: &InlineFn) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
     let return_type = self.eval_type_expression(inline_fn.return_type())?;
     let parameters = inline_fn
       .args()
@@ -322,10 +328,10 @@ impl<'a> TypeChecker<'a> {
   }
 }
 
-pub fn check<'a>(
+pub fn check<'ctx>(
   jang_file: &JangFile,
-  ctx: &'a TypeCheckerCtx<'a>,
-) -> TypeCheckerResult<'a, JangTypeAnalysis<'a>> {
+  ctx: &'ctx TypeCheckerCtx<'ctx>,
+) -> TypeCheckerResult<'ctx, JangTypeAnalysis<'ctx>> {
   TypeChecker::check(jang_file, ctx)
 }
 
@@ -357,33 +363,33 @@ mod tests {
     },
   };
 
-  fn type_check_file<'a>(
+  fn type_check_file<'ctx>(
     source: &str,
-    ctx: &'a TypeCheckerCtx<'a>,
-  ) -> TypeCheckerResult<'a, TypeCheckedFile<'a>> {
+    ctx: &'ctx TypeCheckerCtx<'ctx>,
+  ) -> TypeCheckerResult<'ctx, TypeCheckedFile<'ctx>> {
     let ast = lex_and_parse_jang_file(source.chars()).expect("parse should succeed");
     let analysis = check(&ast, ctx)?;
     Ok(TypeCheckedFile { ast, analysis })
   }
 
-  fn type_check_ok<'a>(source: &str, ctx: &'a TypeCheckerCtx<'a>) -> TypeCheckedFile<'a> {
+  fn type_check_ok<'ctx>(source: &str, ctx: &'ctx TypeCheckerCtx<'ctx>) -> TypeCheckedFile<'ctx> {
     type_check_file(source, ctx).unwrap()
   }
 
-  struct TypeCheckedFile<'a> {
+  struct TypeCheckedFile<'ctx> {
     ast: JangFile,
-    analysis: JangTypeAnalysis<'a>,
+    analysis: JangTypeAnalysis<'ctx>,
   }
 
   // GoogleTest needs Debug, but annotating the AST with
   // types in a debug-friendly way is probably a fair bit of code.
-  impl<'a> std::fmt::Debug for TypeCheckedFile<'a> {
+  impl<'ctx> std::fmt::Debug for TypeCheckedFile<'ctx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
       f.debug_struct("TypeCheckedFile").finish()
     }
   }
 
-  impl<'a> TypeCheckedFile<'a> {
+  impl<'ctx> TypeCheckedFile<'ctx> {
     fn fn_decl_by_name(&self, name: &str) -> &FunctionDecl {
       self
         .ast
@@ -393,7 +399,7 @@ mod tests {
         .unwrap_or_else(|| panic!("function `{name}` not found"))
     }
 
-    fn fn_type(&self, name: &str) -> Ty<'a> {
+    fn fn_type(&self, name: &str) -> Ty<'ctx> {
       self
         .analysis
         .get(self.fn_decl_by_name(name).name_decl().id())

@@ -3,29 +3,29 @@ use itertools::Itertools;
 use std::fmt::Display;
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct FunctionType<'a> {
-  parameters: Vec<Ty<'a>>,
-  return_type: Ty<'a>,
+pub struct FunctionType<'ctx> {
+  parameters: Vec<Ty<'ctx>>,
+  return_type: Ty<'ctx>,
 }
 
-impl<'a> FunctionType<'a> {
-  pub fn new(parameters: Vec<Ty<'a>>, return_type: Ty<'a>) -> Self {
+impl<'ctx> FunctionType<'ctx> {
+  pub fn new(parameters: Vec<Ty<'ctx>>, return_type: Ty<'ctx>) -> Self {
     FunctionType {
       parameters,
       return_type,
     }
   }
 
-  pub fn parameters(&self) -> &[Ty<'a>] {
+  pub fn parameters(&self) -> &[Ty<'ctx>] {
     &self.parameters
   }
 
-  pub fn return_type(&self) -> Ty<'a> {
+  pub fn return_type(&self) -> Ty<'ctx> {
     self.return_type
   }
 }
 
-impl<'a> Display for FunctionType<'a> {
+impl<'ctx> Display for FunctionType<'ctx> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
