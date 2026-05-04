@@ -42,7 +42,7 @@ struct JitInstructionBlockBuilder {
   instructions: Vec<JitInstruction>,
 }
 
-impl<'a> JitInstructionBlockBuilder {
+impl JitInstructionBlockBuilder {
   fn new(id: BlockId) -> Self {
     Self {
       id,
@@ -496,9 +496,7 @@ impl<'a> Cursor<'a> {
   }
 }
 
-pub fn compile_to_bytecode<'a>(
-  fn_decl: &'a FunctionDecl,
-) -> InterpreterResult<JitCompiledFunction> {
+pub fn compile_to_bytecode(fn_decl: &FunctionDecl) -> InterpreterResult<JitCompiledFunction> {
   Cursor::compile_fn_decl(fn_decl)
 }
 

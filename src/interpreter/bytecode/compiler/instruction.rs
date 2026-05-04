@@ -303,7 +303,7 @@ pub mod testing {
     instruction_block_list::testing::{block_id, block_list},
   };
 
-  pub fn block<'a>(
+  pub fn block(
     instructions: Vec<JitInstruction>,
     terminator: JitTerminalInstruction,
   ) -> JitInstructionBlock {
@@ -313,7 +313,7 @@ pub mod testing {
     }
   }
 
-  pub fn function_bytecode<'a>(blocks: Vec<JitInstructionBlock>) -> JitCompiledFunction {
+  pub fn function_bytecode(blocks: Vec<JitInstructionBlock>) -> JitCompiledFunction {
     JitCompiledFunction {
       entrypoint: block_id(0),
       blocks: block_list(blocks),
