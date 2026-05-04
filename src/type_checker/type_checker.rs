@@ -61,16 +61,9 @@ impl<'ctx> TypeChecker<'ctx> {
     checker.register_global_types(jang_file)?;
     checker.check_jang_file(jang_file)?;
 
-    let TypeChecker {
-      types,
-      ast_types,
-      inference,
-      current_fn: _,
-    } = checker;
-
     let mut resolved_types = TypedAstIdTable::new(jang_file);
-    for (ast_id, ty) in ast_types.into_iter() {
-      resolved_types.insert(ast_id, inference.resolve(ty, &types));
+    for (ast_id, ty) in checker.ast_types.into_iter() {
+      resolved_types.insert(ast_id, checker.inference.resolve(ty, &checker.types));
     }
 
     Ok(JangTypeAnalysis::new(resolved_types))
@@ -85,6 +78,22 @@ impl<'ctx> TypeChecker<'ctx> {
       .ast_types
       .get(id)
       .expect("Expected AST ID to have a populated type")
+  }
+
+  fn unify(
+    &mut self,
+    expected: InferredTy<'ctx>,
+    actual: InferredTy<'ctx>,
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
+    self.inference.unify(expected, actual, &self.types)
+  }
+
+  fn check_is_bool(&mut self, actual: InferredTy<'ctx>) -> TypeCheckerResult<'ctx> {
+    self.unify(
+      self.types.primitive_type(PrimitiveType::Bool).into(),
+      actual,
+    )?;
+    Ok(())
   }
 
   fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'ctx> {
@@ -129,23 +138,6 @@ impl<'ctx> TypeChecker<'ctx> {
     result
   }
 
-  fn check_types_match(
-    &mut self,
-    expected: InferredTy<'ctx>,
-    actual: InferredTy<'ctx>,
-  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
-    self.inference.unify(expected, actual, &self.types)
-  }
-
-  fn check_is_bool(&mut self, actual: InferredTy<'ctx>) -> TypeCheckerResult<'ctx> {
-    self
-      .check_types_match(
-        self.types.primitive_type(PrimitiveType::Bool).into(),
-        actual,
-      )
-      .map(drop)
-  }
-
   fn check_statement(&mut self, stmt: &Statement) -> TypeCheckerResult<'ctx> {
     match stmt {
       Statement::Bind(s) => self.check_bind_statement(s),
@@ -173,7 +165,7 @@ impl<'ctx> TypeChecker<'ctx> {
       .var_type()
       .map(|type_expr| -> TypeCheckerResult<'ctx, _> {
         let var_type = self.eval_type_expression(type_expr)?;
-        self.check_types_match(var_type.into(), expr_type)
+        self.unify(var_type.into(), expr_type)
       })
       .transpose()?
       .unwrap_or(expr_type);
@@ -185,7 +177,8 @@ impl<'ctx> TypeChecker<'ctx> {
   fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult<'ctx> {
     let var_type = self.get_ast_type(s.var());
     let expr_type = self.check_expression(s.expr())?;
-    self.check_types_match(var_type, expr_type).map(drop)
+    self.unify(var_type, expr_type)?;
+    Ok(())
   }
 
   fn check_ret_statement(&mut self, s: &RetStatement) -> TypeCheckerResult<'ctx> {
@@ -201,9 +194,8 @@ impl<'ctx> TypeChecker<'ctx> {
     };
     let return_type = f.return_type();
 
-    self
-      .check_types_match(return_type.into(), expr_type)
-      .map(drop)
+    self.unify(return_type.into(), expr_type)?;
+    Ok(())
   }
 
   fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult<'ctx> {
@@ -250,7 +242,7 @@ impl<'ctx> TypeChecker<'ctx> {
   ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let lhs = self.check_expression(expr.lhs())?;
     let rhs = self.check_expression(expr.rhs())?;
-    let operand_ty = self.check_types_match(lhs, rhs)?;
+    let operand_ty = self.unify(lhs, rhs)?;
 
     let bool_ty: InferredTy<'ctx> = self.types.primitive_type(PrimitiveType::Bool).into();
 
@@ -318,7 +310,7 @@ impl<'ctx> TypeChecker<'ctx> {
 
     for (arg, &param_type) in args.iter().zip(f.parameters()) {
       let arg_type = self.check_expression(arg)?;
-      self.check_types_match(param_type.into(), arg_type)?;
+      self.unify(param_type.into(), arg_type)?;
     }
 
     Ok(return_type.into())
@@ -595,7 +587,7 @@ mod tests {
   }
 
   #[gtest]
-  fn integer_literal_infers_from_return_type() {
+  fn integer_literal_infers_i64_from_return_type() {
     let ctx = TypeCheckerCtx::default();
     let file = type_check_ok("fn foo(): i64 { ret 1 }", &ctx);
     let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
@@ -603,11 +595,27 @@ mod tests {
   }
 
   #[gtest]
-  fn float_literal_infers_from_return_type() {
+  fn integer_literal_infers_i32_from_return_type() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo(): i32 { ret 1 }", &ctx);
+    let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
+    expect_that!(&file.analysis.get(ret_stmt.expr().id()), i32_type())
+  }
+
+  #[gtest]
+  fn float_literal_infers_i64_from_return_type() {
     let ctx = TypeCheckerCtx::default();
     let file = type_check_ok("fn foo(): f64 { ret 1. }", &ctx);
     let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
     expect_that!(&file.analysis.get(ret_stmt.expr().id()), f64_type())
+  }
+
+  #[gtest]
+  fn float_literal_infers_f32_from_return_type() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo(): f32 { ret 1. }", &ctx);
+    let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
+    expect_that!(&file.analysis.get(ret_stmt.expr().id()), f32_type())
   }
 
   #[gtest]
