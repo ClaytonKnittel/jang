@@ -18,7 +18,7 @@ pub enum Value<'a> {
   Bool(bool),
   Int64(i64),
   Float32(f32),
-  JitCompiledFunctionRef(&'a JitCompiledFunction<'a>),
+  JitCompiledFunctionRef(&'a JitCompiledFunction),
 }
 
 /// A pair of two identically-typed numeric values.
@@ -184,7 +184,7 @@ impl<'a> Value<'a> {
     }))
   }
 
-  pub fn as_jit_function(&self) -> InterpreterResult<&'a JitCompiledFunction<'a>> {
+  pub fn as_jit_function(&self) -> InterpreterResult<&'a JitCompiledFunction> {
     match self {
       Value::JitCompiledFunctionRef(jit_compiled_function) => Ok(*jit_compiled_function),
       value => Err(InterpreterError::value_err(format!(
