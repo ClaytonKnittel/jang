@@ -28,6 +28,7 @@ use crate::{
   type_checker::{
     context::TypeCheckerCtx,
     error::{TypeCheckerError, TypeCheckerResult},
+    inference::{InferenceTable, InferredTy, TypeClass},
     type_analysis::JangTypeAnalysis,
     typed_ast_id::{TypedAstId, TypedAstIdTable},
     types::{
@@ -40,7 +41,8 @@ use crate::{
 
 struct TypeChecker<'ctx> {
   types: TypeRegistry<'ctx>,
-  ast_types: TypedAstIdTable<Ty<'ctx>>,
+  ast_types: TypedAstIdTable<InferredTy<'ctx>>,
+  inference: InferenceTable<'ctx>,
   current_fn: Option<AstGlobalDeclId>,
 }
 
@@ -52,47 +54,43 @@ impl<'ctx> TypeChecker<'ctx> {
     let mut checker = Self {
       types: TypeRegistry::new(ctx),
       ast_types: TypedAstIdTable::new(jang_file),
+      inference: InferenceTable::default(),
       current_fn: None,
     };
 
     checker.register_global_types(jang_file)?;
     checker.check_jang_file(jang_file)?;
 
+    let TypeChecker {
+      types,
+      ast_types,
+      inference,
+      current_fn: _,
+    } = checker;
+
     let mut resolved_types = TypedAstIdTable::new(jang_file);
-    for (ast_id, ty) in checker.ast_types.into_iter() {
-      resolved_types.insert(ast_id, ty);
+    for (ast_id, ty) in ast_types.into_iter() {
+      resolved_types.insert(ast_id, inference.resolve(ty, &types));
     }
 
     Ok(JangTypeAnalysis::new(resolved_types))
   }
 
-  fn set_ast_type(&mut self, ast_id: impl Into<TypedAstId>, ty: Ty<'ctx>) {
+  fn set_ast_type(&mut self, ast_id: impl Into<TypedAstId>, ty: InferredTy<'ctx>) {
     self.ast_types.insert(ast_id, ty);
   }
 
-  fn get_ast_type(&mut self, id: impl Into<TypedAstId>) -> Ty<'ctx> {
+  fn get_ast_type(&self, id: impl Into<TypedAstId>) -> InferredTy<'ctx> {
     *self
       .ast_types
       .get(id)
       .expect("Expected AST ID to have a populated type")
   }
 
-  fn check_types_match(&self, expected: Ty<'ctx>, actual: Ty<'ctx>) -> TypeCheckerResult<'ctx> {
-    if expected != actual {
-      Err(TypeCheckerError::TypeMismatch { expected, actual })
-    } else {
-      Ok(())
-    }
-  }
-
-  fn check_is_bool(&self, actual: Ty<'ctx>) -> TypeCheckerResult<'ctx> {
-    self.check_types_match(self.types.primitive_type(PrimitiveType::Bool), actual)
-  }
-
   fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'ctx> {
     for fn_decl in jang_file.function_decls() {
       let fn_type = self.function_decl_type(fn_decl)?;
-      self.set_ast_type(fn_decl.name_decl().id(), fn_type);
+      self.set_ast_type(fn_decl.name_decl().id(), fn_type.into());
     }
     Ok(())
   }
@@ -103,7 +101,7 @@ impl<'ctx> TypeChecker<'ctx> {
       .iter()
       .map(|param| {
         let ty = self.eval_type_expression(param.ty())?;
-        self.set_ast_type(param.var().id(), ty);
+        self.set_ast_type(param.var().id(), ty.into());
         Ok(ty)
       })
       .collect_result_vec()?;
@@ -131,6 +129,23 @@ impl<'ctx> TypeChecker<'ctx> {
     result
   }
 
+  fn check_types_match(
+    &mut self,
+    expected: InferredTy<'ctx>,
+    actual: InferredTy<'ctx>,
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
+    self.inference.unify(expected, actual, &self.types)
+  }
+
+  fn check_is_bool(&mut self, actual: InferredTy<'ctx>) -> TypeCheckerResult<'ctx> {
+    self
+      .check_types_match(
+        self.types.primitive_type(PrimitiveType::Bool).into(),
+        actual,
+      )
+      .map(drop)
+  }
+
   fn check_statement(&mut self, stmt: &Statement) -> TypeCheckerResult<'ctx> {
     match stmt {
       Statement::Bind(s) => self.check_bind_statement(s),
@@ -154,33 +169,41 @@ impl<'ctx> TypeChecker<'ctx> {
   fn check_bind_statement(&mut self, s: &BindStatement) -> TypeCheckerResult<'ctx> {
     let expr_type = self.check_expression(s.expr())?;
 
-    let Some(var_type_expr) = s.var_type() else {
-      self.set_ast_type(s.var().id(), expr_type);
-      return Ok(());
-    };
+    let var_type = s
+      .var_type()
+      .map(|type_expr| -> TypeCheckerResult<'ctx, _> {
+        let var_type = self.eval_type_expression(type_expr)?;
+        self.check_types_match(var_type.into(), expr_type)
+      })
+      .transpose()?
+      .unwrap_or(expr_type);
 
-    let var_type = self.eval_type_expression(var_type_expr)?;
-    self.check_types_match(var_type, expr_type)?;
+    self.set_ast_type(s.var().id(), var_type);
     Ok(())
   }
 
   fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult<'ctx> {
     let var_type = self.get_ast_type(s.var());
     let expr_type = self.check_expression(s.expr())?;
-    self.check_types_match(var_type, expr_type)
+    self.check_types_match(var_type, expr_type).map(drop)
   }
 
   fn check_ret_statement(&mut self, s: &RetStatement) -> TypeCheckerResult<'ctx> {
     let expr_type = self.check_expression(s.expr())?;
 
-    let current_fn_type =
-      self.get_ast_type(self.current_fn.expect("Unexpected ret outside a function"));
+    let current_fn_type = self.inference.resolve(
+      self.get_ast_type(self.current_fn.expect("Unexpected ret outside a function")),
+      &self.types,
+    );
 
     let ConcreteType::Function(f) = current_fn_type.deref() else {
       panic!("Expected current function to have FunctionType")
     };
+    let return_type = f.return_type();
 
-    self.check_types_match(f.return_type(), expr_type)
+    self
+      .check_types_match(return_type.into(), expr_type)
+      .map(drop)
   }
 
   fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult<'ctx> {
@@ -196,7 +219,7 @@ impl<'ctx> TypeChecker<'ctx> {
     }
   }
 
-  fn check_expression(&mut self, expr: &Expression) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
+  fn check_expression(&mut self, expr: &Expression) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let ty = match expr.variant() {
       ExpressionVariant::Literal(e) => self.check_literal_expression(e),
       ExpressionVariant::VarRef(e) => self.check_var_ref_expression(e),
@@ -210,72 +233,73 @@ impl<'ctx> TypeChecker<'ctx> {
     Ok(ty)
   }
 
-  fn check_literal_expression(&mut self, expr: &LiteralExpression) -> Ty<'ctx> {
+  fn check_literal_expression(&mut self, expr: &LiteralExpression) -> InferredTy<'ctx> {
     match expr.literal() {
-      Literal::Numeric(NumericLiteral::Integral(_)) => {
-        self.types.primitive_type(PrimitiveType::I32)
-      }
-      Literal::Numeric(NumericLiteral::Float(_)) => self.types.primitive_type(PrimitiveType::F32),
+      Literal::Numeric(NumericLiteral::Integral(_)) => self.inference.new_integral_var(),
+      Literal::Numeric(NumericLiteral::Float(_)) => self.inference.new_floating_var(),
     }
   }
 
-  fn check_var_ref_expression(&mut self, var_ref: &VarRef) -> Ty<'ctx> {
+  fn check_var_ref_expression(&mut self, var_ref: &VarRef) -> InferredTy<'ctx> {
     self.get_ast_type(var_ref)
   }
 
   fn check_binary_expression(
     &mut self,
     expr: &BinaryExpression,
-  ) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let lhs = self.check_expression(expr.lhs())?;
     let rhs = self.check_expression(expr.rhs())?;
-    self.check_types_match(lhs, rhs)?;
+    let operand_ty = self.check_types_match(lhs, rhs)?;
 
-    let expected_type = |expected: &'static str| TypeCheckerError::InvalidOperand {
-      op: expr.op(),
-      expected: expected.to_owned(),
-      actual: lhs,
-    };
-
-    let ConcreteType::Primitive(primitive) = *lhs else {
-      return Err(expected_type("primitive"));
-    };
+    let bool_ty: InferredTy<'ctx> = self.types.primitive_type(PrimitiveType::Bool).into();
 
     use BinaryOp::*;
     match expr.op() {
-      Add | Sub | Mul | Div | Mod => primitive
-        .is_numeric()
-        .then_some(lhs)
-        .ok_or_else(|| expected_type("numeric")),
-      Equal | NotEqual => (primitive.is_integer() || primitive.is_bool())
-        .then_some(self.types.primitive_type(PrimitiveType::Bool))
-        .ok_or_else(|| expected_type("integer or bool")),
-      GreaterThan | GreaterThanEqual | LessThan | LessThanEqual => primitive
-        .is_numeric()
-        .then_some(self.types.primitive_type(PrimitiveType::Bool))
-        .ok_or_else(|| expected_type("numeric")),
-      LogicalAnd | LogicalOr => primitive
-        .is_bool()
-        .then_some(self.types.primitive_type(PrimitiveType::Bool))
-        .ok_or_else(|| expected_type("bool")),
+      Add | Sub | Mul | Div | Mod => {
+        self
+          .inference
+          .check_requirement(operand_ty, TypeClass::Numeric, &self.types)?;
+        Ok(operand_ty)
+      }
+      Equal | NotEqual => {
+        self
+          .inference
+          .check_requirement(operand_ty, TypeClass::Eq, &self.types)?;
+        Ok(bool_ty)
+      }
+      GreaterThan | GreaterThanEqual | LessThan | LessThanEqual => {
+        self
+          .inference
+          .check_requirement(operand_ty, TypeClass::Numeric, &self.types)?;
+        Ok(bool_ty)
+      }
+      LogicalAnd | LogicalOr => {
+        self.check_is_bool(operand_ty)?;
+        Ok(bool_ty)
+      }
     }
   }
 
   fn check_unary_expression(
     &mut self,
     expr: &UnaryExpression,
-  ) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let expr_type = self.check_expression(expr.expr())?;
     match expr.op() {
       UnaryOp::LogicalNot => {
         self.check_is_bool(expr_type)?;
-        Ok(self.types.primitive_type(PrimitiveType::Bool))
+        Ok(self.types.primitive_type(PrimitiveType::Bool).into())
       }
     }
   }
 
-  fn check_call_expression(&mut self, expr: &CallExpression) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
+  fn check_call_expression(
+    &mut self,
+    expr: &CallExpression,
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let target_type = self.check_expression(expr.target())?;
+    let target_type = self.inference.resolve(target_type, &self.types);
     let ConcreteType::Function(f) = target_type.deref() else {
       return Err(TypeCheckerError::NotCallable {
         target: target_type,
@@ -294,13 +318,16 @@ impl<'ctx> TypeChecker<'ctx> {
 
     for (arg, &param_type) in args.iter().zip(f.parameters()) {
       let arg_type = self.check_expression(arg)?;
-      self.check_types_match(param_type, arg_type)?;
+      self.check_types_match(param_type.into(), arg_type)?;
     }
 
-    Ok(return_type)
+    Ok(return_type.into())
   }
 
-  fn check_dot_expression(&mut self, _: &DotExpression) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
+  fn check_dot_expression(
+    &mut self,
+    _: &DotExpression,
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     todo!("Look up struct in global type decls")
   }
 
@@ -350,9 +377,10 @@ mod tests {
       error::{
         TypeCheckerResult,
         matchers::{
-          arity_mismatch_error, invalid_operand, not_callable_error, type_mismatch_error,
+          arity_mismatch_error, not_callable_error, type_class_mismatch, type_mismatch_error,
         },
       },
+      inference::TypeClass,
       type_analysis::JangTypeAnalysis,
       types::{
         concrete::matchers::unit_type,
@@ -567,6 +595,120 @@ mod tests {
   }
 
   #[gtest]
+  fn integer_literal_infers_from_return_type() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo(): i64 { ret 1 }", &ctx);
+    let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
+    expect_that!(&file.analysis.get(ret_stmt.expr().id()), i64_type())
+  }
+
+  #[gtest]
+  fn float_literal_infers_from_return_type() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo(): f64 { ret 1. }", &ctx);
+    let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
+    expect_that!(&file.analysis.get(ret_stmt.expr().id()), f64_type())
+  }
+
+  #[gtest]
+  fn typed_bind_infers_numeric_literal_type() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo() { let x: i64 = 1 }", &ctx);
+    let bind_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_bind();
+    expect_that!(&file.analysis.get(bind_stmt.var().id()), i64_type());
+    expect_that!(&file.analysis.get(bind_stmt.expr().id()), i64_type())
+  }
+
+  #[gtest]
+  fn arithmetic_literals_infer_from_expected_result_type() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo(): i64 { ret 1 + 2 }", &ctx);
+    let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
+    let bin_expr = ret_stmt.expr().variant().as_binary_expr();
+    expect_that!(&file.analysis.get(ret_stmt.expr().id()), i64_type());
+    expect_that!(&file.analysis.get(bin_expr.lhs().id()), i64_type());
+    expect_that!(&file.analysis.get(bin_expr.rhs().id()), i64_type())
+  }
+
+  #[gtest]
+  fn numeric_literal_infers_from_other_binary_operand() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok("fn foo(x: i64): i64 { ret 1 + x }", &ctx);
+    let ret_stmt = file.fn_decl_by_name("foo").body().statements()[0].as_ret();
+    let bin_expr = ret_stmt.expr().variant().as_binary_expr();
+    expect_that!(&file.analysis.get(bin_expr.lhs().id()), i64_type())
+  }
+
+  #[gtest]
+  fn function_argument_infers_numeric_literal_type() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok(
+      r#"
+        fn takes_i64(x: i64) {}
+        fn foo() { takes_i64(1) }
+        "#,
+      &ctx,
+    );
+
+    let call = file.fn_decl_by_name("foo").body().statements()[0].as_call();
+    expect_that!(&file.analysis.get(call.argument_list()[0].id()), i64_type())
+  }
+
+  #[gtest]
+  fn integer_literal_does_not_infer_float_type() {
+    let ctx = TypeCheckerCtx::default();
+    expect_that!(
+      type_check_file("fn foo(): f64 { ret 1 }", &ctx),
+      err(type_mismatch_error(f64_type(), i32_type()))
+    )
+  }
+
+  #[gtest]
+  fn integral_comparison() {
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok("fn foo(): bool { ret 1 == 1 }", &ctx);
+  }
+
+  #[gtest]
+  fn delayed_inference_through_literal_comparison() {
+    let ctx = TypeCheckerCtx::default();
+    let f = type_check_ok(
+      "fn foo(): bool {
+                let x = 1
+                let y: i64 = 3
+                ret x == 2 && x == y
+              }",
+      &ctx,
+    );
+    let two_expr = f.fn_decl_by_name("foo").body().statements()[2]
+      .as_ret()
+      .expr()
+      .variant()
+      .as_binary_expr()
+      .lhs()
+      .variant()
+      .as_binary_expr()
+      .rhs();
+    expect_that!(&f.analysis.get(two_expr.id()), i64_type())
+  }
+
+  #[gtest]
+  fn previously_inferred_type_can_cause_mismatch() {
+    let ctx = TypeCheckerCtx::default();
+    expect_that!(
+      type_check_file(
+        "fn foo(x: i64) {
+                let x = 1
+                let y: i64 = x
+                let z: i32 = x
+              }",
+        &ctx,
+      ),
+      err(type_mismatch_error(i32_type(), i64_type()))
+    )
+  }
+
+  #[gtest]
   fn bind_statement_without_type_ok() {
     let ctx = TypeCheckerCtx::default();
     type_check_ok(
@@ -669,7 +811,7 @@ mod tests {
     let ctx = TypeCheckerCtx::default();
     expect_that!(
       type_check_file("fn f(x: bool): bool { ret x < x }", &ctx),
-      err(invalid_operand(contains_substring("numeric"), bool_type()))
+      err(type_class_mismatch(pat!(TypeClass::Numeric), bool_type()))
     );
   }
 
@@ -702,7 +844,7 @@ mod tests {
 
     expect_that!(
       type_check_file("fn f(x: i32): bool { ret x && x }", &ctx),
-      err(invalid_operand(contains_substring("bool"), i32_type()))
+      err(type_mismatch_error(bool_type(), i32_type()))
     );
   }
 
@@ -733,10 +875,7 @@ mod tests {
     let ctx = TypeCheckerCtx::default();
     expect_that!(
       type_check_file("fn f(x: f64): bool { ret x == x }", &ctx),
-      err(invalid_operand(
-        contains_substring("integer or bool"),
-        f64_type()
-      ))
+      err(type_class_mismatch(pat!(TypeClass::Eq), f64_type()))
     );
   }
 

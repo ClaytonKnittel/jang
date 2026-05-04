@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{parser::ast::binary_expression::BinaryOp, type_checker::types::registry::Ty};
+use crate::type_checker::{inference::TypeClass, types::registry::Ty};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeCheckerError<'ctx> {
@@ -9,10 +9,9 @@ pub enum TypeCheckerError<'ctx> {
     expected: Ty<'ctx>,
     actual: Ty<'ctx>,
   },
-  /// Type mismatch in a binary operation.
-  InvalidOperand {
-    op: BinaryOp,
-    expected: String,
+  /// Type class mismatch.
+  TypeClassMismatch {
+    expected: TypeClass,
     actual: Ty<'ctx>,
   },
   /// Call target is not a function type.
@@ -27,12 +26,8 @@ impl<'ctx> Display for TypeCheckerError<'ctx> {
       Self::TypeMismatch { expected, actual } => {
         write!(f, "expected `{expected}`, but found `{actual}`")
       }
-      Self::InvalidOperand {
-        op,
-        expected,
-        actual,
-      } => {
-        write!(f, "in `{op}` required {expected}, but found `{actual}`")
+      Self::TypeClassMismatch { expected, actual } => {
+        write!(f, "required {expected} type, but found `{actual}`")
       }
       Self::NotCallable { target } => write!(f, "cannot call a value of type `{target}`"),
       Self::ArityMismatch { expected, actual } => write!(
@@ -79,11 +74,11 @@ pub(crate) mod matchers {
     pat!(TypeCheckerError::NotCallable { target: target })
   }
 
-  pub fn invalid_operand<'ctx>(
-    expected: impl Matcher<&'ctx String>,
+  pub fn type_class_mismatch<'ctx>(
+    expected: impl Matcher<&'ctx TypeClass>,
     actual: impl Matcher<&'ctx Ty<'ctx>>,
   ) -> impl Matcher<&'ctx TypeCheckerError<'ctx>> {
-    pat!(TypeCheckerError::InvalidOperand {
+    pat!(TypeCheckerError::TypeClassMismatch {
       expected: expected,
       actual: actual,
       ..

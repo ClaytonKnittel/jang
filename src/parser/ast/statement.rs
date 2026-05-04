@@ -38,7 +38,8 @@ impl Display for Statement {
 #[cfg(test)]
 pub(crate) mod matchers {
   use crate::parser::ast::{
-    bind_statement::BindStatement, ret_statement::RetStatement, statement::Statement,
+    bind_statement::BindStatement, call_expression::CallExpression, ret_statement::RetStatement,
+    statement::Statement,
   };
   use googletest::prelude::*;
 
@@ -58,6 +59,13 @@ pub(crate) mod matchers {
       match self {
         Self::Bind(s) => s,
         _ => panic!("Expected BindStatement, got {:?}", self),
+      }
+    }
+
+    pub fn as_call(&self) -> &CallExpression {
+      match self {
+        Self::CallStatement(s) => s,
+        _ => panic!("Expected CallExpression, got {:?}", self),
       }
     }
   }
