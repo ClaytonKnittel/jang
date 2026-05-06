@@ -1,20 +1,25 @@
+use crate::parser::ast::id::{
+  adt::map::IdMap,
+  def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
+  snapshot::IdSnapshot,
+};
+
 #[derive(Clone, Debug)]
-pub struct AstIdCounts {
-  pub(super) global_decl_count: usize,
-  pub(super) local_decl_count: usize,
-  pub(super) expression_count: usize,
+pub struct AstIdRange {
+  pub(super) start: IdSnapshot,
+  pub(super) end: IdSnapshot,
 }
 
-impl AstIdCounts {
-  pub fn global_decl_count(&self) -> usize {
-    self.global_decl_count
+impl AstIdRange {
+  pub fn new_expression_id_map<T>(&self) -> IdMap<AstExpressionId, T> {
+    IdMap::from_range(self.start.expression, self.end.expression)
   }
 
-  pub fn local_decl_count(&self) -> usize {
-    self.local_decl_count
+  pub fn new_local_id_map<T>(&self) -> IdMap<AstLocalDeclId, T> {
+    IdMap::from_range(self.start.local, self.end.local)
   }
 
-  pub fn expression_count(&self) -> usize {
-    self.expression_count
+  pub fn new_global_id_map<T>(&self) -> IdMap<AstGlobalDeclId, T> {
+    IdMap::from_range(self.start.global, self.end.global)
   }
 }

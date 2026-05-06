@@ -7,7 +7,7 @@ use crate::parser::ast::{
   id::{
     adt::map::IdMap,
     def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
-    id_counts::AstIdCounts,
+    id_counts::AstIdRange,
   },
   type_decl::TypeDecl,
 };
@@ -18,7 +18,7 @@ pub struct JangFile {
   function_decls: Vec<FunctionDecl>,
   #[vec]
   type_decls: Vec<TypeDecl>,
-  id_counts: AstIdCounts,
+  id_range: AstIdRange,
 }
 
 impl JangFile {
@@ -31,15 +31,15 @@ impl JangFile {
   }
 
   pub fn new_expression_id_map<T: std::clone::Clone>(&self) -> IdMap<AstExpressionId, T> {
-    IdMap::with_capacity(self.id_counts.expression_count())
+    self.id_range.new_expression_id_map()
   }
 
   pub fn new_global_decl_id_map<T: std::clone::Clone>(&self) -> IdMap<AstGlobalDeclId, T> {
-    IdMap::with_capacity(self.id_counts.global_decl_count())
+    self.id_range.new_global_id_map()
   }
 
   pub fn new_local_decl_id_map<T: std::clone::Clone>(&self) -> IdMap<AstLocalDeclId, T> {
-    IdMap::with_capacity(self.id_counts.local_decl_count())
+    self.id_range.new_local_id_map()
   }
 }
 
