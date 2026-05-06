@@ -1,7 +1,7 @@
 // Intentionally allow IdMap to depend on the private trait AstIdImpl,
 // so ID types remain entirely opaque to code outside the ast module.
 #![allow(private_bounds)]
-use std::{marker::PhantomData, ops::Index};
+use std::ops::Index;
 
 use crate::parser::ast::id::AstIdImpl;
 
@@ -9,7 +9,6 @@ use crate::parser::ast::id::AstIdImpl;
 pub struct IdMap<ID: AstIdImpl, T> {
   offset: ID,
   data: Vec<Option<T>>,
-  phantom_data: PhantomData<ID>,
 }
 
 impl<ID: AstIdImpl, T> IdMap<ID, T> {
@@ -36,7 +35,6 @@ impl<ID: AstIdImpl, T> IdMap<ID, T> {
     Self {
       offset: start,
       data: (start.as_index()..end.as_index()).map(|_| None).collect(),
-      phantom_data: PhantomData,
     }
   }
 }
@@ -54,7 +52,6 @@ impl<ID: AstIdImpl, T> Index<ID> for IdMap<ID, T> {
 pub struct IdMapIterator<ID: AstIdImpl, T> {
   offset: ID,
   iter: std::iter::Enumerate<std::vec::IntoIter<Option<T>>>,
-  phantom_data: PhantomData<ID>,
 }
 
 impl<ID: AstIdImpl, T> Iterator for IdMapIterator<ID, T> {
@@ -78,7 +75,6 @@ impl<ID: AstIdImpl, T> IntoIterator for IdMap<ID, T> {
     IdMapIterator {
       offset: self.offset,
       iter: self.data.into_iter().enumerate(),
-      phantom_data: PhantomData,
     }
   }
 }
