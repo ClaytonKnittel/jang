@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use crate::type_checker::{inference::TypeClass, types::registry::Ty};
+use crate::{
+  parser::token::ident::Ident,
+  type_checker::{inference::TypeClass, types::registry::Ty},
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TypeCheckerError<'ctx> {
@@ -16,6 +19,8 @@ pub enum TypeCheckerError<'ctx> {
   },
   /// Call target is not a function type.
   NotCallable { target: Ty<'ctx> },
+  /// Bad member access.
+  InvalidMemberAccess { target: Ty<'ctx>, member: Ident },
   /// A call passed the wrong number of arguments.
   ArityMismatch { expected: usize, actual: usize },
 }
@@ -30,6 +35,9 @@ impl<'ctx> Display for TypeCheckerError<'ctx> {
         write!(f, "required {expected} type, but found `{actual}`")
       }
       Self::NotCallable { target } => write!(f, "cannot call a value of type `{target}`"),
+      Self::InvalidMemberAccess { target, member } => {
+        write!(f, "cannot access member \"{member}\" on type `{target}`")
+      }
       Self::ArityMismatch { expected, actual } => write!(
         f,
         "wrong number of arguments: expected {expected}, but found {actual}"
@@ -82,6 +90,16 @@ pub(crate) mod matchers {
       expected: expected,
       actual: actual,
       ..
+    })
+  }
+
+  pub fn invalid_member_access<'a>(
+    target: impl Matcher<&'a Ty<'a>>,
+    member: impl Matcher<&'a Ident>,
+  ) -> impl Matcher<&'a TypeCheckerError<'a>> {
+    pat!(TypeCheckerError::InvalidMemberAccess {
+      target: target,
+      member: member
     })
   }
 }

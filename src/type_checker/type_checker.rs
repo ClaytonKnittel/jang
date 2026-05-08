@@ -19,6 +19,7 @@ use crate::{
       rebind_statement::RebindStatement,
       ret_statement::RetStatement,
       statement::Statement,
+      structured_type_decl::{StructuredTypeDecl, StructuredTypeField},
       type_expr::{InlineFn, TypeExpression, TypeExpressionVariant},
       unary_experssion::{UnaryExpression, UnaryOp},
       var::var_ref::VarRef,
@@ -35,6 +36,7 @@ use crate::{
       concrete::ConcreteType,
       primitive::PrimitiveType,
       registry::{Ty, TypeRegistry},
+      strukt::StructField,
     },
   },
 };
@@ -317,9 +319,23 @@ impl<'ctx> TypeChecker<'ctx> {
 
   fn check_dot_expression(
     &mut self,
-    _: &DotExpression,
+    dot_expr: &DotExpression,
   ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
-    todo!("Look up struct in global type decls")
+    let base_inferred_ty = self.check_expression(dot_expr.base())?;
+    let base_ty = self.inference.resolve(base_inferred_ty, &self.types);
+    let invalid_member_access = || TypeCheckerError::InvalidMemberAccess {
+      target: base_ty,
+      member: dot_expr.member().clone(),
+    };
+
+    let ConcreteType::Struct(s) = base_ty.deref() else {
+      return Err(invalid_member_access());
+    };
+    let Some(member_ty) = s.field_ty(dot_expr.member()) else {
+      return Err(invalid_member_access());
+    };
+
+    Ok(member_ty.into())
   }
 
   fn eval_type_expression(
@@ -331,7 +347,7 @@ impl<'ctx> TypeChecker<'ctx> {
       TypeExpressionVariant::InlineFn(inline_fn) => self.eval_inline_fn(inline_fn),
       TypeExpressionVariant::Primitive(p) => Ok(self.types.primitive_type(p.into())),
       TypeExpressionVariant::Named(_) => todo!("Look up struct in global type decls"),
-      TypeExpressionVariant::AnonymousStruct(_) => todo!("Handle structs"),
+      TypeExpressionVariant::AnonymousStruct(s) => self.eval_struct_type(s),
     }
   }
 
@@ -343,6 +359,28 @@ impl<'ctx> TypeChecker<'ctx> {
       .map(|arg| self.eval_type_expression(arg))
       .collect_result_vec()?;
     Ok(self.types.function_type(parameters, return_type))
+  }
+
+  fn eval_struct_type(
+    &mut self,
+    struct_type: &StructuredTypeDecl,
+  ) -> TypeCheckerResult<'ctx, Ty<'ctx>> {
+    let fields = struct_type
+      .fields()
+      .iter()
+      .map(|f| self.eval_struct_field_type(f))
+      .collect_result_vec()?;
+    Ok(self.types.struct_type(fields))
+  }
+
+  fn eval_struct_field_type(
+    &mut self,
+    field: &StructuredTypeField,
+  ) -> TypeCheckerResult<'ctx, StructField<'ctx>> {
+    Ok(StructField::new(
+      field.name().clone(),
+      self.eval_type_expression(field.ty())?,
+    ))
   }
 }
 
@@ -361,6 +399,7 @@ mod tests {
     parser::{
       ast::{function_decl::FunctionDecl, jang_file::JangFile},
       grammar::testing::lex_and_parse_jang_file,
+      token::ident::matchers::ident,
     },
     type_checker::{
       check,
@@ -368,7 +407,8 @@ mod tests {
       error::{
         TypeCheckerResult,
         matchers::{
-          arity_mismatch_error, not_callable_error, type_class_mismatch, type_mismatch_error,
+          arity_mismatch_error, invalid_member_access, not_callable_error, type_class_mismatch,
+          type_mismatch_error,
         },
       },
       inference::TypeClass,
@@ -378,6 +418,7 @@ mod tests {
         function::matchers::{fn_param_types, fn_return_type},
         primitive::matchers::{bool_type, f32_type, f64_type, i32_type, i64_type},
         registry::Ty,
+        strukt::matchers::{struct_field, struct_fields},
       },
     },
   };
@@ -1007,6 +1048,87 @@ mod tests {
         fn_param_types(is_empty()),
         fn_param_types(elements_are![bool_type()]),
       ))
+    )
+  }
+
+  #[gtest]
+  fn struct_member_access() {
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok(
+      r#"
+        fn f(x: { y: i32 }): i32 {
+          ret x.y
+        }
+        "#,
+      &ctx,
+    );
+  }
+
+  #[gtest]
+  fn struct_member_fn_call() {
+    let ctx = TypeCheckerCtx::default();
+    type_check_ok(
+      r#"
+        fn f(a: { x: () -> i64 }): i64 {
+          ret a.x()
+        }
+        "#,
+      &ctx,
+    );
+  }
+
+  #[gtest]
+  fn struct_member_invalid_base() {
+    let ctx = TypeCheckerCtx::default();
+    expect_that!(
+      type_check_file(
+        r#"
+        fn f(a: i32): i64 {
+          ret a.x
+        }
+        "#,
+        &ctx,
+      ),
+      err(invalid_member_access(i32_type(), ident("x")))
+    );
+  }
+
+  #[gtest]
+  fn struct_member_invalid_name_in_member() {
+    let ctx = TypeCheckerCtx::default();
+    expect_that!(
+      type_check_file(
+        r#"
+        fn f(a: i32): i64 {
+          ret a.does_not_exist
+        }
+        "#,
+        &ctx,
+      ),
+      err(invalid_member_access(i32_type(), ident("does_not_exist")))
+    );
+  }
+
+  #[gtest]
+  fn struct_type_in_expr() {
+    let ctx = TypeCheckerCtx::default();
+    let file = type_check_ok(
+      r#"
+        fn f(a: {f0: i64 f1: i32}): i64 {
+          ret a.f0
+        }
+        "#,
+      &ctx,
+    );
+
+    let ret_stmt = file.fn_decl_by_name("f").body().statements()[0].as_ret();
+    let dot_expr = ret_stmt.expr().variant().as_dot_expr();
+    expect_that!(
+      &file.analysis.get(dot_expr.base().id()),
+      struct_fields(elements_are![
+        struct_field(ident("f0"), i64_type()),
+        struct_field(ident("f1"), i32_type())
+      ])
     )
   }
 }

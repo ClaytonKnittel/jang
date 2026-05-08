@@ -14,6 +14,14 @@ impl StructuredTypeField {
   pub fn new(name: Ident, ty: TypeExpression) -> Self {
     Self { name, ty }
   }
+
+  pub fn name(&self) -> &Ident {
+    &self.name
+  }
+
+  pub fn ty(&self) -> &TypeExpression {
+    &self.ty
+  }
 }
 
 impl Display for StructuredTypeField {
