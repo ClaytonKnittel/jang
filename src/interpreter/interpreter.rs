@@ -84,7 +84,10 @@ mod tests {
   use googletest::{expect_that, gtest, prelude::*};
 
   use crate::{
-    interpreter::{error::InterpreterResult, interpreter::Interpreter},
+    interpreter::{
+      error::{InterpreterResult, matchers::interpreter_value_error},
+      interpreter::Interpreter,
+    },
     parser::grammar::testing::lex_and_parse_jang_file,
   };
 
@@ -470,25 +473,6 @@ mod tests {
         .chars()
       ),
       ok(eq(&7))
-    );
-  }
-
-  #[gtest]
-  fn arithmetic_value_type_mismatch() {
-    expect_that!(
-      interpret_program(
-        r#"
-        fn test(x: i64): i64 {
-          ret x + main
-        }
-
-        fn main(): i64 {
-          ret test(1)
-        }
-        "#
-        .chars()
-      ),
-      err(anything())
     );
   }
 

@@ -368,6 +368,7 @@ impl<'a, 'ty> OpenCursor<'a, 'ty> {
       (PrimitiveType::F32, Numeric(Float(l))) => PrimitiveValue::Float32(l.parse_as()?),
       (PrimitiveType::F64, Numeric(Float(l))) => PrimitiveValue::Float64(l.parse_as()?),
       _ => {
+        // This is impossible, as code must have passed the type checking.
         panic!(
           "Literal type mismatch, type: {ty}, expr: {}",
           expr.literal()
