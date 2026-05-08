@@ -37,12 +37,12 @@ use crate::{
   },
 };
 
-struct JitInstructionBlockBuilder<'a> {
+struct JitInstructionBlockBuilder {
   id: BlockId,
-  instructions: Vec<JitInstruction<'a>>,
+  instructions: Vec<JitInstruction>,
 }
 
-impl<'a> JitInstructionBlockBuilder<'a> {
+impl JitInstructionBlockBuilder {
   fn new(id: BlockId) -> Self {
     Self {
       id,
@@ -50,12 +50,12 @@ impl<'a> JitInstructionBlockBuilder<'a> {
     }
   }
 
-  fn emit_instr(mut self, instr: JitInstruction<'a>) -> Self {
+  fn emit_instr(mut self, instr: JitInstruction) -> Self {
     self.instructions.push(instr);
     self
   }
 
-  fn terminate_with_instr(self, terminal: JitTerminalInstruction) -> TerminatedBlock<'a> {
+  fn terminate_with_instr(self, terminal: JitTerminalInstruction) -> TerminatedBlock {
     TerminatedBlock {
       id: self.id,
       block: JitInstructionBlock::new(self.instructions, terminal),
@@ -63,14 +63,14 @@ impl<'a> JitInstructionBlockBuilder<'a> {
   }
 }
 
-struct TerminatedBlock<'a> {
+struct TerminatedBlock {
   id: BlockId,
-  block: JitInstructionBlock<'a>,
+  block: JitInstructionBlock,
 }
 
 struct JitFunctionBuilder<'a> {
   entrypoint: BlockId,
-  blocks: BlockListBuilder<JitInstructionBlock<'a>>,
+  blocks: BlockListBuilder<JitInstructionBlock>,
   fn_name: &'a Ident,
 }
 
@@ -89,12 +89,12 @@ impl<'a> JitFunctionBuilder<'a> {
     self.blocks.allocate_uninitialized()
   }
 
-  fn finish_block(mut self, block: TerminatedBlock<'a>) -> InterpreterResult<Self> {
+  fn finish_block(mut self, block: TerminatedBlock) -> InterpreterResult<Self> {
     self.blocks.set(block.id, block.block)?;
     Ok(self)
   }
 
-  fn build(self) -> InterpreterResult<BlockList<JitInstructionBlock<'a>>> {
+  fn build(self) -> InterpreterResult<BlockList<JitInstructionBlock>> {
     self
       .blocks
       .build()
@@ -107,7 +107,7 @@ struct OpenCursor<'a> {
   fn_builder: JitFunctionBuilder<'a>,
   lexical_scope: JitCompilerLexicalScope<'a>,
   loop_context: LoopContext,
-  block: JitInstructionBlockBuilder<'a>,
+  block: JitInstructionBlockBuilder,
 }
 
 // Function compilation state when all blocks have been terminated.
@@ -153,7 +153,7 @@ impl<'a> OpenCursor<'a> {
     self.fn_builder.allocate_block()
   }
 
-  fn emit_instr(self, instr: JitInstruction<'a>) -> Self {
+  fn emit_instr(self, instr: JitInstruction) -> Self {
     Self {
       block: self.block.emit_instr(instr),
       ..self
@@ -212,12 +212,12 @@ impl<'a> OpenCursor<'a> {
           )
           .local_id(),
       ),
-      VarRef::Global(global_decl) => JitInstruction::LoadGlobal(global_decl.name()),
+      VarRef::Global(global_decl) => JitInstruction::LoadGlobal(global_decl.name().clone()),
     };
     self.emit_instr(instruction)
   }
 
-  fn emit_literal_load(self, literal: &'a Literal) -> Self {
+  fn emit_literal_load(self, literal: Literal) -> Self {
     self.emit_instr(JitInstruction::LoadLiteral(literal))
   }
 
@@ -334,7 +334,7 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_literal_expression(self, expr: &'a LiteralExpression) -> InterpreterResult<Self> {
-    Ok(self.emit_literal_load(expr.literal()))
+    Ok(self.emit_literal_load(expr.literal().clone()))
   }
 
   fn compile_else_block(self, else_clause: &'a ElseClause) -> InterpreterResult<Cursor<'a>> {
@@ -473,7 +473,7 @@ impl<'a> Cursor<'a> {
     }
   }
 
-  fn compile_fn_decl(fn_decl: &'a FunctionDecl) -> InterpreterResult<JitCompiledFunction<'a>> {
+  fn compile_fn_decl(fn_decl: &'a FunctionDecl) -> InterpreterResult<JitCompiledFunction> {
     let cur = fn_decl
       .parameters()
       .iter()
@@ -496,9 +496,7 @@ impl<'a> Cursor<'a> {
   }
 }
 
-pub fn compile_to_bytecode<'a>(
-  fn_decl: &'a FunctionDecl,
-) -> InterpreterResult<JitCompiledFunction<'a>> {
+pub fn compile_to_bytecode(fn_decl: &FunctionDecl) -> InterpreterResult<JitCompiledFunction> {
   Cursor::compile_fn_decl(fn_decl)
 }
 

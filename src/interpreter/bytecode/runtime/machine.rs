@@ -47,17 +47,17 @@ pub trait JitFunctionContext<'a> {
 
 #[derive(Clone, Copy)]
 enum CurrentInstruction<'a> {
-  Instr(&'a JitInstruction<'a>),
+  Instr(&'a JitInstruction),
   Term(&'a JitTerminalInstruction),
 }
 
 struct JitInstructionBlockCursor<'a> {
-  block: &'a JitInstructionBlock<'a>,
+  block: &'a JitInstructionBlock,
   instr_index: usize,
 }
 
 impl<'a> JitInstructionBlockCursor<'a> {
-  fn start_of(block: &'a JitInstructionBlock<'a>) -> Self {
+  fn start_of(block: &'a JitInstructionBlock) -> Self {
     Self {
       block,
       instr_index: 0,
@@ -84,7 +84,7 @@ enum FrameAction<'a> {
 
   // Pushes a call frame and transitions execution to target_fn.
   Call {
-    target_fn: &'a JitCompiledFunction<'a>,
+    target_fn: &'a JitCompiledFunction,
     args: Vec<Value<'a>>,
   },
 
@@ -93,7 +93,7 @@ enum FrameAction<'a> {
 }
 
 struct JitCallFrame<'a> {
-  jit_fn: &'a JitCompiledFunction<'a>,
+  jit_fn: &'a JitCompiledFunction,
   locals: LocalTable<Value<'a>>,
   stack: ValueStack<'a>,
   block_cursor: JitInstructionBlockCursor<'a>,
@@ -101,10 +101,7 @@ struct JitCallFrame<'a> {
 
 // A single call frame.
 impl<'a> JitCallFrame<'a> {
-  fn from_call(
-    jit_fn: &'a JitCompiledFunction<'a>,
-    args: Vec<Value<'a>>,
-  ) -> InterpreterResult<Self> {
+  fn from_call(jit_fn: &'a JitCompiledFunction, args: Vec<Value<'a>>) -> InterpreterResult<Self> {
     let entrypoint = jit_fn
       .block(jit_fn.entrypoint())
       .ok_or_else(|| InterpreterError::jit_err("entrypoint block must exist"))?;
@@ -239,7 +236,7 @@ impl<'a> JitCallFrame<'a> {
 }
 
 pub fn evaluate_function<'a>(
-  jit_fn: &'a JitCompiledFunction<'a>,
+  jit_fn: &'a JitCompiledFunction,
   args: Vec<Value<'a>>,
   context: &'a impl JitFunctionContext<'a>,
 ) -> InterpreterResult<Value<'a>> {
@@ -318,7 +315,7 @@ mod tests {
     }
   }
 
-  fn evaluate_no_arg_fn<'a>(jit_fn: &'a JitCompiledFunction<'a>) -> InterpreterResult<Value<'a>> {
+  fn evaluate_no_arg_fn<'a>(jit_fn: &'a JitCompiledFunction) -> InterpreterResult<Value<'a>> {
     evaluate_function(jit_fn, Vec::new(), &EmptyContext)
   }
 
@@ -354,10 +351,9 @@ mod tests {
 
   #[gtest]
   fn store_then_load_local_round_trips() {
-    let one = Literal::Numeric(NumericLiteral::from_str("1"));
     let code = function_bytecode(vec![block(
       vec![
-        JitInstruction::LoadLiteral(&one),
+        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("1"))),
         JitInstruction::StoreLocal(local_id(0)),
         JitInstruction::LoadLocal(local_id(0)),
       ],
@@ -369,9 +365,8 @@ mod tests {
 
   #[gtest]
   fn global_not_found() {
-    let global = Ident::new_isolated("x");
     let code = function_bytecode(vec![block(
-      vec![JitInstruction::LoadGlobal(&global)],
+      vec![JitInstruction::LoadGlobal(Ident::new_isolated("x"))],
       JitTerminalInstruction::Return,
     )]);
 
@@ -385,12 +380,10 @@ mod tests {
 
   #[gtest]
   fn subtraction_uses_rhs_lhs_order() {
-    let two = Literal::Numeric(NumericLiteral::from_str("2"));
-    let one = Literal::Numeric(NumericLiteral::from_str("1"));
     let code = function_bytecode(vec![block(
       vec![
-        JitInstruction::LoadLiteral(&two),
-        JitInstruction::LoadLiteral(&one),
+        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("2"))),
+        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("1"))),
         JitInstruction::BinaryOp(BinaryOp::Sub),
       ],
       JitTerminalInstruction::Return,
@@ -401,12 +394,10 @@ mod tests {
 
   #[gtest]
   fn comparison_returns_boolean() {
-    let two = Literal::Numeric(NumericLiteral::from_str("2"));
-    let one = Literal::Numeric(NumericLiteral::from_str("1"));
     let code = function_bytecode(vec![block(
       vec![
-        JitInstruction::LoadLiteral(&two),
-        JitInstruction::LoadLiteral(&one),
+        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("2"))),
+        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("1"))),
         JitInstruction::BinaryOp(BinaryOp::Equal),
       ],
       JitTerminalInstruction::Return,
@@ -442,13 +433,11 @@ mod tests {
       )]),
     };
 
-    let two = Literal::Numeric(NumericLiteral::from_str("2"));
-    let one = Literal::Numeric(NumericLiteral::from_str("1"));
     let code = function_bytecode(vec![block(
       vec![
-        JitInstruction::LoadLiteral(&two),
-        JitInstruction::LoadLiteral(&one),
-        JitInstruction::LoadGlobal(&sub_function_name),
+        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("2"))),
+        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("1"))),
+        JitInstruction::LoadGlobal(sub_function_name),
         JitInstruction::Call(JitCallInstruction::with_arity(2)),
       ],
       JitTerminalInstruction::Return,

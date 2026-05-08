@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub enum JitInstruction<'a> {
+pub enum JitInstruction {
   // Binary operator. Pops rhs off the stack, pops lhs off the stack,
   // combines the two, and pushes the result on the stack.
   //
@@ -24,10 +24,10 @@ pub enum JitInstruction<'a> {
   UnaryOp(UnaryOp),
 
   // Push a literal value onto the stack.
-  LoadLiteral(&'a Literal),
+  LoadLiteral(Literal),
 
   // Pushes a global value onto the stack.
-  LoadGlobal(&'a Ident),
+  LoadGlobal(Ident),
 
   // Pushes a local onto the stack.
   LoadLocal(LocalId),
@@ -103,20 +103,20 @@ impl JitCallInstruction {
 // (possibly pausing for an external function call)
 // followed by a terminal instruction.
 #[derive(Debug)]
-pub struct JitInstructionBlock<'a> {
-  instructions: Vec<JitInstruction<'a>>,
+pub struct JitInstructionBlock {
+  instructions: Vec<JitInstruction>,
   terminator: JitTerminalInstruction,
 }
 
-impl<'a> JitInstructionBlock<'a> {
-  pub fn new(instructions: Vec<JitInstruction<'a>>, terminator: JitTerminalInstruction) -> Self {
+impl JitInstructionBlock {
+  pub fn new(instructions: Vec<JitInstruction>, terminator: JitTerminalInstruction) -> Self {
     Self {
       instructions,
       terminator,
     }
   }
 
-  pub fn instructions(&self) -> &[JitInstruction<'a>] {
+  pub fn instructions(&self) -> &[JitInstruction] {
     &self.instructions
   }
 
@@ -127,13 +127,13 @@ impl<'a> JitInstructionBlock<'a> {
 
 // A compiled function, composed logical blocks that contain instruction sequences.
 #[derive(Debug)]
-pub struct JitCompiledFunction<'a> {
+pub struct JitCompiledFunction {
   entrypoint: BlockId,
-  blocks: BlockList<JitInstructionBlock<'a>>,
+  blocks: BlockList<JitInstructionBlock>,
 }
 
-impl<'a> JitCompiledFunction<'a> {
-  pub fn new(entrypoint: BlockId, blocks: BlockList<JitInstructionBlock<'a>>) -> Self {
+impl JitCompiledFunction {
+  pub fn new(entrypoint: BlockId, blocks: BlockList<JitInstructionBlock>) -> Self {
     Self { entrypoint, blocks }
   }
 
@@ -141,7 +141,7 @@ impl<'a> JitCompiledFunction<'a> {
     self.entrypoint
   }
 
-  pub fn block(&self, block_id: BlockId) -> Option<&JitInstructionBlock<'a>> {
+  pub fn block(&self, block_id: BlockId) -> Option<&JitInstructionBlock> {
     self.blocks.block(block_id)
   }
 }
@@ -165,53 +165,47 @@ pub mod matchers {
 
   pub fn binary_op_instruction<'a>(
     op_matcher: impl Matcher<&'a BinaryOp>,
-  ) -> impl Matcher<&'a JitInstruction<'a>> {
+  ) -> impl Matcher<&'a JitInstruction> {
     pat!(JitInstruction::BinaryOp(op_matcher))
   }
 
   pub fn unary_op_instruction<'a>(
     op_matcher: impl Matcher<&'a UnaryOp>,
-  ) -> impl Matcher<&'a JitInstruction<'a>> {
+  ) -> impl Matcher<&'a JitInstruction> {
     pat!(JitInstruction::UnaryOp(op_matcher))
   }
 
   pub fn load_literal_instruction<'a>(
     literal_matcher: impl Matcher<&'a Literal>,
-  ) -> impl Matcher<&'a JitInstruction<'a>> {
-    pat!(JitInstruction::LoadLiteral(result_of!(
-      |lit: &&'a Literal| *lit,
-      literal_matcher
-    )))
+  ) -> impl Matcher<&'a JitInstruction> {
+    pat!(JitInstruction::LoadLiteral(literal_matcher))
   }
 
-  pub fn load_unit_instruction<'a>() -> impl Matcher<&'a JitInstruction<'a>> {
+  pub fn load_unit_instruction<'a>() -> impl Matcher<&'a JitInstruction> {
     pat!(JitInstruction::LoadUnit)
   }
 
   pub fn load_global_instruction<'a>(
     ident_matcher: impl Matcher<&'a Ident>,
-  ) -> impl Matcher<&'a JitInstruction<'a>> {
-    pat!(JitInstruction::LoadGlobal(result_of!(
-      |ident: &&'a Ident| *ident,
-      ident_matcher
-    )))
+  ) -> impl Matcher<&'a JitInstruction> {
+    pat!(JitInstruction::LoadGlobal(ident_matcher))
   }
 
   pub fn load_local_instruction<'a>(
     local_id_matcher: impl Matcher<&'a LocalId>,
-  ) -> impl Matcher<&'a JitInstruction<'a>> {
+  ) -> impl Matcher<&'a JitInstruction> {
     pat!(JitInstruction::LoadLocal(local_id_matcher))
   }
 
   pub fn store_local_instruction<'a>(
     local_id_matcher: impl Matcher<&'a LocalId>,
-  ) -> impl Matcher<&'a JitInstruction<'a>> {
+  ) -> impl Matcher<&'a JitInstruction> {
     pat!(JitInstruction::StoreLocal(local_id_matcher))
   }
 
   pub fn call_instruction<'a>(
     call_matcher: impl Matcher<&'a JitCallInstruction>,
-  ) -> impl Matcher<&'a JitInstruction<'a>> {
+  ) -> impl Matcher<&'a JitInstruction> {
     pat!(JitInstruction::Call(call_matcher))
   }
 
@@ -268,9 +262,9 @@ pub mod matchers {
   }
 
   pub fn instruction_block<'a>(
-    instructions_matcher: impl Matcher<&'a Vec<JitInstruction<'a>>>,
+    instructions_matcher: impl Matcher<&'a Vec<JitInstruction>>,
     terminator_matcher: impl Matcher<&'a JitTerminalInstruction>,
-  ) -> impl Matcher<&'a JitInstructionBlock<'a>> {
+  ) -> impl Matcher<&'a JitInstructionBlock> {
     pat!(JitInstructionBlock {
       instructions: instructions_matcher,
       terminator: terminator_matcher,
@@ -279,22 +273,19 @@ pub mod matchers {
 
   pub fn has_instruction_block<'a>(
     block_id: BlockId,
-    block_matcher: impl Matcher<&'a JitInstructionBlock<'a>>,
-  ) -> impl Matcher<&'a JitCompiledFunction<'a>> {
+    block_matcher: impl Matcher<&'a JitInstructionBlock>,
+  ) -> impl Matcher<&'a JitCompiledFunction> {
     result_of!(
-      move |f: &'a JitCompiledFunction<'a>| f
-        .blocks
-        .block(block_id)
-        .expect("expected present in test"),
+      move |f: &'a JitCompiledFunction| f.blocks.block(block_id).expect("expected present in test"),
       block_matcher
     )
   }
 
   pub fn entry_block<'a>(
-    block_matcher: impl Matcher<&'a JitInstructionBlock<'a>>,
-  ) -> impl Matcher<&'a JitCompiledFunction<'a>> {
+    block_matcher: impl Matcher<&'a JitInstructionBlock>,
+  ) -> impl Matcher<&'a JitCompiledFunction> {
     all!(result_of!(
-      |f: &'a JitCompiledFunction<'a>| f
+      |f: &'a JitCompiledFunction| f
         .blocks
         .block(f.entrypoint)
         .expect("expected present in test"),
@@ -312,17 +303,17 @@ pub mod testing {
     instruction_block_list::testing::{block_id, block_list},
   };
 
-  pub fn block<'a>(
-    instructions: Vec<JitInstruction<'a>>,
+  pub fn block(
+    instructions: Vec<JitInstruction>,
     terminator: JitTerminalInstruction,
-  ) -> JitInstructionBlock<'a> {
+  ) -> JitInstructionBlock {
     JitInstructionBlock {
       instructions,
       terminator,
     }
   }
 
-  pub fn function_bytecode<'a>(blocks: Vec<JitInstructionBlock<'a>>) -> JitCompiledFunction<'a> {
+  pub fn function_bytecode(blocks: Vec<JitInstructionBlock>) -> JitCompiledFunction {
     JitCompiledFunction {
       entrypoint: block_id(0),
       blocks: block_list(blocks),
