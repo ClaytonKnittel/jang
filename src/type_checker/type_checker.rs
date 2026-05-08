@@ -1099,13 +1099,16 @@ mod tests {
     expect_that!(
       type_check_file(
         r#"
-        fn f(a: i32): i64 {
+        fn f(a: {}): i64 {
           ret a.does_not_exist
         }
         "#,
         &ctx,
       ),
-      err(invalid_member_access(i32_type(), ident("does_not_exist")))
+      err(invalid_member_access(
+        struct_fields(is_empty()),
+        ident("does_not_exist")
+      ))
     );
   }
 

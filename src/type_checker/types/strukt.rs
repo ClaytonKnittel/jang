@@ -33,7 +33,10 @@ pub struct StructType<'ctx> {
 impl<'ctx> StructType<'ctx> {
   pub(super) fn new(fields: impl IntoIterator<Item = StructField<'ctx>>) -> Self {
     Self {
-      fields: fields.into_iter().collect(),
+      fields: fields
+        .into_iter()
+        .sorted_by(|a, b| a.name.name().cmp(b.name.name()))
+        .collect(),
     }
   }
 

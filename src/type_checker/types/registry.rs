@@ -101,7 +101,7 @@ impl<'ctx> TypeRegistry<'ctx> {
     )))
   }
 
-  /// Adds a function type to the registry and returns its handle,
+  /// Adds a struct type to the registry and returns its handle,
   /// deduplicating if the function already exists.
   pub fn struct_type(&mut self, fields: impl IntoIterator<Item = StructField<'ctx>>) -> Ty<'ctx> {
     self
