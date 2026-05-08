@@ -1,6 +1,6 @@
 use crate::parser::ast::id::{
   def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
-  id_counts::AstIdRange,
+  range::AstIdRange,
 };
 
 #[derive(Clone, Debug)]

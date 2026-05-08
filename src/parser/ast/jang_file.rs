@@ -7,7 +7,7 @@ use crate::parser::ast::{
   id::{
     adt::map::IdMap,
     def::{AstExpressionId, AstGlobalDeclId, AstLocalDeclId},
-    id_counts::AstIdRange,
+    range::AstIdRange,
   },
   type_decl::TypeDecl,
 };
