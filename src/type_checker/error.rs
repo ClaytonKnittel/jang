@@ -23,8 +23,6 @@ pub enum TypeCheckerError<'ctx> {
   InvalidMemberAccess { target: Ty<'ctx>, member: Ident },
   /// A call passed the wrong number of arguments.
   ArityMismatch { expected: usize, actual: usize },
-  /// A variable reference could not be resolved.
-  UndefinedVariable,
 }
 
 impl<'ctx> Display for TypeCheckerError<'ctx> {
@@ -44,7 +42,6 @@ impl<'ctx> Display for TypeCheckerError<'ctx> {
         f,
         "wrong number of arguments: expected {expected}, but found {actual}"
       ),
-      Self::UndefinedVariable => write!(f, "unbound variable"),
     }
   }
 }

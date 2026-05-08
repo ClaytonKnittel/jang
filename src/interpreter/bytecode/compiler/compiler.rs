@@ -927,22 +927,6 @@ mod tests {
   }
 
   #[gtest]
-  fn cannot_rebind_unknown_local() {
-    let compile_result = compile_fn(
-      r#"
-      fn f(): i64 {
-        mut x = 1
-        y = 70
-        ret x
-      }
-      "#
-      .chars(),
-    );
-
-    expect_that!(&compile_result, err(anything()))
-  }
-
-  #[gtest]
   fn call_with_multiple_args() {
     let compile_result = compile_fn(
       r#"

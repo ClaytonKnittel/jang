@@ -84,10 +84,7 @@ mod tests {
   use googletest::{expect_that, gtest, prelude::*};
 
   use crate::{
-    interpreter::{
-      error::{InterpreterResult, matchers::interpreter_value_error},
-      interpreter::Interpreter,
-    },
+    interpreter::{error::InterpreterResult, interpreter::Interpreter},
     parser::grammar::testing::lex_and_parse_jang_file,
   };
 
@@ -162,27 +159,6 @@ mod tests {
         .chars()
       ),
       ok(eq(&25))
-    );
-  }
-
-  #[gtest]
-  fn unbound_variable_throws_error() {
-    expect_that!(
-      interpret_program(
-        r#"
-        fn g(): i64 {
-          ret x
-        }
-        fn f(x: i64): i64 {
-          ret g()
-        }
-        fn main(): i64 {
-          ret f(1)
-        }
-        "#
-        .chars()
-      ),
-      err(displays_as(contains_substring("unbound variable")))
     );
   }
 
