@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use cknittel_util::from_variants::FromVariants;
 
 use crate::{
@@ -12,6 +14,8 @@ use crate::{
       loop_context::LoopContext,
     },
     error::{InterpreterError, InterpreterResult},
+    parse_as::ParseAs,
+    value::PrimitiveValue,
   },
   parser::{
     ast::{
@@ -21,6 +25,7 @@ use crate::{
       call_expression::CallExpression,
       expression::{Expression, ExpressionVariant},
       function_decl::FunctionDecl,
+      id::def::AstExpressionId,
       if_statement::{ElseClause, IfStatement},
       literal_expression::LiteralExpression,
       loop_statement::LoopStatement,
@@ -33,7 +38,14 @@ use crate::{
         var_ref::VarRef,
       },
     },
-    token::{ident::Ident, literal::Literal},
+    token::{
+      ident::Ident,
+      literal::{Literal, NumericLiteral},
+    },
+  },
+  type_checker::{
+    type_analysis::JangTypeAnalysis,
+    types::{concrete::ConcreteType, primitive::PrimitiveType},
   },
 };
 
@@ -103,34 +115,37 @@ impl<'a> JitFunctionBuilder<'a> {
 }
 
 // Function compilation state when there is an unterminated instruction block.
-struct OpenCursor<'a> {
+struct OpenCursor<'a, 'ty> {
   fn_builder: JitFunctionBuilder<'a>,
   lexical_scope: JitCompilerLexicalScope<'a>,
   loop_context: LoopContext,
+  types: &'a JangTypeAnalysis<'ty>,
   block: JitInstructionBlockBuilder,
 }
 
 // Function compilation state when all blocks have been terminated.
-struct ClosedCursor<'a> {
+struct ClosedCursor<'a, 'ty> {
   fn_builder: JitFunctionBuilder<'a>,
   lexical_scope: JitCompilerLexicalScope<'a>,
   loop_context: LoopContext,
+  types: &'a JangTypeAnalysis<'ty>,
 }
 
 #[derive(FromVariants)]
-enum Cursor<'a> {
-  Open(OpenCursor<'a>),
-  Closed(ClosedCursor<'a>),
+enum Cursor<'a, 'ty> {
+  Open(OpenCursor<'a, 'ty>),
+  Closed(ClosedCursor<'a, 'ty>),
 }
 
-impl<'a> OpenCursor<'a> {
-  fn new(fn_name: &'a GlobalDecl) -> Self {
+impl<'a, 'ty> OpenCursor<'a, 'ty> {
+  fn new(fn_name: &'a GlobalDecl, types: &'a JangTypeAnalysis<'ty>) -> Self {
     let fn_builder = JitFunctionBuilder::new(fn_name.name());
     let entrypoint = fn_builder.entrypoint;
     Self {
       fn_builder,
       lexical_scope: JitCompilerLexicalScope::default(),
       block: JitInstructionBlockBuilder::new(entrypoint),
+      types,
       loop_context: LoopContext::default(),
     }
   }
@@ -160,19 +175,20 @@ impl<'a> OpenCursor<'a> {
     }
   }
 
-  fn return_unit(self) -> InterpreterResult<ClosedCursor<'a>> {
+  fn return_unit(self) -> InterpreterResult<ClosedCursor<'a, 'ty>> {
     self
       .emit_instr(JitInstruction::LoadUnit)
       .terminate(JitTerminalInstruction::Return)
   }
 
-  fn terminate(self, terminal: JitTerminalInstruction) -> InterpreterResult<ClosedCursor<'a>> {
+  fn terminate(self, terminal: JitTerminalInstruction) -> InterpreterResult<ClosedCursor<'a, 'ty>> {
     Ok(ClosedCursor {
       fn_builder: self
         .fn_builder
         .finish_block(self.block.terminate_with_instr(terminal))?,
       lexical_scope: self.lexical_scope,
       loop_context: self.loop_context,
+      types: self.types,
     })
   }
 
@@ -217,11 +233,11 @@ impl<'a> OpenCursor<'a> {
     self.emit_instr(instruction)
   }
 
-  fn emit_literal_load(self, literal: Literal) -> Self {
+  fn emit_literal_load(self, literal: PrimitiveValue) -> Self {
     self.emit_instr(JitInstruction::LoadLiteral(literal))
   }
 
-  fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a>> {
+  fn compile_statement(self, statement: &'a Statement) -> InterpreterResult<Cursor<'a, 'ty>> {
     match statement {
       Statement::Bind(bind_statement) => Ok(self.compile_bind_statement(bind_statement)?.into()),
       Statement::Rebind(rebind_statement) => {
@@ -259,7 +275,7 @@ impl<'a> OpenCursor<'a> {
     }
   }
 
-  fn compile_lexical_block(self, block: &'a Block) -> InterpreterResult<Cursor<'a>> {
+  fn compile_lexical_block(self, block: &'a Block) -> InterpreterResult<Cursor<'a, 'ty>> {
     Cursor::from(self.enter_lexical_scope())
       .compile_statements(block.statements())?
       .exit_lexical_scope()
@@ -268,7 +284,7 @@ impl<'a> OpenCursor<'a> {
   fn compile_if_statement(
     mut self,
     if_statement: &'a IfStatement,
-  ) -> InterpreterResult<OpenCursor<'a>> {
+  ) -> InterpreterResult<OpenCursor<'a, 'ty>> {
     let if_block_id = self.allocate_block();
     let else_block_id = self.allocate_block();
     let join_block_id = self.allocate_block();
@@ -292,7 +308,7 @@ impl<'a> OpenCursor<'a> {
   fn compile_loop_statement(
     mut self,
     loop_statement: &'a LoopStatement,
-  ) -> InterpreterResult<OpenCursor<'a>> {
+  ) -> InterpreterResult<OpenCursor<'a, 'ty>> {
     let loop_block_id = self.allocate_block();
     let join_block_id = self.allocate_block();
     Ok(
@@ -308,7 +324,7 @@ impl<'a> OpenCursor<'a> {
     )
   }
 
-  fn compile_break_statement(self) -> InterpreterResult<ClosedCursor<'a>> {
+  fn compile_break_statement(self) -> InterpreterResult<ClosedCursor<'a, 'ty>> {
     let break_target = self
       .loop_context
       .break_target()
@@ -317,8 +333,9 @@ impl<'a> OpenCursor<'a> {
   }
 
   fn compile_expr(self, expr: &'a Expression) -> InterpreterResult<Self> {
+    let id = expr.id();
     match expr.variant() {
-      ExpressionVariant::Literal(expr) => self.compile_literal_expression(expr),
+      ExpressionVariant::Literal(expr) => self.compile_literal_expression(id, expr),
       ExpressionVariant::VarRef(expr) => self.compile_var_ref_expression(expr),
       ExpressionVariant::BinaryExpression(expr) => self.compile_binary_expression(expr),
       ExpressionVariant::UnaryExpression(expr) => self.compile_unary_expression(expr),
@@ -333,11 +350,34 @@ impl<'a> OpenCursor<'a> {
     Ok(self.emit_load(expr))
   }
 
-  fn compile_literal_expression(self, expr: &'a LiteralExpression) -> InterpreterResult<Self> {
-    Ok(self.emit_literal_load(expr.literal().clone()))
+  fn compile_literal_expression(
+    self,
+    id: AstExpressionId,
+    expr: &'a LiteralExpression,
+  ) -> InterpreterResult<Self> {
+    let ty = self.types.get(id);
+    let ConcreteType::Primitive(ty) = ty.deref() else {
+      panic!("Literals must be primitive type")
+    };
+
+    use Literal::*;
+    use NumericLiteral::*;
+    let value = match (ty, expr.literal()) {
+      (PrimitiveType::I32, Numeric(Integral(l))) => PrimitiveValue::Int32(l.parse_as()?),
+      (PrimitiveType::I64, Numeric(Integral(l))) => PrimitiveValue::Int64(l.parse_as()?),
+      (PrimitiveType::F32, Numeric(Float(l))) => PrimitiveValue::Float32(l.parse_as()?),
+      (PrimitiveType::F64, Numeric(Float(l))) => PrimitiveValue::Float64(l.parse_as()?),
+      _ => {
+        panic!(
+          "Literal type mismatch, type: {ty}, expr: {}",
+          expr.literal()
+        )
+      }
+    };
+    Ok(self.emit_literal_load(value))
   }
 
-  fn compile_else_block(self, else_clause: &'a ElseClause) -> InterpreterResult<Cursor<'a>> {
+  fn compile_else_block(self, else_clause: &'a ElseClause) -> InterpreterResult<Cursor<'a, 'ty>> {
     match else_clause {
       ElseClause::None => Ok(self.into()),
       ElseClause::Else(block) => self.compile_lexical_block(block),
@@ -365,7 +405,7 @@ impl<'a> OpenCursor<'a> {
   fn compile_ret_statement(
     self,
     ret_statement: &'a RetStatement,
-  ) -> InterpreterResult<ClosedCursor<'a>> {
+  ) -> InterpreterResult<ClosedCursor<'a, 'ty>> {
     // Tail calls for direct recursion.
     if let ExpressionVariant::CallExpression(call) = ret_statement.expr().variant()
       && let ExpressionVariant::VarRef(var_ref) = call.target().variant()
@@ -385,7 +425,7 @@ impl<'a> OpenCursor<'a> {
   fn compile_call_expression(
     self,
     call_expression: &'a CallExpression,
-  ) -> InterpreterResult<OpenCursor<'a>> {
+  ) -> InterpreterResult<OpenCursor<'a, 'ty>> {
     Ok(
       self
         .compile_call_arguments(call_expression)?
@@ -399,7 +439,7 @@ impl<'a> OpenCursor<'a> {
   fn compile_call_arguments(
     self,
     call_expression: &'a CallExpression,
-  ) -> InterpreterResult<OpenCursor<'a>> {
+  ) -> InterpreterResult<OpenCursor<'a, 'ty>> {
     call_expression
       .argument_list()
       .iter()
@@ -407,12 +447,13 @@ impl<'a> OpenCursor<'a> {
   }
 }
 
-impl<'a> ClosedCursor<'a> {
-  fn start_block(self, block_id: BlockId) -> OpenCursor<'a> {
+impl<'a, 'ty> ClosedCursor<'a, 'ty> {
+  fn start_block(self, block_id: BlockId) -> OpenCursor<'a, 'ty> {
     OpenCursor {
       fn_builder: self.fn_builder,
       lexical_scope: self.lexical_scope,
       loop_context: self.loop_context,
+      types: self.types,
       block: JitInstructionBlockBuilder::new(block_id),
     }
   }
@@ -439,8 +480,11 @@ impl<'a> ClosedCursor<'a> {
   }
 }
 
-impl<'a> Cursor<'a> {
-  fn finish_with_fallthrough_to(self, block_id: BlockId) -> InterpreterResult<ClosedCursor<'a>> {
+impl<'a, 'ty> Cursor<'a, 'ty> {
+  fn finish_with_fallthrough_to(
+    self,
+    block_id: BlockId,
+  ) -> InterpreterResult<ClosedCursor<'a, 'ty>> {
     match self {
       Cursor::Open(cursor) => cursor.terminate(JitTerminalInstruction::Jump(block_id)),
       Cursor::Closed(cursor) => Ok(cursor),
@@ -473,14 +517,18 @@ impl<'a> Cursor<'a> {
     }
   }
 
-  fn compile_fn_decl(fn_decl: &'a FunctionDecl) -> InterpreterResult<JitCompiledFunction> {
+  fn compile_fn(
+    fn_decl: &'a FunctionDecl,
+    types: &JangTypeAnalysis<'ty>,
+  ) -> InterpreterResult<JitCompiledFunction> {
     let cur = fn_decl
       .parameters()
       .iter()
       .rev()
-      .fold(OpenCursor::new(fn_decl.name_decl()), |cursor, param| {
-        cursor.emit_local_store(param.var())
-      })
+      .fold(
+        OpenCursor::new(fn_decl.name_decl(), types),
+        |cursor, param| cursor.emit_local_store(param.var()),
+      )
       .compile_lexical_block(fn_decl.body())?;
 
     // Terminate by returning unit value if not already closed.
@@ -496,52 +544,52 @@ impl<'a> Cursor<'a> {
   }
 }
 
-pub fn compile_to_bytecode(fn_decl: &FunctionDecl) -> InterpreterResult<JitCompiledFunction> {
-  Cursor::compile_fn_decl(fn_decl)
+pub fn compile_to_bytecode<'ty>(
+  fn_decl: &FunctionDecl,
+  types: &JangTypeAnalysis<'ty>,
+) -> InterpreterResult<JitCompiledFunction> {
+  Cursor::compile_fn(fn_decl, types)
 }
 
 #[cfg(test)]
 mod tests {
   use crate::{
-    error::JangResult,
     interpreter::{
       bytecode::{
         compiler::{
-          compiler::compile_to_bytecode, instruction::matchers::*,
+          compiler::compile_to_bytecode,
+          instruction::{JitCompiledFunction, matchers::*},
           instruction_block_list::testing::block_id,
         },
         runtime::local_table::testing::local_id,
       },
-      error::InterpreterError,
+      error::{InterpreterError, InterpreterResult},
+      value::matchers::{i32_value_primitive, i64_value_primitive},
     },
     parser::{
-      ast::{binary_expression::BinaryOp, function_decl::FunctionDecl, unary_experssion::UnaryOp},
+      ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
       grammar::testing::lex_and_parse_jang_file,
-      token::{ident::matchers::ident, literal::matchers::integral},
+      token::ident::matchers::ident,
     },
+    type_checker::{check, context::TypeCheckerCtx},
   };
   use googletest::prelude::*;
 
-  fn parse_fn_decl(text: impl IntoIterator<Item = char>) -> JangResult<FunctionDecl> {
-    lex_and_parse_jang_file(text)?
-      .function_decls()
-      .first()
-      .cloned()
-      .ok_or_else(|| InterpreterError::generic_err("no function decls in AST").into())
+  fn compile_fn(text: impl IntoIterator<Item = char>) -> InterpreterResult<JitCompiledFunction> {
+    let ctx = TypeCheckerCtx::default();
+    let ast = lex_and_parse_jang_file(text).unwrap();
+    let types = check(&ast, &ctx).map_err(|err| InterpreterError::generic_err(err.to_string()))?;
+    compile_to_bytecode(&ast.function_decls()[0], &types)
   }
 
   #[gtest]
   fn empty_function() {
-    let decl = parse_fn_decl(
-      r#"
+    let fn_def = r#"
       fn f() { }
       "#
-      .chars(),
-    )
-    .unwrap();
-
+    .chars();
     expect_that!(
-      compile_to_bytecode(&decl),
+      compile_fn(fn_def),
       ok(entry_block(instruction_block(
         elements_are![load_unit_instruction()],
         ret_terminator(),
@@ -551,23 +599,22 @@ mod tests {
 
   #[gtest]
   fn binary_operators() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         ret 2 * (3 + 4)
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
-          load_literal_instruction(integral("2")),
-          load_literal_instruction(integral("3")),
-          load_literal_instruction(integral("4")),
+          load_literal_instruction(i64_value_primitive(eq(&2))),
+          load_literal_instruction(i64_value_primitive(eq(&3))),
+          load_literal_instruction(i64_value_primitive(eq(&4))),
           binary_op_instruction(pat!(BinaryOp::Add)),
           binary_op_instruction(pat!(BinaryOp::Mul)),
         ],
@@ -578,22 +625,21 @@ mod tests {
 
   #[gtest]
   fn unary_operator() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): bool {
         ret !(2 == 3)
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
-          load_literal_instruction(integral("2")),
-          load_literal_instruction(integral("3")),
+          load_literal_instruction(i32_value_primitive(eq(&2))),
+          load_literal_instruction(i32_value_primitive(eq(&3))),
           binary_op_instruction(pat!(BinaryOp::Equal)),
           unary_op_instruction(pat!(UnaryOp::LogicalNot)),
         ],
@@ -604,10 +650,10 @@ mod tests {
 
   #[gtest]
   fn if_statement() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
-        if 0 {
+        if 0 == 0 {
           ret 1
         } else {
         }
@@ -615,8 +661,7 @@ mod tests {
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     let entry_block_id = block_id(0);
     let if_block_id = block_id(1);
@@ -624,12 +669,16 @@ mod tests {
     let join_block_id = block_id(3);
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(all![
         has_instruction_block(
           entry_block_id,
           instruction_block(
-            elements_are![load_literal_instruction(integral("0"))],
+            elements_are![
+              load_literal_instruction(i32_value_primitive(eq(&0))),
+              load_literal_instruction(i32_value_primitive(eq(&0))),
+              binary_op_instruction(pat!(BinaryOp::Equal)),
+            ],
             conditional_jump_terminator(all![
               if_branch_target(eq(&if_block_id)),
               else_branch_target(eq(&else_block_id))
@@ -639,7 +688,7 @@ mod tests {
         has_instruction_block(
           if_block_id,
           instruction_block(
-            elements_are![load_literal_instruction(integral("1"))],
+            elements_are![load_literal_instruction(i64_value_primitive(eq(&1)))],
             ret_terminator()
           )
         ),
@@ -657,19 +706,19 @@ mod tests {
 
   #[gtest]
   fn loop_statement() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         loop {
-          if x {
+          if x() {
             break
           }
         }
       }
+      fn x(): bool { ret 0 == 1 }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     let entry_block_id = block_id(0);
     let loop_block_id = block_id(1);
@@ -679,7 +728,7 @@ mod tests {
     let loop_end_block_id = block_id(5);
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(all![
         has_instruction_block(
           entry_block_id,
@@ -688,7 +737,10 @@ mod tests {
         has_instruction_block(
           loop_block_id,
           instruction_block(
-            elements_are![load_global_instruction(ident("x"))],
+            elements_are![
+              load_global_instruction(ident("x")),
+              call_instruction(call_with_arity(eq(&0))),
+            ],
             conditional_jump_terminator(all![
               if_branch_target(eq(&if_block_id)),
               else_branch_target(eq(&else_block_id))
@@ -717,7 +769,7 @@ mod tests {
 
   #[gtest]
   fn lexical_scoping() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         let x = 1
@@ -731,18 +783,17 @@ mod tests {
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
-          load_literal_instruction(integral("1")),
+          load_literal_instruction(i32_value_primitive(eq(&1))),
           store_local_instruction(eq(&local_id(0))),
-          load_literal_instruction(integral("2")),
+          load_literal_instruction(i64_value_primitive(eq(&2))),
           store_local_instruction(eq(&local_id(1))),
-          load_literal_instruction(integral("3")),
+          load_literal_instruction(i32_value_primitive(eq(&3))),
           store_local_instruction(eq(&local_id(2))),
           load_local_instruction(eq(&local_id(1))),
         ],
@@ -753,18 +804,18 @@ mod tests {
 
   #[gtest]
   fn function_call_no_args() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f() {
         func()
       }
+      fn func() { }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
           load_global_instruction(ident("func")),
@@ -778,7 +829,7 @@ mod tests {
 
   #[gtest]
   fn store_and_load_local() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         let x = 1 + 2
@@ -786,15 +837,14 @@ mod tests {
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
-          load_literal_instruction(integral("1")),
-          load_literal_instruction(integral("2")),
+          load_literal_instruction(i64_value_primitive(eq(&1))),
+          load_literal_instruction(i64_value_primitive(eq(&2))),
           binary_op_instruction(pat!(BinaryOp::Add)),
           store_local_instruction(eq(&local_id(0))),
           load_local_instruction(eq(&local_id(0))),
@@ -806,7 +856,7 @@ mod tests {
 
   #[gtest]
   fn store_and_load_mutable_local() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         mut x = 1 + 2
@@ -814,15 +864,14 @@ mod tests {
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
-          load_literal_instruction(integral("1")),
-          load_literal_instruction(integral("2")),
+          load_literal_instruction(i64_value_primitive(eq(&1))),
+          load_literal_instruction(i64_value_primitive(eq(&2))),
           binary_op_instruction(pat!(BinaryOp::Add)),
           store_local_instruction(eq(&local_id(0))),
           load_local_instruction(eq(&local_id(0))),
@@ -834,7 +883,7 @@ mod tests {
 
   #[gtest]
   fn rebind_mutable_local() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         mut x = 1
@@ -843,16 +892,15 @@ mod tests {
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
-          load_literal_instruction(integral("1")),
+          load_literal_instruction(i64_value_primitive(eq(&1))),
           store_local_instruction(eq(&local_id(0))),
-          load_literal_instruction(integral("70")),
+          load_literal_instruction(i64_value_primitive(eq(&70))),
           store_local_instruction(eq(&local_id(0))),
           load_local_instruction(eq(&local_id(0))),
         ],
@@ -863,7 +911,7 @@ mod tests {
 
   #[gtest]
   fn cannot_rebind_immutable_local() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         let x = 1
@@ -872,15 +920,14 @@ mod tests {
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
-    expect_that!(compile_to_bytecode(&decl), err(anything()))
+    expect_that!(&compile_result, err(anything()))
   }
 
   #[gtest]
   fn cannot_rebind_unknown_local() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         mut x = 1
@@ -889,31 +936,30 @@ mod tests {
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
-    expect_that!(compile_to_bytecode(&decl), err(anything()))
+    expect_that!(&compile_result, err(anything()))
   }
 
   #[gtest]
   fn call_with_multiple_args() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f() {
         func(1, 2, 3)
       }
+      fn func(a: i64, b: i64, c: i64) { }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
-          load_literal_instruction(integral("1")),
-          load_literal_instruction(integral("2")),
-          load_literal_instruction(integral("3")),
+          load_literal_instruction(i64_value_primitive(eq(&1))),
+          load_literal_instruction(i64_value_primitive(eq(&2))),
+          load_literal_instruction(i64_value_primitive(eq(&3))),
           load_global_instruction(ident("func")),
           call_instruction(call_with_arity(eq(&3))),
           load_unit_instruction(),
@@ -925,25 +971,25 @@ mod tests {
 
   #[gtest]
   fn call_argument_eval_order() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f() {
         func(1 + 2, 3 + 4)
       }
+      fn func(a: i64, b: i64) { }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
-          load_literal_instruction(integral("1")),
-          load_literal_instruction(integral("2")),
+          load_literal_instruction(i64_value_primitive(eq(&1))),
+          load_literal_instruction(i64_value_primitive(eq(&2))),
           binary_op_instruction(pat!(BinaryOp::Add)),
-          load_literal_instruction(integral("3")),
-          load_literal_instruction(integral("4")),
+          load_literal_instruction(i64_value_primitive(eq(&3))),
+          load_literal_instruction(i64_value_primitive(eq(&4))),
           binary_op_instruction(pat!(BinaryOp::Add)),
           load_global_instruction(ident("func")),
           call_instruction(call_with_arity(eq(&2))),
@@ -956,18 +1002,17 @@ mod tests {
 
   #[gtest]
   fn fn_decl_with_parameters() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
-      fn f(a: i64, b: i64, c: i64) {
+      fn f(a: i64, b: i64, c: i64): i64 {
         ret a + (b + c)
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
           // Load arguments.
@@ -989,24 +1034,24 @@ mod tests {
 
   #[gtest]
   fn values_as_functions() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f() {
         let x = global_fn
         ret x(1)
       }
+      fn global_fn(a: i64) { }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
           load_global_instruction(ident("global_fn")),
           store_local_instruction(eq(&local_id(0))),
-          load_literal_instruction(integral("1")),
+          load_literal_instruction(i64_value_primitive(eq(&1))),
           load_local_instruction(eq(&local_id(0))),
           call_instruction(call_with_arity(eq(&1))),
         ],
@@ -1017,18 +1062,17 @@ mod tests {
 
   #[gtest]
   fn simple_tail_recursion_no_args() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(): i64 {
         ret f()
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![],
         jump_terminator(eq(&block_id(0))),
@@ -1038,18 +1082,17 @@ mod tests {
 
   #[gtest]
   fn simple_tail_recursion_with_args() {
-    let decl = parse_fn_decl(
+    let compile_result = compile_fn(
       r#"
       fn f(a: i64, b: i64): i64 {
         ret f(a, b)
       }
       "#
       .chars(),
-    )
-    .unwrap();
+    );
 
     expect_that!(
-      compile_to_bytecode(&decl),
+      &compile_result,
       ok(entry_block(instruction_block(
         elements_are![
           store_local_instruction(eq(&local_id(0))),

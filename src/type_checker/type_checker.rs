@@ -82,6 +82,17 @@ impl<'ctx> TypeChecker<'ctx> {
       .expect("Expected AST ID to have a populated type")
   }
 
+  fn try_get_ast_type(
+    &self,
+    id: impl Into<TypedAstId>,
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
+    self
+      .ast_types
+      .get(id)
+      .copied()
+      .ok_or(TypeCheckerError::UndefinedVariable)
+  }
+
   fn unify(
     &mut self,
     expected: InferredTy<'ctx>,
@@ -178,7 +189,7 @@ impl<'ctx> TypeChecker<'ctx> {
   }
 
   fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult<'ctx> {
-    let var_type = self.get_ast_type(s.var());
+    let var_type = self.try_get_ast_type(s.var())?;
     let expr_type = self.check_expression(s.expr())?;
     self.unify(var_type, expr_type).erase_ok()
   }
@@ -215,7 +226,7 @@ impl<'ctx> TypeChecker<'ctx> {
   fn check_expression(&mut self, expr: &Expression) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let ty = match expr.variant() {
       ExpressionVariant::Literal(e) => self.check_literal_expression(e),
-      ExpressionVariant::VarRef(e) => self.check_var_ref_expression(e),
+      ExpressionVariant::VarRef(e) => self.check_var_ref_expression(e)?,
       ExpressionVariant::BinaryExpression(e) => self.check_binary_expression(e)?,
       ExpressionVariant::UnaryExpression(e) => self.check_unary_expression(e)?,
       ExpressionVariant::CallExpression(e) => self.check_call_expression(e)?,
@@ -233,8 +244,11 @@ impl<'ctx> TypeChecker<'ctx> {
     }
   }
 
-  fn check_var_ref_expression(&mut self, var_ref: &VarRef) -> InferredTy<'ctx> {
-    self.get_ast_type(var_ref)
+  fn check_var_ref_expression(
+    &mut self,
+    var_ref: &VarRef,
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
+    self.try_get_ast_type(var_ref)
   }
 
   fn check_binary_expression(
@@ -789,8 +803,9 @@ mod tests {
     let ctx = TypeCheckerCtx::default();
     type_check_ok(
       r#"
-        fn foo(x: i32, y: f64) {
-          let y = x
+        fn f(): i64 {
+          let x: i64 = 1 + 2
+          ret x
         }
         "#,
       &ctx,
