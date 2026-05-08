@@ -14,21 +14,21 @@ use crate::{
 
 const MAIN_FN_NAME: &str = "main";
 
-struct Program<'a> {
-  functions: HashMap<Ident, JitCompiledFunction<'a>>,
+struct Program {
+  functions: HashMap<Ident, JitCompiledFunction>,
 }
 
-impl<'a> Program<'a> {
-  pub fn lookup_function(&self, var: &Ident) -> Option<&JitCompiledFunction<'a>> {
+impl Program {
+  pub fn lookup_function(&self, var: &Ident) -> Option<&JitCompiledFunction> {
     self.functions.get(var)
   }
 }
 
-pub struct Interpreter<'a> {
-  program: Program<'a>,
+pub struct Interpreter {
+  program: Program,
 }
 
-impl<'a> JitFunctionContext<'a> for Interpreter<'a> {
+impl<'a> JitFunctionContext<'a> for Interpreter {
   fn resolve_ident(&'a self, name: &Ident) -> InterpreterResult<Value<'a>> {
     Ok(Value::JitCompiledFunctionRef(
       self
@@ -39,9 +39,9 @@ impl<'a> JitFunctionContext<'a> for Interpreter<'a> {
   }
 }
 
-impl<'a> Interpreter<'a> {
+impl<'a> Interpreter {
   pub fn new(jang_file: &'a JangFile) -> InterpreterResult<Self> {
-    let function_decls_by_name: HashMap<Ident, JitCompiledFunction<'a>> = jang_file
+    let function_decls_by_name: HashMap<Ident, JitCompiledFunction> = jang_file
       .function_decls()
       .iter()
       .map(|f| Ok((f.name_decl().name().clone(), compile_to_bytecode(f)?)))
