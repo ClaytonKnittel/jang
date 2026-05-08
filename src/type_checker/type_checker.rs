@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use cknittel_util::iter::CollectResult;
+use cknittel_util::{iter::CollectResult, result::EraseOk};
 
 use crate::{
   parser::{
@@ -89,11 +89,12 @@ impl<'ctx> TypeChecker<'ctx> {
   }
 
   fn check_is_bool(&mut self, actual: InferredTy<'ctx>) -> TypeCheckerResult<'ctx> {
-    self.unify(
-      self.types.primitive_type(PrimitiveType::Bool).into(),
-      actual,
-    )?;
-    Ok(())
+    self
+      .unify(
+        self.types.primitive_type(PrimitiveType::Bool).into(),
+        actual,
+      )
+      .erase_ok()
   }
 
   fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'ctx> {
@@ -177,8 +178,7 @@ impl<'ctx> TypeChecker<'ctx> {
   fn check_rebind_statement(&mut self, s: &RebindStatement) -> TypeCheckerResult<'ctx> {
     let var_type = self.get_ast_type(s.var());
     let expr_type = self.check_expression(s.expr())?;
-    self.unify(var_type, expr_type)?;
-    Ok(())
+    self.unify(var_type, expr_type).erase_ok()
   }
 
   fn check_ret_statement(&mut self, s: &RetStatement) -> TypeCheckerResult<'ctx> {
@@ -194,8 +194,7 @@ impl<'ctx> TypeChecker<'ctx> {
     };
     let return_type = f.return_type();
 
-    self.unify(return_type.into(), expr_type)?;
-    Ok(())
+    self.unify(return_type.into(), expr_type).erase_ok()
   }
 
   fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult<'ctx> {
