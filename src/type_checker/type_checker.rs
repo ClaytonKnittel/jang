@@ -790,8 +790,9 @@ mod tests {
     let ctx = TypeCheckerCtx::default();
     type_check_ok(
       r#"
-        fn foo(x: i32, y: f64) {
+        fn f(x: i64, y: i64): i64 {
           let y = x
+          ret y
         }
         "#,
       &ctx,
