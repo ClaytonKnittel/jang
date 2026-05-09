@@ -23,6 +23,7 @@ use crate::{
       rebind_statement::RebindStatement,
       ret_statement::RetStatement,
       statement::Statement,
+      struct_expression::{StructExpressionBuilder, StructFieldInitializer},
       structured_type_decl::{StructuredTypeDecl, StructuredTypeDeclBuilder, StructuredTypeField},
       type_decl::{TypeDecl, TypeDeclVariant},
       type_expr::{
@@ -252,7 +253,19 @@ pub_grammar!(
     #ctx.new_expression(#expr_variant)
   };
 
-  <expr_variant>: ExpressionVariant => <logical_or_expr>;
+  <expr_variant>: ExpressionVariant => <struct_expr>;
+
+  <struct_expr>: ExpressionVariant => <open_bracket> <struct_expr_builder> <close_bracket> {
+    #struct_expr_builder.build()?.into()
+  };
+  <struct_expr>: ExpressionVariant => <logical_or_expr>;
+
+  <struct_expr_builder>: StructExpressionBuilder => ! {
+    StructExpressionBuilder::default()
+  };
+  <struct_expr_builder>: StructExpressionBuilder => <struct_expr_builder> <ident> <colon> <expr> {
+    #struct_expr_builder.add_fields(StructFieldInitializer::new(#ident, #expr))
+  };
 
   <logical_or_expr>: ExpressionVariant => <logical_or_expr> <logical_or> <logical_and_expr> {
     BinaryExpression::new(
@@ -471,6 +484,7 @@ mod tests {
         rebind_statement::matchers::rebind_stmt,
         ret_statement::matchers::ret_statement as ret_stmt,
         statement::{Statement, matchers::break_statement},
+        struct_expression::matchers::{struct_exp, struct_initializer_field},
         structured_type_decl::matchers::type_field,
         type_decl::matchers::{enum_type, type_alias},
         type_expr::{
@@ -524,7 +538,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 443);
+    expect_eq!(JangGrammar::TABLE_SIZE, 511);
   }
 
   #[gtest]
@@ -2146,6 +2160,81 @@ mod tests {
         )]),
         let_stmt(ident("w"), global_var_ref_expr(ident("z"))),
       ])))
+    );
+  }
+
+  #[gtest]
+  fn empty_struct_initializer() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name() {
+          let x = {}
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        struct_exp(is_empty())
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn struct_initializer_many_fields() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name() {
+          let x = {
+            a: 1
+            b: (1 + 2)
+          }
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![let_stmt(
+        ident("x"),
+        struct_exp(elements_are![
+          struct_initializer_field(ident("a"), lit_exp(integral("1"))),
+          struct_initializer_field(
+            ident("b"),
+            bin_exp(
+              lit_exp(integral("1")),
+              &BinaryOp::Add,
+              lit_exp(integral("2"))
+            )
+          )
+        ])
+      )])))
+    );
+  }
+
+  #[gtest]
+  fn struct_initializer_in_expr() {
+    let ast = lex_and_parse_jang_file(
+      r#"
+        fn function_name() {
+          f({})
+        }
+        "#
+      .chars(),
+    )
+    .unwrap();
+
+    expect_that!(
+      ast,
+      jang_file_with_fn(fn_body(block(elements_are![call_statement(
+        call_expr_args(elements_are![struct_exp(is_empty())])
+      )])))
     );
   }
 }

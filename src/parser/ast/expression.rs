@@ -5,13 +5,14 @@ use cknittel_util::from_variants::FromVariants;
 use crate::parser::ast::{
   binary_expression::BinaryExpression, call_expression::CallExpression,
   dot_expression::DotExpression, id::def::AstExpressionId, literal_expression::LiteralExpression,
-  unary_experssion::UnaryExpression, var::var_ref::VarRef,
+  struct_expression::StructExpression, unary_experssion::UnaryExpression, var::var_ref::VarRef,
 };
 
 #[derive(Clone, Debug, FromVariants)]
 pub enum ExpressionVariant {
   Literal(LiteralExpression),
   VarRef(VarRef),
+  AnonymousStruct(StructExpression),
   BinaryExpression(BinaryExpression),
   UnaryExpression(UnaryExpression),
   CallExpression(CallExpression),
@@ -23,6 +24,7 @@ impl Display for ExpressionVariant {
     match self {
       Self::Literal(literal) => write!(f, "{literal}"),
       Self::VarRef(var_ref) => write!(f, "{var_ref}"),
+      Self::AnonymousStruct(struct_expr) => write!(f, "{struct_expr}"),
       Self::BinaryExpression(binary_expr) => write!(f, "({binary_expr})"),
       Self::UnaryExpression(unary_expr) => write!(f, "{unary_expr}"),
       Self::CallExpression(call_expr) => write!(f, "{call_expr}"),
