@@ -17,6 +17,7 @@ pub mod loop_statement;
 pub mod rebind_statement;
 pub mod ret_statement;
 pub mod statement;
+pub mod struct_expression;
 pub mod structured_type_decl;
 pub mod type_decl;
 pub mod type_expr;

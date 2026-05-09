@@ -220,6 +220,7 @@ impl<'ctx> TypeChecker<'ctx> {
       ExpressionVariant::UnaryExpression(e) => self.check_unary_expression(e)?,
       ExpressionVariant::CallExpression(e) => self.check_call_expression(e)?,
       ExpressionVariant::DotExpression(e) => self.check_dot_expression(e)?,
+      ExpressionVariant::AnonymousStruct(_) => todo!("AnonymousStruct expression"),
     };
 
     self.set_ast_type(expr.id(), ty);
