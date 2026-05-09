@@ -1,11 +1,14 @@
 use crate::{
-  interpreter::bytecode::{
-    compiler::instruction_block_list::{BlockId, BlockList},
-    runtime::local_table::LocalId,
+  interpreter::{
+    bytecode::{
+      compiler::instruction_block_list::{BlockId, BlockList},
+      runtime::local_table::LocalId,
+    },
+    value::PrimitiveValue,
   },
   parser::{
     ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
-    token::{ident::Ident, literal::Literal},
+    token::ident::Ident,
   },
 };
 
@@ -24,7 +27,7 @@ pub enum JitInstruction {
   UnaryOp(UnaryOp),
 
   // Push a literal value onto the stack.
-  LoadLiteral(Literal),
+  LoadLiteral(PrimitiveValue),
 
   // Pushes a global value onto the stack.
   LoadGlobal(Ident),
@@ -153,12 +156,13 @@ pub mod matchers {
     JitInstructionBlock, JitTerminalInstruction,
   };
   use crate::{
-    interpreter::bytecode::{
-      compiler::instruction_block_list::BlockId, runtime::local_table::LocalId,
+    interpreter::{
+      bytecode::{compiler::instruction_block_list::BlockId, runtime::local_table::LocalId},
+      value::PrimitiveValue,
     },
     parser::{
       ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
-      token::{ident::Ident, literal::Literal},
+      token::ident::Ident,
     },
   };
   use googletest::prelude::*;
@@ -176,9 +180,9 @@ pub mod matchers {
   }
 
   pub fn load_literal_instruction<'a>(
-    literal_matcher: impl Matcher<&'a Literal>,
+    value_matcher: impl Matcher<&'a PrimitiveValue>,
   ) -> impl Matcher<&'a JitInstruction> {
-    pat!(JitInstruction::LoadLiteral(literal_matcher))
+    pat!(JitInstruction::LoadLiteral(value_matcher))
   }
 
   pub fn load_unit_instruction<'a>() -> impl Matcher<&'a JitInstruction> {
