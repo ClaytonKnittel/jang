@@ -4,6 +4,11 @@ use cknittel_util::builder::Builder;
 
 use crate::parser::ast::{
   block::Block,
+  id::{
+    adt::map::IdMap,
+    def::{AstExpressionId, AstLocalDeclId},
+    range::AstIdRange,
+  },
   type_expr::TypeExpression,
   var::var_decl::{GlobalDecl, LocalDecl},
 };
@@ -14,6 +19,7 @@ pub struct FunctionDecl {
   parameters: FunctionParameters,
   return_type: Option<TypeExpression>,
   body: Block,
+  id_range: AstIdRange,
 }
 
 impl FunctionDecl {
@@ -22,12 +28,14 @@ impl FunctionDecl {
     parameters: FunctionParameters,
     return_type: Option<TypeExpression>,
     body: Block,
+    id_range: AstIdRange,
   ) -> Self {
     Self {
       name,
       parameters,
       return_type,
       body,
+      id_range,
     }
   }
 
@@ -45,6 +53,14 @@ impl FunctionDecl {
 
   pub fn body(&self) -> &Block {
     &self.body
+  }
+
+  pub fn new_expression_id_map<T: std::clone::Clone>(&self) -> IdMap<AstExpressionId, T> {
+    self.id_range.new_expression_id_map()
+  }
+
+  pub fn new_local_decl_id_map<T: std::clone::Clone>(&self) -> IdMap<AstLocalDeclId, T> {
+    self.id_range.new_local_id_map()
   }
 }
 

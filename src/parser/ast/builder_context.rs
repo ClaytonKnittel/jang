@@ -1,12 +1,9 @@
-use cknittel_util::builder::error::BuilderResult;
-
 use crate::{
   error::JangResult,
   parser::{
     ast::{
       expression::{Expression, ExpressionVariant},
-      id::builder::IdBuilder,
-      jang_file::{JangFile, JangFileBuilder},
+      id::{builder::IdBuilder, snapshot::IdSnapshot},
       var::{
         var_decl::{GlobalDecl, LocalDecl},
         var_decl_map::VarDeclMap,
@@ -44,10 +41,8 @@ impl AstBuilderContext {
     self.var_decl_map.var_ref(ident, &mut self.id_builder)
   }
 
-  pub fn build_jang_file(&self, jang_file_builder: JangFileBuilder) -> BuilderResult<JangFile> {
-    jang_file_builder
-      .with_id_counts(self.id_builder.id_counts())
-      .build()
+  pub fn id_snapshot(&self) -> IdSnapshot {
+    self.id_builder.snapshot()
   }
 
   pub fn enter_block_scope(&mut self) {

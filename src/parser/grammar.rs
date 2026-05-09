@@ -16,6 +16,7 @@ use crate::{
       function_decl::{
         FunctionDecl, FunctionParameter, FunctionParameters, FunctionParametersBuilder,
       },
+      id::snapshot::IdSnapshot,
       if_statement::IfStatement,
       jang_file::{JangFile, JangFileBuilder},
       literal_expression::LiteralExpression,
@@ -46,8 +47,8 @@ pub_grammar!(
   context_type: AstBuilderContext;
   error_type: JangError;
 
-  <root>: JangFile => <jang_file> {
-    #ctx.build_jang_file(#jang_file)?
+  <root>: JangFile => <id_range_start> <jang_file> <id_range_end> {
+    #jang_file.with_id_range(#id_range_start.to(#id_range_end)).build()?
   };
 
   <jang_file>: JangFileBuilder => <jang_file> <type_decl> {
@@ -113,6 +114,7 @@ pub_grammar!(
   };
 
   <function_decl>: FunctionDecl =>
+      <id_range_start>
       Keyword(Keyword::Function)
       <ident>
       Joint
@@ -121,13 +123,22 @@ pub_grammar!(
       <maybe_type_annotation>
       <block_scope>
       <end_function_scope>
+      <id_range_end>
   {
     FunctionDecl::new(
       #ctx.new_global_decl(#ident)?,
       #function_params,
       #maybe_type_annotation,
-      #block_scope
+      #block_scope,
+      #id_range_start.to(#id_range_end),
     )
+  };
+
+  <id_range_start>: IdSnapshot => ! {
+    #ctx.id_snapshot()
+  };
+  <id_range_end>: IdSnapshot => ! {
+    #ctx.id_snapshot()
   };
 
   <start_function_scope> => ! {
@@ -524,7 +535,7 @@ mod tests {
 
   #[gtest]
   fn grammar_size() {
-    expect_eq!(JangGrammar::TABLE_SIZE, 443);
+    expect_eq!(JangGrammar::TABLE_SIZE, 447);
   }
 
   #[gtest]
