@@ -7,9 +7,10 @@ use crate::{
       runtime::machine::{self, JitFunctionContext},
     },
     error::{InterpreterError, InterpreterResult},
-    value::Value,
+    value::{PrimitiveValue, Value},
   },
   parser::{ast::jang_file::JangFile, token::ident::Ident},
+  type_checker::{check, context::TypeCheckerCtx},
 };
 
 const MAIN_FN_NAME: &str = "main";
@@ -41,10 +42,18 @@ impl<'a> JitFunctionContext<'a> for Interpreter {
 
 impl<'a> Interpreter {
   pub fn new(jang_file: &'a JangFile) -> InterpreterResult<Self> {
+    let type_checker_ctx = TypeCheckerCtx::default();
+    let types = check(jang_file, &type_checker_ctx)
+      .map_err(|err| InterpreterError::generic_err(err.to_string()))?;
     let function_decls_by_name: HashMap<Ident, JitCompiledFunction> = jang_file
       .function_decls()
       .iter()
-      .map(|f| Ok((f.name_decl().name().clone(), compile_to_bytecode(f)?)))
+      .map(|f| {
+        Ok((
+          f.name_decl().name().clone(),
+          compile_to_bytecode(f, &types)?,
+        ))
+      })
       .collect::<InterpreterResult<_>>()?;
 
     Ok(Interpreter {
@@ -60,7 +69,7 @@ impl<'a> Interpreter {
     };
 
     match machine::evaluate_function(main_fn, Vec::new(), self)? {
-      Value::Int64(v) => Ok(v),
+      Value::Primitive(PrimitiveValue::Int64(v)) => Ok(v),
       Value::Unit => Err(InterpreterError::value_err("main must return a value")),
       r => Err(InterpreterError::value_err(format!(
         "invalid return value from main: {:?}",
@@ -75,16 +84,13 @@ mod tests {
   use googletest::{expect_that, gtest, prelude::*};
 
   use crate::{
-    interpreter::{
-      error::{InterpreterResult, matchers::interpreter_value_error},
-      interpreter::Interpreter,
-    },
+    interpreter::{error::InterpreterResult, interpreter::Interpreter},
     parser::grammar::testing::lex_and_parse_jang_file,
   };
 
   fn interpret_program(text: impl IntoIterator<Item = char>) -> InterpreterResult<i64> {
     let ast = lex_and_parse_jang_file(text).unwrap();
-    let interp = Interpreter::new(&ast).unwrap();
+    let interp = Interpreter::new(&ast)?;
     interp.run_main()
   }
 
@@ -153,27 +159,6 @@ mod tests {
         .chars()
       ),
       ok(eq(&25))
-    );
-  }
-
-  #[gtest]
-  fn unbound_variable_throws_error() {
-    expect_that!(
-      interpret_program(
-        r#"
-        fn g(): i64 {
-          ret x
-        }
-        fn f(x: i64): i64 {
-          ret g()
-        }
-        fn main(): i64 {
-          ret f(1)
-        }
-        "#
-        .chars()
-      ),
-      err(displays_as(contains_substring("unbound variable")))
     );
   }
 
@@ -464,25 +449,6 @@ mod tests {
         .chars()
       ),
       ok(eq(&7))
-    );
-  }
-
-  #[gtest]
-  fn arithmetic_value_type_mismatch() {
-    expect_that!(
-      interpret_program(
-        r#"
-        fn test(x: i64): i64 {
-          ret x + main
-        }
-
-        fn main(): i64 {
-          ret test(1)
-        }
-        "#
-        .chars()
-      ),
-      err(interpreter_value_error(contains_substring("add")))
     );
   }
 

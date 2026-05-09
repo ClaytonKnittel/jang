@@ -141,7 +141,7 @@ impl<'a> JitCallFrame<'a> {
           self.execute_unary_operation(op)?;
         }
         JitInstruction::LoadLiteral(literal) => {
-          self.stack.push_value(Value::from_literal(literal)?);
+          self.stack.push_value(Value::Primitive(literal.clone()));
         }
         JitInstruction::LoadGlobal(ident) => {
           self.stack.push_value(context.resolve_ident(ident)?);
@@ -284,10 +284,7 @@ mod tests {
     },
     parser::{
       ast::{binary_expression::BinaryOp, unary_experssion::UnaryOp},
-      token::{
-        ident::Ident,
-        literal::{Literal, NumericLiteral},
-      },
+      token::ident::Ident,
     },
   };
   use googletest::prelude::*;
@@ -353,7 +350,7 @@ mod tests {
   fn store_then_load_local_round_trips() {
     let code = function_bytecode(vec![block(
       vec![
-        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("1"))),
+        JitInstruction::LoadLiteral(1i64.into()),
         JitInstruction::StoreLocal(local_id(0)),
         JitInstruction::LoadLocal(local_id(0)),
       ],
@@ -382,8 +379,8 @@ mod tests {
   fn subtraction_uses_rhs_lhs_order() {
     let code = function_bytecode(vec![block(
       vec![
-        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("2"))),
-        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("1"))),
+        JitInstruction::LoadLiteral(2i64.into()),
+        JitInstruction::LoadLiteral(1i64.into()),
         JitInstruction::BinaryOp(BinaryOp::Sub),
       ],
       JitTerminalInstruction::Return,
@@ -396,8 +393,8 @@ mod tests {
   fn comparison_returns_boolean() {
     let code = function_bytecode(vec![block(
       vec![
-        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("2"))),
-        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("1"))),
+        JitInstruction::LoadLiteral(2.into()),
+        JitInstruction::LoadLiteral(1.into()),
         JitInstruction::BinaryOp(BinaryOp::Equal),
       ],
       JitTerminalInstruction::Return,
@@ -414,7 +411,7 @@ mod tests {
     )]);
 
     expect_that!(
-      evaluate_function(&code, vec![Value::Bool(false)], &EmptyContext),
+      evaluate_function(&code, vec![Value::Primitive(false.into())], &EmptyContext),
       ok(bool_value(&true)),
     )
   }
@@ -435,8 +432,8 @@ mod tests {
 
     let code = function_bytecode(vec![block(
       vec![
-        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("2"))),
-        JitInstruction::LoadLiteral(Literal::Numeric(NumericLiteral::from_str("1"))),
+        JitInstruction::LoadLiteral(2i64.into()),
+        JitInstruction::LoadLiteral(1i64.into()),
         JitInstruction::LoadGlobal(sub_function_name),
         JitInstruction::Call(JitCallInstruction::with_arity(2)),
       ],

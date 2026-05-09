@@ -1,5 +1,6 @@
 pub mod context;
 pub mod error;
+mod inference;
 pub mod type_analysis;
 mod type_checker;
 pub mod typed_ast_id;

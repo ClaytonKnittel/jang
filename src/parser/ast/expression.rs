@@ -61,6 +61,7 @@ impl Display for Expression {
 pub(crate) mod matchers {
   use crate::parser::ast::{
     binary_expression::BinaryExpression,
+    dot_expression::DotExpression,
     expression::{Expression, ExpressionVariant},
   };
   use googletest::prelude::*;
@@ -79,6 +80,13 @@ pub(crate) mod matchers {
       match self {
         Self::BinaryExpression(e) => e,
         _ => panic!("Expected BinaryExpression, got {:?}", self),
+      }
+    }
+
+    pub fn as_dot_expr(&self) -> &DotExpression {
+      match self {
+        Self::DotExpression(e) => e,
+        _ => panic!("Expected DotExpression, got {:?}", self),
       }
     }
   }
