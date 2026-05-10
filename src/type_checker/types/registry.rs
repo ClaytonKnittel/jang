@@ -10,20 +10,20 @@ use enum_map::EnumMap;
 use crate::type_checker::{
   context::TypeCheckerCtx,
   types::{
-    concrete::ConcreteType,
     function::FunctionType,
     primitive::PrimitiveType,
     strukt::{StructField, StructType},
+    ty_kind::TyKind,
   },
 };
 
-/// A reference to a unique [`ConcreteType`] allocated through a
+/// A reference to a unique [`TyKind`] allocated through a
 /// [`TypeRegistry`]. [`Ty`] is copyable and equality is cheap.
 #[derive(Clone, Copy, Debug, Eq)]
-pub struct Ty<'ctx>(&'ctx ConcreteType<'ctx>);
+pub struct Ty<'ctx>(&'ctx TyKind<Ty<'ctx>>);
 
 impl<'ctx> Deref for Ty<'ctx> {
-  type Target = ConcreteType<'ctx>;
+  type Target = TyKind<Ty<'ctx>>;
 
   fn deref(&self) -> &Self::Target {
     self.0
@@ -71,8 +71,8 @@ pub struct TypeRegistry<'ctx> {
 impl<'ctx> TypeRegistry<'ctx> {
   pub fn new(ctx: &'ctx TypeCheckerCtx<'ctx>) -> Self {
     let mut type_set = TypeSet::new(ctx);
-    let unit_type = type_set.add(ConcreteType::Unit);
-    let primitives = enum_map::enum_map! { p => type_set.add(ConcreteType::Primitive(p)) };
+    let unit_type = type_set.add(TyKind::Unit);
+    let primitives = enum_map::enum_map! { p => type_set.add(TyKind::Primitive(p)) };
     Self {
       type_set,
       unit_type,
@@ -95,7 +95,7 @@ impl<'ctx> TypeRegistry<'ctx> {
     parameters: impl IntoIterator<Item = Ty<'ctx>>,
     return_type: Ty<'ctx>,
   ) -> Ty<'ctx> {
-    self.type_set.add(ConcreteType::Function(FunctionType::new(
+    self.type_set.add(TyKind::Function(FunctionType::new(
       parameters.into_iter().collect(),
       return_type,
     )))
@@ -103,10 +103,11 @@ impl<'ctx> TypeRegistry<'ctx> {
 
   /// Adds a struct type to the registry and returns its handle,
   /// deduplicating if the function already exists.
-  pub fn struct_type(&mut self, fields: impl IntoIterator<Item = StructField<'ctx>>) -> Ty<'ctx> {
-    self
-      .type_set
-      .add(ConcreteType::Struct(StructType::new(fields)))
+  pub fn struct_type(
+    &mut self,
+    fields: impl IntoIterator<Item = StructField<Ty<'ctx>>>,
+  ) -> Ty<'ctx> {
+    self.type_set.add(TyKind::Struct(StructType::new(fields)))
   }
 }
 
@@ -116,7 +117,7 @@ struct TypeSet<'ctx> {
   ctx: &'ctx TypeCheckerCtx<'ctx>,
 
   /// For deduplication.
-  type_set: HashSet<&'ctx ConcreteType<'ctx>>,
+  type_set: HashSet<&'ctx TyKind<Ty<'ctx>>>,
 }
 
 impl<'ctx> TypeSet<'ctx> {
@@ -128,11 +129,11 @@ impl<'ctx> TypeSet<'ctx> {
   }
 
   /// Adds a new type to the set, deduplicating against existing entries.
-  fn add(&mut self, concrete: ConcreteType<'ctx>) -> Ty<'ctx> {
-    if let Some(ty) = self.type_set.get(&concrete) {
+  fn add(&mut self, kind: TyKind<Ty<'ctx>>) -> Ty<'ctx> {
+    if let Some(ty) = self.type_set.get(&kind) {
       return Ty(ty);
     }
-    let allocated: &'ctx ConcreteType<'ctx> = self.ctx.types().alloc(concrete);
+    let allocated: &'ctx TyKind<Ty<'ctx>> = self.ctx.types().alloc(kind);
     self.type_set.insert(allocated);
     Ty(allocated)
   }
@@ -143,8 +144,8 @@ pub(crate) mod matchers {
   use super::*;
   use googletest::prelude::*;
 
-  /// Lifts a matcher on `&ConcreteType` to a matcher on `&Ty`.
-  pub fn ty<'a>(matcher: impl Matcher<&'a ConcreteType<'a>>) -> impl Matcher<&'a Ty<'a>> {
+  /// Lifts a matcher on `&TyKind<Ty>` to a matcher on `&Ty`.
+  pub fn ty<'a>(matcher: impl Matcher<&'a TyKind<Ty<'a>>>) -> impl Matcher<&'a Ty<'a>> {
     result_of!(|ty: &'a Ty<'a>| ty.deref(), matcher)
   }
 }

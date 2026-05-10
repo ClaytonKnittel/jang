@@ -1,31 +1,33 @@
-use crate::type_checker::types::registry::Ty;
-use itertools::Itertools;
 use std::fmt::Display;
 
+use itertools::Itertools;
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct FunctionType<'ctx> {
-  parameters: Vec<Ty<'ctx>>,
-  return_type: Ty<'ctx>,
+pub struct FunctionType<Ty> {
+  parameters: Vec<Ty>,
+  return_type: Ty,
 }
 
-impl<'ctx> FunctionType<'ctx> {
-  pub fn new(parameters: Vec<Ty<'ctx>>, return_type: Ty<'ctx>) -> Self {
+impl<Ty> FunctionType<Ty> {
+  pub fn new(parameters: Vec<Ty>, return_type: Ty) -> Self {
     FunctionType {
       parameters,
       return_type,
     }
   }
 
-  pub fn parameters(&self) -> &[Ty<'ctx>] {
+  pub fn parameters(&self) -> &[Ty] {
     &self.parameters
   }
+}
 
-  pub fn return_type(&self) -> Ty<'ctx> {
+impl<Ty: Copy> FunctionType<Ty> {
+  pub fn return_type(&self) -> Ty {
     self.return_type
   }
 }
 
-impl<'ctx> Display for FunctionType<'ctx> {
+impl<Ty: Display> Display for FunctionType<Ty> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
@@ -39,7 +41,7 @@ impl<'ctx> Display for FunctionType<'ctx> {
 #[cfg(test)]
 pub(crate) mod matchers {
   use super::*;
-  use crate::type_checker::types::concrete::matchers::concrete_fn_type;
+  use crate::type_checker::types::{registry::Ty, ty_kind::matchers::concrete_fn_type};
   use googletest::prelude::*;
 
   pub fn fn_param_types<'a>(params: impl Matcher<&'a [Ty<'a>]>) -> impl Matcher<&'a Ty<'a>> {

@@ -29,11 +29,12 @@ use crate::{
   type_checker::{
     context::TypeCheckerCtx,
     error::{TypeCheckerError, TypeCheckerResult},
-    inference::{InferenceTable, InferredTy, TypeClass},
+    inference::{InferenceTable, TypeClass},
+    types::inferred_ty::InferredTy,
     type_analysis::JangTypeAnalysis,
     typed_ast_id::{TypedAstId, TypedAstIdTable},
     types::{
-      concrete::ConcreteType,
+      ty_kind::TyKind,
       primitive::PrimitiveType,
       registry::{Ty, TypeRegistry},
       strukt::StructField,
@@ -56,7 +57,7 @@ impl<'ctx> TypeChecker<'ctx> {
     let mut checker = Self {
       types: TypeRegistry::new(ctx),
       ast_types: TypedAstIdTable::new(jang_file),
-      inference: InferenceTable::default(),
+      inference: InferenceTable::new(ctx),
       current_fn: None,
     };
 
@@ -65,7 +66,7 @@ impl<'ctx> TypeChecker<'ctx> {
 
     let mut resolved_types = TypedAstIdTable::new(jang_file);
     for (ast_id, ty) in checker.ast_types.into_iter() {
-      resolved_types.insert(ast_id, checker.inference.resolve(ty, &checker.types));
+      resolved_types.insert(ast_id, checker.inference.resolve(ty, &mut checker.types));
     }
 
     Ok(JangTypeAnalysis::new(resolved_types))
@@ -87,22 +88,22 @@ impl<'ctx> TypeChecker<'ctx> {
     expected: InferredTy<'ctx>,
     actual: InferredTy<'ctx>,
   ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
-    self.inference.unify(expected, actual, &self.types)
+    self.inference.unify(expected, actual, &mut self.types)
+  }
+
+  fn lift(&self, ty: Ty<'ctx>) -> InferredTy<'ctx> {
+    self.inference.lift_ty(ty)
   }
 
   fn check_is_bool(&mut self, actual: InferredTy<'ctx>) -> TypeCheckerResult<'ctx> {
-    self
-      .unify(
-        self.types.primitive_type(PrimitiveType::Bool).into(),
-        actual,
-      )
-      .erase_ok()
+    let bool_ty = self.lift(self.types.primitive_type(PrimitiveType::Bool));
+    self.unify(bool_ty, actual).erase_ok()
   }
 
   fn register_global_types(&mut self, jang_file: &JangFile) -> TypeCheckerResult<'ctx> {
     for fn_decl in jang_file.function_decls() {
       let fn_type = self.function_decl_type(fn_decl)?;
-      self.set_ast_type(fn_decl.name_decl().id(), fn_type.into());
+      self.set_ast_type(fn_decl.name_decl().id(), self.lift(fn_type));
     }
     Ok(())
   }
@@ -113,7 +114,7 @@ impl<'ctx> TypeChecker<'ctx> {
       .iter()
       .map(|param| {
         let ty = self.eval_type_expression(param.ty())?;
-        self.set_ast_type(param.var().id(), ty.into());
+        self.set_ast_type(param.var().id(), self.lift(ty));
         Ok(ty)
       })
       .collect_result_vec()?;
@@ -168,7 +169,7 @@ impl<'ctx> TypeChecker<'ctx> {
       .var_type()
       .map(|type_expr| -> TypeCheckerResult<'ctx, _> {
         let var_type = self.eval_type_expression(type_expr)?;
-        self.unify(var_type.into(), expr_type)
+        self.unify(self.lift(var_type), expr_type)
       })
       .transpose()?
       .unwrap_or(expr_type);
@@ -188,15 +189,15 @@ impl<'ctx> TypeChecker<'ctx> {
 
     let current_fn_type = self.inference.resolve(
       self.get_ast_type(self.current_fn.expect("Unexpected ret outside a function")),
-      &self.types,
+      &mut self.types,
     );
 
-    let ConcreteType::Function(f) = current_fn_type.deref() else {
+    let TyKind::Function(f) = current_fn_type.deref() else {
       panic!("Expected current function to have FunctionType")
     };
     let return_type = f.return_type();
 
-    self.unify(return_type.into(), expr_type).erase_ok()
+    self.unify(self.lift(return_type), expr_type).erase_ok()
   }
 
   fn check_if_statement(&mut self, s: &IfStatement) -> TypeCheckerResult<'ctx> {
@@ -245,26 +246,26 @@ impl<'ctx> TypeChecker<'ctx> {
     let rhs = self.check_expression(expr.rhs())?;
     let operand_ty = self.unify(lhs, rhs)?;
 
-    let bool_ty: InferredTy<'ctx> = self.types.primitive_type(PrimitiveType::Bool).into();
+    let bool_ty: InferredTy<'ctx> = self.lift(self.types.primitive_type(PrimitiveType::Bool));
 
     use BinaryOp::*;
     match expr.op() {
       Add | Sub | Mul | Div | Mod => {
         self
           .inference
-          .check_requirement(operand_ty, TypeClass::Numeric, &self.types)?;
+          .check_requirement(operand_ty, TypeClass::Numeric, &mut self.types)?;
         Ok(operand_ty)
       }
       Equal | NotEqual => {
         self
           .inference
-          .check_requirement(operand_ty, TypeClass::Eq, &self.types)?;
+          .check_requirement(operand_ty, TypeClass::Eq, &mut self.types)?;
         Ok(bool_ty)
       }
       GreaterThan | GreaterThanEqual | LessThan | LessThanEqual => {
         self
           .inference
-          .check_requirement(operand_ty, TypeClass::Numeric, &self.types)?;
+          .check_requirement(operand_ty, TypeClass::Numeric, &mut self.types)?;
         Ok(bool_ty)
       }
       LogicalAnd | LogicalOr => {
@@ -282,7 +283,7 @@ impl<'ctx> TypeChecker<'ctx> {
     match expr.op() {
       UnaryOp::LogicalNot => {
         self.check_is_bool(expr_type)?;
-        Ok(self.types.primitive_type(PrimitiveType::Bool).into())
+        Ok(self.lift(self.types.primitive_type(PrimitiveType::Bool)))
       }
     }
   }
@@ -292,8 +293,8 @@ impl<'ctx> TypeChecker<'ctx> {
     expr: &CallExpression,
   ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let target_type = self.check_expression(expr.target())?;
-    let target_type = self.inference.resolve(target_type, &self.types);
-    let ConcreteType::Function(f) = target_type.deref() else {
+    let target_type = self.inference.resolve(target_type, &mut self.types);
+    let TyKind::Function(f) = target_type.deref() else {
       return Err(TypeCheckerError::NotCallable {
         target: target_type,
       });
@@ -311,10 +312,10 @@ impl<'ctx> TypeChecker<'ctx> {
 
     for (arg, &param_type) in args.iter().zip(f.parameters()) {
       let arg_type = self.check_expression(arg)?;
-      self.unify(param_type.into(), arg_type)?;
+      self.unify(self.lift(param_type), arg_type)?;
     }
 
-    Ok(return_type.into())
+    Ok(self.lift(return_type))
   }
 
   fn check_dot_expression(
@@ -322,20 +323,20 @@ impl<'ctx> TypeChecker<'ctx> {
     dot_expr: &DotExpression,
   ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let base_inferred_ty = self.check_expression(dot_expr.base())?;
-    let base_ty = self.inference.resolve(base_inferred_ty, &self.types);
+    let base_ty = self.inference.resolve(base_inferred_ty, &mut self.types);
     let invalid_member_access = || TypeCheckerError::InvalidMemberAccess {
       target: base_ty,
       member: dot_expr.member().clone(),
     };
 
-    let ConcreteType::Struct(s) = base_ty.deref() else {
+    let TyKind::Struct(s) = base_ty.deref() else {
       return Err(invalid_member_access());
     };
     let Some(member_ty) = s.field_ty(dot_expr.member()) else {
       return Err(invalid_member_access());
     };
 
-    Ok(member_ty.into())
+    Ok(self.lift(member_ty))
   }
 
   fn eval_type_expression(
@@ -376,7 +377,7 @@ impl<'ctx> TypeChecker<'ctx> {
   fn eval_struct_field_type(
     &mut self,
     field: &StructuredTypeField,
-  ) -> TypeCheckerResult<'ctx, StructField<'ctx>> {
+  ) -> TypeCheckerResult<'ctx, StructField<Ty<'ctx>>> {
     Ok(StructField::new(
       field.name().clone(),
       self.eval_type_expression(field.ty())?,
@@ -414,7 +415,7 @@ mod tests {
       inference::TypeClass,
       type_analysis::JangTypeAnalysis,
       types::{
-        concrete::matchers::unit_type,
+        ty_kind::matchers::unit_type,
         function::matchers::{fn_param_types, fn_return_type},
         primitive::matchers::{bool_type, f32_type, f64_type, i32_type, i64_type},
         registry::Ty,

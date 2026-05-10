@@ -1,42 +1,33 @@
 use std::{error::Error, fmt::Display, ops::Deref};
 
-use cknittel_util::{
-  from_variants::FromVariants,
-  union_find::{UnionFind, UnionFindData, UnionFindMergeError},
-};
+use cknittel_util::union_find::{UnionFind, UnionFindData, UnionFindMergeError};
 
 use crate::type_checker::{
+  context::TypeCheckerCtx,
   error::{TypeCheckerError, TypeCheckerResult},
   types::{
-    concrete::ConcreteType,
+    function::FunctionType,
+    inferred_ty::{InferredTy, InferredTyKind, TypeVarId},
     primitive::PrimitiveType,
     registry::{Ty, TypeRegistry},
+    strukt::{StructField, StructType},
+    ty_kind::TyKind,
   },
 };
 
-/// A handle for a Ty that may be undergoing inference.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct InferredTy<'ctx>(InferredTyKind<'ctx>);
-
-/// The content of a type that may be undergoing inference.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, FromVariants)]
-enum InferredTyKind<'ctx> {
-  Ty(Ty<'ctx>),
-  Var(TypeVarId),
-}
-
-impl<'ctx> From<Ty<'ctx>> for InferredTy<'ctx> {
-  fn from(ty: Ty<'ctx>) -> Self {
-    Self(ty.into())
-  }
-}
-
-#[derive(Default)]
 pub struct InferenceTable<'ctx> {
   vars: UnionFind<TypeVar<'ctx>>,
+  ctx: &'ctx TypeCheckerCtx<'ctx>,
 }
 
 impl<'ctx> InferenceTable<'ctx> {
+  pub fn new(ctx: &'ctx TypeCheckerCtx<'ctx>) -> Self {
+    Self {
+      vars: UnionFind::default(),
+      ctx,
+    }
+  }
+
   /// Creates a new integral type variable.
   pub fn new_integral_var(&mut self) -> InferredTy<'ctx> {
     self.new_var(Constraint::Integral)
@@ -48,16 +39,55 @@ impl<'ctx> InferenceTable<'ctx> {
   }
 
   fn new_var(&mut self, constraint: Constraint) -> InferredTy<'ctx> {
-    InferredTy(TypeVarId(self.vars.add_set(TypeVar::Unbound(constraint)).id()).into())
+    let id = TypeVarId(self.vars.add_set(TypeVar::Unbound(constraint)).id());
+    InferredTy::new(self.ctx.inferred_kinds().alloc(InferredTyKind::Var(id)))
   }
 
-  pub fn resolve(&self, ty: InferredTy<'ctx>, types: &TypeRegistry<'ctx>) -> Ty<'ctx> {
-    match ty.0 {
-      InferredTyKind::Ty(ty) => ty,
-      InferredTyKind::Var(id) => match self.type_var(id) {
+  /// Lift a concrete `Ty<'ctx>` into an `InferredTy<'ctx>`.
+  pub fn lift_ty(&self, ty: Ty<'ctx>) -> InferredTy<'ctx> {
+    let kind = self.lift_ty_kind(ty.deref());
+    InferredTy::new(self.ctx.inferred_kinds().alloc(InferredTyKind::Ty(kind)))
+  }
+
+  fn lift_ty_kind(&self, kind: &TyKind<Ty<'ctx>>) -> TyKind<InferredTy<'ctx>> {
+    match kind {
+      TyKind::Unit => TyKind::Unit,
+      TyKind::Primitive(p) => TyKind::Primitive(*p),
+      TyKind::Function(f) => TyKind::Function(FunctionType::new(
+        f.parameters().iter().copied().map(|p| self.lift_ty(p)).collect(),
+        self.lift_ty(f.return_type()),
+      )),
+      TyKind::Struct(s) => TyKind::Struct(StructType::new(
+        s.fields().iter().map(|f| StructField::new(f.name().clone(), self.lift_ty(f.ty()))),
+      )),
+    }
+  }
+
+  pub fn resolve(&self, ty: InferredTy<'ctx>, types: &mut TypeRegistry<'ctx>) -> Ty<'ctx> {
+    match ty.kind() {
+      InferredTyKind::Ty(kind) => self.resolve_kind(kind, types),
+      InferredTyKind::Var(id) => match self.type_var(*id) {
         TypeVar::Bound(ty) => ty,
         TypeVar::Unbound(constraint) => constraint.default_type(types),
       },
+    }
+  }
+
+  fn resolve_kind(&self, kind: &TyKind<InferredTy<'ctx>>, types: &mut TypeRegistry<'ctx>) -> Ty<'ctx> {
+    match kind {
+      TyKind::Unit => types.unit_type(),
+      TyKind::Primitive(p) => types.primitive_type(*p),
+      TyKind::Function(f) => {
+        let params: Vec<Ty<'ctx>> = f.parameters().iter().copied().map(|p| self.resolve(p, types)).collect();
+        let ret = self.resolve(f.return_type(), types);
+        types.function_type(params, ret)
+      }
+      TyKind::Struct(s) => {
+        let fields: Vec<StructField<Ty<'ctx>>> = s.fields().iter()
+          .map(|f| StructField::new(f.name().clone(), self.resolve(f.ty(), types)))
+          .collect();
+        types.struct_type(fields)
+      }
     }
   }
 
@@ -65,39 +95,110 @@ impl<'ctx> InferenceTable<'ctx> {
     &mut self,
     expected: InferredTy<'ctx>,
     actual: InferredTy<'ctx>,
-    types: &TypeRegistry<'ctx>,
+    types: &mut TypeRegistry<'ctx>,
   ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
-    match (expected.0, actual.0) {
-      // If both are non-variadic, they must be equal.
-      (InferredTyKind::Ty(a), InferredTyKind::Ty(b)) => {
-        if a == b {
-          Ok(a.into())
-        } else {
-          Err(self.mismatch_error(expected, actual, types))
-        }
+    match (expected.kind(), actual.kind()) {
+      (InferredTyKind::Ty(k_e), InferredTyKind::Ty(k_a)) => {
+        // k_e and k_a have lifetime 'ctx (they come from the arena),
+        // so they don't borrow self — safe to mutably borrow self below.
+        let k_e: &TyKind<InferredTy<'ctx>> = k_e;
+        let k_a: &TyKind<InferredTy<'ctx>> = k_a;
+        self.unify_kinds(k_e, k_a, expected, actual, types)
       }
-
-      // If one type is variadic, it must conform to the concrete type.
-      (InferredTyKind::Ty(ty), InferredTyKind::Var(var_id))
-      | (InferredTyKind::Var(var_id), InferredTyKind::Ty(ty)) => self
-        .bind_var(var_id, ty)
-        .map(|_| ty.into())
-        .map_err(|_| self.mismatch_error(expected, actual, types)),
-
-      // If both are type variables, they must unify.
-      (InferredTyKind::Var(expected_id), InferredTyKind::Var(actual_id)) => self
-        .vars
-        .try_union(expected_id.0, actual_id.0)
-        .map(|root| InferredTy(TypeVarId(root.id()).into()))
-        .map_err(|_| self.mismatch_error(expected, actual, types)),
+      (InferredTyKind::Ty(_), InferredTyKind::Var(var_id)) => {
+        let var_id = *var_id;
+        self
+          .bind_var_to_inferred(var_id, expected, types)
+          .map(|_| expected)
+          .map_err(|_| self.mismatch_error(expected, actual, types))
+      }
+      (InferredTyKind::Var(var_id), InferredTyKind::Ty(_)) => {
+        let var_id = *var_id;
+        self
+          .bind_var_to_inferred(var_id, actual, types)
+          .map(|_| actual)
+          .map_err(|_| self.mismatch_error(expected, actual, types))
+      }
+      (InferredTyKind::Var(e_id), InferredTyKind::Var(a_id)) => {
+        let (e, a) = (*e_id, *a_id);
+        self
+          .vars
+          .try_union(e.0, a.0)
+          .map(|root| {
+            let id = TypeVarId(root.id());
+            InferredTy::new(self.ctx.inferred_kinds().alloc(InferredTyKind::Var(id)))
+          })
+          .map_err(|_| self.mismatch_error(expected, actual, types))
+      }
     }
+  }
+
+  fn unify_kinds(
+    &mut self,
+    k_e: &TyKind<InferredTy<'ctx>>,
+    k_a: &TyKind<InferredTy<'ctx>>,
+    expected: InferredTy<'ctx>,
+    actual: InferredTy<'ctx>,
+    types: &mut TypeRegistry<'ctx>,
+  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
+    match (k_e, k_a) {
+      (TyKind::Unit, TyKind::Unit) => Ok(expected),
+      (TyKind::Primitive(p_e), TyKind::Primitive(p_a)) if p_e == p_a => Ok(expected),
+      (TyKind::Function(f_e), TyKind::Function(f_a)) => {
+        if f_e.parameters().len() != f_a.parameters().len() {
+          return Err(self.mismatch_error(expected, actual, types));
+        }
+        // Collect before mutably borrowing self
+        let pairs: Vec<(InferredTy<'ctx>, InferredTy<'ctx>)> = f_e
+          .parameters()
+          .iter()
+          .copied()
+          .zip(f_a.parameters().iter().copied())
+          .collect();
+        let (ret_e, ret_a) = (f_e.return_type(), f_a.return_type());
+        for (pe, pa) in pairs {
+          self.unify(pe, pa, types)?;
+        }
+        self.unify(ret_e, ret_a, types)?;
+        Ok(expected)
+      }
+      (TyKind::Struct(s_e), TyKind::Struct(s_a)) => {
+        if s_e.fields().len() != s_a.fields().len() {
+          return Err(self.mismatch_error(expected, actual, types));
+        }
+        let pairs: Vec<(InferredTy<'ctx>, InferredTy<'ctx>, bool)> = s_e
+          .fields()
+          .iter()
+          .zip(s_a.fields().iter())
+          .map(|(fe, fa)| (fe.ty(), fa.ty(), fe.name() == fa.name()))
+          .collect();
+        for (te, ta, names_match) in pairs {
+          if !names_match {
+            return Err(self.mismatch_error(expected, actual, types));
+          }
+          self.unify(te, ta, types)?;
+        }
+        Ok(expected)
+      }
+      _ => Err(self.mismatch_error(expected, actual, types)),
+    }
+  }
+
+  fn bind_var_to_inferred(
+    &mut self,
+    var_id: TypeVarId,
+    ty: InferredTy<'ctx>,
+    types: &mut TypeRegistry<'ctx>,
+  ) -> Result<(), TypeVarMergeError> {
+    let concrete = self.resolve(ty, types);
+    self.bind_var(var_id, concrete)
   }
 
   pub fn check_requirement(
     &self,
     ty: InferredTy<'ctx>,
     requirement: TypeClass,
-    types: &TypeRegistry<'ctx>,
+    types: &mut TypeRegistry<'ctx>,
   ) -> TypeCheckerResult<'ctx> {
     self
       .type_matches_requirement(ty, requirement)
@@ -109,9 +210,9 @@ impl<'ctx> InferenceTable<'ctx> {
   }
 
   fn type_matches_requirement(&self, ty: InferredTy<'ctx>, requirement: TypeClass) -> bool {
-    match ty.0 {
-      InferredTyKind::Ty(ty) => requirement.accepts_ty(ty),
-      InferredTyKind::Var(id) => match self.type_var(id) {
+    match ty.kind() {
+      InferredTyKind::Ty(kind) => requirement.accepts_kind(kind),
+      InferredTyKind::Var(id) => match self.type_var(*id) {
         TypeVar::Bound(ty) => requirement.accepts_ty(ty),
         TypeVar::Unbound(constraint) => requirement.accepts_constraint(constraint),
       },
@@ -122,7 +223,7 @@ impl<'ctx> InferenceTable<'ctx> {
     &self,
     expected: InferredTy<'ctx>,
     actual: InferredTy<'ctx>,
-    types: &TypeRegistry<'ctx>,
+    types: &mut TypeRegistry<'ctx>,
   ) -> TypeCheckerError<'ctx> {
     TypeCheckerError::TypeMismatch {
       expected: self.resolve(expected, types),
@@ -162,10 +263,14 @@ impl Display for TypeClass {
 impl TypeClass {
   /// Whether `ty` is within this type class.
   fn accepts_ty<'ctx>(&self, ty: Ty<'ctx>) -> bool {
+    self.accepts_kind(ty.deref())
+  }
+
+  fn accepts_kind<T>(&self, kind: &TyKind<T>) -> bool {
     use PrimitiveType::*;
     match self {
-      Self::Numeric => matches!(ty.deref(), ConcreteType::Primitive(I32 | I64 | F32 | F64)),
-      Self::Eq => matches!(ty.deref(), ConcreteType::Primitive(I32 | I64 | Bool)),
+      Self::Numeric => matches!(kind, TyKind::Primitive(I32 | I64 | F32 | F64)),
+      Self::Eq => matches!(kind, TyKind::Primitive(I32 | I64 | Bool)),
     }
   }
 
@@ -179,11 +284,6 @@ impl TypeClass {
   }
 }
 
-/// An ID for a type variable.
-/// This is an ID of a node in the [`InferenceTable`]'s [`UnionFind`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct TypeVarId(usize);
-
 /// A variable for a type that may change over time during inference.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TypeVar<'ctx> {
@@ -194,9 +294,8 @@ enum TypeVar<'ctx> {
 impl<'ctx> TypeVar<'ctx> {
   /// Whether `self` can be narrowed to `other`.
   fn narrows_to(&self, other: &Self) -> bool {
-    use ConcreteType::*;
-    use Constraint::*;
     use PrimitiveType::*;
+    use Constraint::*;
     use TypeVar::*;
 
     let (Unbound(this), Bound(other)) = (self, other) else {
@@ -205,7 +304,7 @@ impl<'ctx> TypeVar<'ctx> {
 
     matches!(
       (this, other.deref()),
-      (Floating, Primitive(F32 | F64)) | (Integral, Primitive(I32 | I64))
+      (Floating, TyKind::Primitive(F32 | F64)) | (Integral, TyKind::Primitive(I32 | I64))
     )
   }
 }
@@ -268,42 +367,42 @@ mod tests {
   #[gtest]
   fn unresolved_numeric_vars_resolve_to_default_types() {
     let ctx = TypeCheckerCtx::default();
-    let types = TypeRegistry::new(&ctx);
-    let mut inference = InferenceTable::default();
+    let mut types = TypeRegistry::new(&ctx);
+    let mut inference = InferenceTable::new(&ctx);
 
     let integral = inference.new_integral_var();
     let floating = inference.new_floating_var();
 
-    expect_that!(&inference.resolve(integral, &types), i32_type());
-    expect_that!(&inference.resolve(floating, &types), f32_type());
+    expect_that!(&inference.resolve(integral, &mut types), i32_type());
+    expect_that!(&inference.resolve(floating, &mut types), f32_type());
   }
 
   #[gtest]
   fn unify_works_across_multiple_variables() {
     let ctx = TypeCheckerCtx::default();
-    let types = TypeRegistry::new(&ctx);
-    let mut inference = InferenceTable::default();
+    let mut types = TypeRegistry::new(&ctx);
+    let mut inference = InferenceTable::new(&ctx);
 
     let var0 = inference.new_integral_var();
     let var1 = inference.new_integral_var();
-    let i64_ty = InferredTy::from(types.primitive_type(PrimitiveType::I64));
-    inference.unify(var0, var1, &types).unwrap();
-    inference.unify(var1, i64_ty, &types).unwrap();
+    let i64_ty = inference.lift_ty(types.primitive_type(PrimitiveType::I64));
+    inference.unify(var0, var1, &mut types).unwrap();
+    inference.unify(var1, i64_ty, &mut types).unwrap();
 
-    expect_that!(&inference.resolve(var0, &types), i64_type());
+    expect_that!(&inference.resolve(var0, &mut types), i64_type());
   }
 
   #[gtest]
   fn unify_rejects_incompatible_bound_types() {
     let ctx = TypeCheckerCtx::default();
-    let types = TypeRegistry::new(&ctx);
-    let mut inference = InferenceTable::default();
+    let mut types = TypeRegistry::new(&ctx);
+    let mut inference = InferenceTable::new(&ctx);
 
-    let i32 = InferredTy::from(types.primitive_type(PrimitiveType::I32));
-    let bool = InferredTy::from(types.primitive_type(PrimitiveType::Bool));
+    let i32 = inference.lift_ty(types.primitive_type(PrimitiveType::I32));
+    let bool = inference.lift_ty(types.primitive_type(PrimitiveType::Bool));
 
     expect_that!(
-      inference.unify(i32, bool, &types),
+      inference.unify(i32, bool, &mut types),
       err(type_mismatch_error(i32_type(), bool_type()))
     );
   }
@@ -311,14 +410,14 @@ mod tests {
   #[gtest]
   fn unify_rejects_incompatible_variables() {
     let ctx = TypeCheckerCtx::default();
-    let types = TypeRegistry::new(&ctx);
-    let mut inference = InferenceTable::default();
+    let mut types = TypeRegistry::new(&ctx);
+    let mut inference = InferenceTable::new(&ctx);
 
     let integral_var = inference.new_integral_var();
     let floating_var = inference.new_floating_var();
 
     expect_that!(
-      inference.unify(integral_var, floating_var, &types),
+      inference.unify(integral_var, floating_var, &mut types),
       err(type_mismatch_error(i32_type(), f32_type()))
     );
   }
@@ -326,14 +425,14 @@ mod tests {
   #[gtest]
   fn unify_rejects_incompatible_numeric_constraint() {
     let ctx = TypeCheckerCtx::default();
-    let types = TypeRegistry::new(&ctx);
-    let mut inference = InferenceTable::default();
+    let mut types = TypeRegistry::new(&ctx);
+    let mut inference = InferenceTable::new(&ctx);
 
     let integral = inference.new_integral_var();
-    let f64 = InferredTy::from(types.primitive_type(PrimitiveType::F64));
+    let f64 = inference.lift_ty(types.primitive_type(PrimitiveType::F64));
 
     expect_that!(
-      inference.unify(integral, f64, &types),
+      inference.unify(integral, f64, &mut types),
       err(type_mismatch_error(i32_type(), f64_type()))
     );
   }

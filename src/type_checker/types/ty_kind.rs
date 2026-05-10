@@ -5,14 +5,14 @@ use crate::type_checker::types::{
 };
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ConcreteType<'ctx> {
+pub enum TyKind<Ty> {
   Unit,
-  Function(FunctionType<'ctx>),
+  Function(FunctionType<Ty>),
   Primitive(PrimitiveType),
-  Struct(StructType<'ctx>),
+  Struct(StructType<Ty>),
 }
 
-impl<'ctx> Display for ConcreteType<'ctx> {
+impl<Ty: Display> Display for TyKind<Ty> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Self::Unit => f.write_str("unit"),
@@ -27,31 +27,31 @@ impl<'ctx> Display for ConcreteType<'ctx> {
 pub(crate) mod matchers {
   use super::*;
   use crate::type_checker::types::{
-    concrete::ConcreteType,
     registry::{Ty, matchers::ty},
     strukt::StructType,
+    ty_kind::TyKind,
   };
   use googletest::prelude::*;
 
   pub fn concrete_primitive_type<'a>(
     primitive_matcher: impl Matcher<&'a PrimitiveType>,
   ) -> impl Matcher<&'a Ty<'a>> {
-    ty(pat!(ConcreteType::Primitive(primitive_matcher)))
+    ty(pat!(TyKind::Primitive(primitive_matcher)))
   }
 
   pub fn concrete_fn_type<'a>(
-    function_matcher: impl Matcher<&'a FunctionType<'a>>,
+    function_matcher: impl Matcher<&'a FunctionType<Ty<'a>>>,
   ) -> impl Matcher<&'a Ty<'a>> {
-    ty(pat!(ConcreteType::Function(function_matcher)))
+    ty(pat!(TyKind::Function(function_matcher)))
   }
 
   pub fn unit_type<'a>() -> impl Matcher<&'a Ty<'a>> {
-    ty(pat!(ConcreteType::Unit))
+    ty(pat!(TyKind::Unit))
   }
 
   pub fn struct_type<'a>(
-    struct_matcher: impl Matcher<&'a StructType<'a>>,
+    struct_matcher: impl Matcher<&'a StructType<Ty<'a>>>,
   ) -> impl Matcher<&'a Ty<'a>> {
-    ty(pat!(ConcreteType::Struct(struct_matcher)))
+    ty(pat!(TyKind::Struct(struct_matcher)))
   }
 }
