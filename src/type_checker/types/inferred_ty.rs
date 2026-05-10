@@ -20,7 +20,7 @@ impl<'ctx> InferredTy<'ctx> {
 pub enum InferredTyKind<'ctx> {
   /// A compound type whose sub-components may themselves be type variables.
   InferredTy(TyKind<InferredTy<'ctx>>),
-  /// A fully concrete type. Lifting a [`Ty`] costs one arena allocation with no recursion.
+  /// A fully concrete type.
   Ty(Ty<'ctx>),
   /// A type variable.
   Var(TypeVarId),

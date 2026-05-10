@@ -6,10 +6,11 @@ use crate::type_checker::{
   context::TypeCheckerCtx,
   error::{TypeCheckerError, TypeCheckerResult},
   types::{
+    function::FunctionType,
     inferred_ty::{InferredTy, InferredTyKind, TypeVarId},
     primitive::PrimitiveType,
     registry::{Ty, TypeRegistry},
-    strukt::StructField,
+    strukt::{StructField, StructType},
     ty_kind::TyKind,
   },
 };
@@ -45,6 +46,21 @@ impl<'ctx> InferenceTable<'ctx> {
   /// Lift a concrete `Ty<'ctx>` into an `InferredTy<'ctx>`. Costs one arena allocation.
   pub fn lift_ty(&self, ty: Ty<'ctx>) -> InferredTy<'ctx> {
     InferredTy::new(self.ctx.inferred_kinds().alloc(InferredTyKind::Ty(ty)))
+  }
+
+  /// Shallowly convert a `TyKind<Ty>` into a `TyKind<InferredTy>` by lifting each child `Ty`.
+  fn lift_kind(&self, kind: &TyKind<Ty<'ctx>>) -> TyKind<InferredTy<'ctx>> {
+    match kind {
+      TyKind::Unit => TyKind::Unit,
+      TyKind::Primitive(p) => TyKind::Primitive(*p),
+      TyKind::Function(f) => TyKind::Function(FunctionType::new(
+        f.parameters().iter().copied().map(|p| self.lift_ty(p)).collect(),
+        self.lift_ty(f.return_type()),
+      )),
+      TyKind::Struct(s) => TyKind::Struct(StructType::new(
+        s.fields().iter().map(|f| StructField::new(f.name().clone(), self.lift_ty(f.ty()))),
+      )),
+    }
   }
 
   pub fn resolve(&self, ty: InferredTy<'ctx>, types: &mut TypeRegistry<'ctx>) -> Ty<'ctx> {
@@ -110,14 +126,14 @@ impl<'ctx> InferenceTable<'ctx> {
         self.unify_kinds(k_e, k_a, expected, actual, types)
       }
 
-      // One concrete, one compound — expand the concrete side lazily.
+      // One concrete, one compound — lift the concrete side and recurse into sub-components.
       (InferredTyKind::Ty(ty), InferredTyKind::InferredTy(k)) => {
-        let (ty, k) = (*ty, k);
-        self.unify_concrete_with_kind(ty, k, actual, types)
+        let lifted = self.lift_kind(ty.deref());
+        self.unify_kinds(&lifted, k, expected, actual, types)
       }
       (InferredTyKind::InferredTy(k), InferredTyKind::Ty(ty)) => {
-        let (k, ty) = (k, *ty);
-        self.unify_concrete_with_kind(ty, k, expected, types)
+        let lifted = self.lift_kind(ty.deref());
+        self.unify_kinds(k, &lifted, expected, actual, types)
       }
 
       // Var vs var — union-find merge.
@@ -148,58 +164,6 @@ impl<'ctx> InferenceTable<'ctx> {
           .map(|_| actual)
           .map_err(|_| self.mismatch_error(expected, actual, types))
       }
-    }
-  }
-
-  /// Unify a concrete `Ty` with a compound inferred `TyKind` by expanding the concrete
-  /// side one level and recursively unifying each sub-component.
-  fn unify_concrete_with_kind(
-    &mut self,
-    ty: Ty<'ctx>,
-    kind: &TyKind<InferredTy<'ctx>>,
-    representative: InferredTy<'ctx>,
-    types: &mut TypeRegistry<'ctx>,
-  ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
-    match (ty.deref(), kind) {
-      (TyKind::Unit, TyKind::Unit) => Ok(representative),
-      (TyKind::Primitive(p1), TyKind::Primitive(p2)) if p1 == p2 => Ok(representative),
-      (TyKind::Function(f_ty), TyKind::Function(f_inf)) => {
-        if f_ty.parameters().len() != f_inf.parameters().len() {
-          return Err(TypeCheckerError::ArityMismatch {
-            expected: f_ty.parameters().len(),
-            actual: f_inf.parameters().len(),
-          });
-        }
-        let pairs: Vec<(InferredTy<'ctx>, InferredTy<'ctx>)> = f_ty
-          .parameters()
-          .iter()
-          .copied()
-          .map(|p| self.lift_ty(p))
-          .zip(f_inf.parameters().iter().copied())
-          .collect();
-        let (ret_ty, ret_inf) = (self.lift_ty(f_ty.return_type()), f_inf.return_type());
-        for (pe, pa) in pairs {
-          self.unify(pe, pa, types)?;
-        }
-        self.unify(ret_ty, ret_inf, types)?;
-        Ok(representative)
-      }
-      (TyKind::Struct(s_ty), TyKind::Struct(s_inf)) => {
-        if s_ty.fields().len() != s_inf.fields().len() {
-          return Err(self.mismatch_error(self.lift_ty(ty), representative, types));
-        }
-        // Fields are sorted, so just zip and check their types.
-        let pairs = s_ty.fields().iter().zip(s_inf.fields().iter());
-        for (f0, f1) in pairs {
-          if f0.name() != f1.name() {
-            return Err(self.mismatch_error(self.lift_ty(ty), representative, types));
-          }
-          let f0_ty = self.lift_ty(f0.ty());
-          self.unify(f0_ty, f1.ty(), types)?;
-        }
-        Ok(representative)
-      }
-      _ => Err(self.mismatch_error(self.lift_ty(ty), representative, types)),
     }
   }
 
@@ -236,17 +200,11 @@ impl<'ctx> InferenceTable<'ctx> {
         if s_e.fields().len() != s_a.fields().len() {
           return Err(self.mismatch_error(expected, actual, types));
         }
-        let pairs: Vec<(InferredTy<'ctx>, InferredTy<'ctx>, bool)> = s_e
-          .fields()
-          .iter()
-          .zip(s_a.fields().iter())
-          .map(|(fe, fa)| (fe.ty(), fa.ty(), fe.name() == fa.name()))
-          .collect();
-        for (te, ta, names_match) in pairs {
-          if !names_match {
+        for (fe, fa) in s_e.fields().iter().zip(s_a.fields().iter()) {
+          if fe.name() != fa.name() {
             return Err(self.mismatch_error(expected, actual, types));
           }
-          self.unify(te, ta, types)?;
+          self.unify(fe.ty(), fa.ty(), types)?;
         }
         Ok(expected)
       }
