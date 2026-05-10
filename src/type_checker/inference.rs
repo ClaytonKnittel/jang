@@ -66,7 +66,7 @@ impl<'ctx> InferenceTable<'ctx> {
   pub fn resolve(&self, ty: InferredTy<'ctx>, types: &mut TypeRegistry<'ctx>) -> Ty<'ctx> {
     match ty.kind() {
       InferredTyKind::Ty(ty) => *ty,
-      InferredTyKind::InferredTy(kind) => self.resolve_kind(kind, types),
+      InferredTyKind::Compound(kind) => self.resolve_kind(kind, types),
       InferredTyKind::Var(id) => match self.type_var(*id) {
         TypeVar::Bound(ty) => ty,
         TypeVar::Unbound(constraint) => constraint.default_type(types),
@@ -121,17 +121,17 @@ impl<'ctx> InferenceTable<'ctx> {
 
       // Both compound inferred — recurse into sub-components.
       // k_e / k_a are 'ctx arena refs and don't borrow self.
-      (InferredTyKind::InferredTy(k_e), InferredTyKind::InferredTy(k_a)) => {
+      (InferredTyKind::Compound(k_e), InferredTyKind::Compound(k_a)) => {
         let (k_e, k_a): (&TyKind<InferredTy<'ctx>>, &TyKind<InferredTy<'ctx>>) = (k_e, k_a);
         self.unify_kinds(k_e, k_a, expected, actual, types)
       }
 
       // One concrete, one compound — lift the concrete side and recurse into sub-components.
-      (InferredTyKind::Ty(ty), InferredTyKind::InferredTy(k)) => {
+      (InferredTyKind::Ty(ty), InferredTyKind::Compound(k)) => {
         let lifted = self.lift_kind(ty.deref());
         self.unify_kinds(&lifted, k, expected, actual, types)
       }
-      (InferredTyKind::InferredTy(k), InferredTyKind::Ty(ty)) => {
+      (InferredTyKind::Compound(k), InferredTyKind::Ty(ty)) => {
         let lifted = self.lift_kind(ty.deref());
         self.unify_kinds(k, &lifted, expected, actual, types)
       }
@@ -150,14 +150,14 @@ impl<'ctx> InferenceTable<'ctx> {
       }
 
       // Non-var vs var — bind the var.
-      (InferredTyKind::Ty(_) | InferredTyKind::InferredTy(_), InferredTyKind::Var(var_id)) => {
+      (InferredTyKind::Ty(_) | InferredTyKind::Compound(_), InferredTyKind::Var(var_id)) => {
         let var_id = *var_id;
         self
           .bind_var_to_inferred(var_id, expected, types)
           .map(|_| expected)
           .map_err(|_| self.mismatch_error(expected, actual, types))
       }
-      (InferredTyKind::Var(var_id), InferredTyKind::Ty(_) | InferredTyKind::InferredTy(_)) => {
+      (InferredTyKind::Var(var_id), InferredTyKind::Ty(_) | InferredTyKind::Compound(_)) => {
         let var_id = *var_id;
         self
           .bind_var_to_inferred(var_id, actual, types)
@@ -240,7 +240,7 @@ impl<'ctx> InferenceTable<'ctx> {
   fn type_matches_requirement(&self, ty: InferredTy<'ctx>, requirement: TypeClass) -> bool {
     match ty.kind() {
       InferredTyKind::Ty(ty) => requirement.accepts_ty(*ty),
-      InferredTyKind::InferredTy(kind) => requirement.accepts_kind(kind),
+      InferredTyKind::Compound(kind) => requirement.accepts_kind(kind),
       InferredTyKind::Var(id) => match self.type_var(*id) {
         TypeVar::Bound(ty) => requirement.accepts_ty(ty),
         TypeVar::Unbound(constraint) => requirement.accepts_constraint(constraint),
@@ -417,7 +417,7 @@ mod tests {
       inference
         .ctx
         .inferred_kinds()
-        .alloc(InferredTyKind::InferredTy(TyKind::Function(
+        .alloc(InferredTyKind::Compound(TyKind::Function(
           FunctionType::new(params, return_type),
         ))),
     )
@@ -431,7 +431,7 @@ mod tests {
       inference
         .ctx
         .inferred_kinds()
-        .alloc(InferredTyKind::InferredTy(TyKind::Struct(StructType::new(
+        .alloc(InferredTyKind::Compound(TyKind::Struct(StructType::new(
           fields,
         )))),
     )
@@ -605,7 +605,7 @@ mod tests {
 
   #[gtest]
   fn concrete_fn_unifies_with_inferred_fn_and_binds_vars() {
-    // Exercises unify_concrete_with_kind: Ty(fn_ty) vs InferredTy(Function([var], var)).
+    // Exercises unify_concrete_with_kind: Ty(fn_ty) vs Compound(Function([var], var)).
     let ctx = TypeCheckerCtx::default();
     let mut types = TypeRegistry::new(&ctx);
     let mut inference = InferenceTable::new(&ctx);

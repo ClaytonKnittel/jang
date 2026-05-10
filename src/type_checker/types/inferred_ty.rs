@@ -19,7 +19,7 @@ impl<'ctx> InferredTy<'ctx> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InferredTyKind<'ctx> {
   /// A compound type whose sub-components may themselves be type variables.
-  InferredTy(TyKind<InferredTy<'ctx>>),
+  Compound(TyKind<InferredTy<'ctx>>),
   /// A fully concrete type.
   Ty(Ty<'ctx>),
   /// A type variable.
