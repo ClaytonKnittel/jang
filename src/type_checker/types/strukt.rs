@@ -57,7 +57,7 @@ impl<'ctx> Display for StructType<'ctx> {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::type_checker::types::concrete::matchers::struct_type;
+  use crate::type_checker::types::ty_kind::matchers::struct_type;
 
   use super::*;
   use googletest::prelude::*;

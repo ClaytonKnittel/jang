@@ -8,7 +8,7 @@ use cknittel_util::{
 use crate::type_checker::{
   error::{TypeCheckerError, TypeCheckerResult},
   types::{
-    concrete::TyKind,
+    ty_kind::TyKind,
     primitive::PrimitiveType,
     registry::{Ty, TypeRegistry},
   },

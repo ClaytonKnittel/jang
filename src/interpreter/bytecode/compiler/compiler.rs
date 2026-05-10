@@ -45,7 +45,7 @@ use crate::{
   },
   type_checker::{
     type_analysis::JangTypeAnalysis,
-    types::{concrete::TyKind, primitive::PrimitiveType},
+    types::{primitive::PrimitiveType, ty_kind::TyKind},
   },
 };
 

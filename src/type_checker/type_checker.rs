@@ -33,7 +33,7 @@ use crate::{
     type_analysis::JangTypeAnalysis,
     typed_ast_id::{TypedAstId, TypedAstIdTable},
     types::{
-      concrete::TyKind,
+      ty_kind::TyKind,
       primitive::PrimitiveType,
       registry::{Ty, TypeRegistry},
       strukt::StructField,
@@ -414,7 +414,7 @@ mod tests {
       inference::TypeClass,
       type_analysis::JangTypeAnalysis,
       types::{
-        concrete::matchers::unit_type,
+        ty_kind::matchers::unit_type,
         function::matchers::{fn_param_types, fn_return_type},
         primitive::matchers::{bool_type, f32_type, f64_type, i32_type, i64_type},
         registry::Ty,

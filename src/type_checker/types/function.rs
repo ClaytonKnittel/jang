@@ -39,7 +39,7 @@ impl<'ctx> Display for FunctionType<'ctx> {
 #[cfg(test)]
 pub(crate) mod matchers {
   use super::*;
-  use crate::type_checker::types::concrete::matchers::concrete_fn_type;
+  use crate::type_checker::types::ty_kind::matchers::concrete_fn_type;
   use googletest::prelude::*;
 
   pub fn fn_param_types<'a>(params: impl Matcher<&'a [Ty<'a>]>) -> impl Matcher<&'a Ty<'a>> {

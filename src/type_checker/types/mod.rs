@@ -1,4 +1,4 @@
-pub mod concrete;
+pub mod ty_kind;
 pub mod function;
 pub mod primitive;
 pub mod registry;

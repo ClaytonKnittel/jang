@@ -1,4 +1,4 @@
-use crate::{adt::arena::Arena, type_checker::types::concrete::TyKind};
+use crate::{adt::arena::Arena, type_checker::types::ty_kind::TyKind};
 
 /// Context needed for a type checking pass.
 #[derive(Default)]

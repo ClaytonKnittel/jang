@@ -10,10 +10,10 @@ use enum_map::EnumMap;
 use crate::type_checker::{
   context::TypeCheckerCtx,
   types::{
-    concrete::TyKind,
     function::FunctionType,
     primitive::PrimitiveType,
     strukt::{StructField, StructType},
+    ty_kind::TyKind,
   },
 };
 
@@ -104,9 +104,7 @@ impl<'ctx> TypeRegistry<'ctx> {
   /// Adds a struct type to the registry and returns its handle,
   /// deduplicating if the function already exists.
   pub fn struct_type(&mut self, fields: impl IntoIterator<Item = StructField<'ctx>>) -> Ty<'ctx> {
-    self
-      .type_set
-      .add(TyKind::Struct(StructType::new(fields)))
+    self.type_set.add(TyKind::Struct(StructType::new(fields)))
   }
 }
 
