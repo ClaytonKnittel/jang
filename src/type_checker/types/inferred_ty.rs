@@ -1,4 +1,4 @@
-use crate::type_checker::types::ty_kind::TyKind;
+use crate::type_checker::types::{registry::Ty, ty_kind::TyKind};
 
 /// A type that may be undergoing inference — it can be a concrete compound
 /// type whose sub-components may themselves be type variables.
@@ -18,8 +18,10 @@ impl<'ctx> InferredTy<'ctx> {
 /// The content of an [`InferredTy`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum InferredTyKind<'ctx> {
-  /// A compound type; inner references can be type variables.
-  Ty(TyKind<InferredTy<'ctx>>),
+  /// A compound type whose sub-components may themselves be type variables.
+  InferredTy(TyKind<InferredTy<'ctx>>),
+  /// A fully concrete type. Lifting a [`Ty`] costs one arena allocation with no recursion.
+  Ty(Ty<'ctx>),
   /// A type variable.
   Var(TypeVarId),
 }
