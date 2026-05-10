@@ -8,7 +8,7 @@ use cknittel_util::{
 use crate::type_checker::{
   error::{TypeCheckerError, TypeCheckerResult},
   types::{
-    concrete::ConcreteType,
+    concrete::TyKind,
     primitive::PrimitiveType,
     registry::{Ty, TypeRegistry},
   },
@@ -164,8 +164,8 @@ impl TypeClass {
   fn accepts_ty<'ctx>(&self, ty: Ty<'ctx>) -> bool {
     use PrimitiveType::*;
     match self {
-      Self::Numeric => matches!(ty.deref(), ConcreteType::Primitive(I32 | I64 | F32 | F64)),
-      Self::Eq => matches!(ty.deref(), ConcreteType::Primitive(I32 | I64 | Bool)),
+      Self::Numeric => matches!(ty.deref(), TyKind::Primitive(I32 | I64 | F32 | F64)),
+      Self::Eq => matches!(ty.deref(), TyKind::Primitive(I32 | I64 | Bool)),
     }
   }
 
@@ -194,9 +194,9 @@ enum TypeVar<'ctx> {
 impl<'ctx> TypeVar<'ctx> {
   /// Whether `self` can be narrowed to `other`.
   fn narrows_to(&self, other: &Self) -> bool {
-    use ConcreteType::*;
     use Constraint::*;
     use PrimitiveType::*;
+    use TyKind::*;
     use TypeVar::*;
 
     let (Unbound(this), Bound(other)) = (self, other) else {
