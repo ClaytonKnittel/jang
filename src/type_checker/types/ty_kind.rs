@@ -27,9 +27,9 @@ impl<'ctx> Display for TyKind<'ctx> {
 pub(crate) mod matchers {
   use super::*;
   use crate::type_checker::types::{
-    ty_kind::TyKind,
     registry::{Ty, matchers::ty},
     strukt::StructType,
+    ty_kind::TyKind,
   };
   use googletest::prelude::*;
 

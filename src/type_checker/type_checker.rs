@@ -33,10 +33,10 @@ use crate::{
     type_analysis::JangTypeAnalysis,
     typed_ast_id::{TypedAstId, TypedAstIdTable},
     types::{
-      ty_kind::TyKind,
       primitive::PrimitiveType,
       registry::{Ty, TypeRegistry},
       strukt::StructField,
+      ty_kind::TyKind,
     },
   },
 };
@@ -414,11 +414,11 @@ mod tests {
       inference::TypeClass,
       type_analysis::JangTypeAnalysis,
       types::{
-        ty_kind::matchers::unit_type,
         function::matchers::{fn_param_types, fn_return_type},
         primitive::matchers::{bool_type, f32_type, f64_type, i32_type, i64_type},
         registry::Ty,
         strukt::matchers::{struct_field, struct_fields},
+        ty_kind::matchers::unit_type,
       },
     },
   };
