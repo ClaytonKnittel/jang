@@ -58,7 +58,7 @@ impl PrimitiveType {
 
 #[cfg(test)]
 pub(crate) mod matchers {
-  use crate::type_checker::types::{registry::Ty, ty_kind::matchers::concrete_primitive_type};
+  use crate::type_checker::types::{registry::Ty, ty_term::matchers::concrete_primitive_type};
 
   use super::*;
   use googletest::prelude::*;

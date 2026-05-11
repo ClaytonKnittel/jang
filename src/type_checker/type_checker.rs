@@ -36,7 +36,7 @@ use crate::{
       primitive::PrimitiveType,
       registry::{Ty, TypeRegistry},
       strukt::StructField,
-      ty_kind::TyKind,
+      ty_term::TyTerm,
     },
   },
 };
@@ -191,7 +191,7 @@ impl<'ctx> TypeChecker<'ctx> {
       &self.types,
     );
 
-    let TyKind::Function(f) = current_fn_type.deref() else {
+    let TyTerm::Function(f) = current_fn_type.deref() else {
       panic!("Expected current function to have FunctionType")
     };
     let return_type = f.return_type();
@@ -293,7 +293,7 @@ impl<'ctx> TypeChecker<'ctx> {
   ) -> TypeCheckerResult<'ctx, InferredTy<'ctx>> {
     let target_type = self.check_expression(expr.target())?;
     let target_type = self.inference.resolve(target_type, &self.types);
-    let TyKind::Function(f) = target_type.deref() else {
+    let TyTerm::Function(f) = target_type.deref() else {
       return Err(TypeCheckerError::NotCallable {
         target: target_type,
       });
@@ -328,7 +328,7 @@ impl<'ctx> TypeChecker<'ctx> {
       member: dot_expr.member().clone(),
     };
 
-    let TyKind::Struct(s) = base_ty.deref() else {
+    let TyTerm::Struct(s) = base_ty.deref() else {
       return Err(invalid_member_access());
     };
     let Some(member_ty) = s.field_ty(dot_expr.member()) else {
@@ -418,7 +418,7 @@ mod tests {
         primitive::matchers::{bool_type, f32_type, f64_type, i32_type, i64_type},
         registry::Ty,
         strukt::matchers::{struct_field, struct_fields},
-        ty_kind::matchers::unit_type,
+        ty_term::matchers::unit_type,
       },
     },
   };

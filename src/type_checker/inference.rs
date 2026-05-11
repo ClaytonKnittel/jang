@@ -10,7 +10,7 @@ use crate::type_checker::{
   types::{
     primitive::PrimitiveType,
     registry::{Ty, TypeRegistry},
-    ty_kind::TyKind,
+    ty_term::TyTerm,
   },
 };
 
@@ -164,8 +164,8 @@ impl TypeClass {
   fn accepts_ty<'ctx>(&self, ty: Ty<'ctx>) -> bool {
     use PrimitiveType::*;
     match self {
-      Self::Numeric => matches!(ty.deref(), TyKind::Primitive(I32 | I64 | F32 | F64)),
-      Self::Eq => matches!(ty.deref(), TyKind::Primitive(I32 | I64 | Bool)),
+      Self::Numeric => matches!(ty.deref(), TyTerm::Primitive(I32 | I64 | F32 | F64)),
+      Self::Eq => matches!(ty.deref(), TyTerm::Primitive(I32 | I64 | Bool)),
     }
   }
 
@@ -196,7 +196,7 @@ impl<'ctx> TypeVar<'ctx> {
   fn narrows_to(&self, other: &Self) -> bool {
     use Constraint::*;
     use PrimitiveType::*;
-    use TyKind::*;
+    use TyTerm::*;
     use TypeVar::*;
 
     let (Unbound(this), Bound(other)) = (self, other) else {
