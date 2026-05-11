@@ -45,7 +45,7 @@ use crate::{
   },
   type_checker::{
     type_analysis::JangTypeAnalysis,
-    types::{concrete::ConcreteType, primitive::PrimitiveType},
+    types::{primitive::PrimitiveType, ty_term::TyTerm},
   },
 };
 
@@ -356,7 +356,7 @@ impl<'a, 'ty> OpenCursor<'a, 'ty> {
     expr: &'a LiteralExpression,
   ) -> InterpreterResult<Self> {
     let ty = self.types.get(id);
-    let ConcreteType::Primitive(ty) = ty.deref() else {
+    let TyTerm::Primitive(ty) = ty.deref() else {
       panic!("Literals must be primitive type")
     };
 
